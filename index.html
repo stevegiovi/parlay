@@ -831,9 +831,10 @@ const SupabaseDB = (() => {
     return data;
   }
 
-  function getCoupleId() { return _coupleRow?.id || null; }
-  function getMyRole()   { return _myRole; }
-  function getMyUserId() { return _myUserId; }
+  function getCoupleId()  { return _coupleRow?.id || null; }
+  function getMyRole()    { return _myRole; }
+  function getMyUserId()  { return _myUserId; }
+  function getMyEmail()   { return _session?.user?.email || ''; }
 
   function getPartnerUserId() {
     if (!_coupleRow) return null;
@@ -843,7 +844,9 @@ const SupabaseDB = (() => {
   // ── Profile ───────────────────────────────────────────────
   async function saveProfile(updates) {
     if (!configured || !_session) return;
-    await sb.from('profiles').upsert({ id: _myUserId, ...updates });
+    // Always persist email alongside profile so partner can display it
+    const email = _session.user?.email || '';
+    await sb.from('profiles').upsert({ id: _myUserId, email, ...updates });
   }
 
   async function loadProfile(userId) {
@@ -1040,8 +1043,26 @@ const SupabaseDB = (() => {
     const couple = await loadCouple();
 
     if (couple) {
+      // Load partner's profile so home banner + setup show correct name/email
+      const partnerId = getPartnerUserId();
+      if (partnerId) {
+        const partnerProfile = await loadProfile(partnerId);
+        if (partnerProfile) {
+          State.set('partner', {
+            ...State.get('partner'),
+            name:      partnerProfile.name  || State.get('partner')?.name || '',
+            email:     partnerProfile.email || '',
+            connected: true,
+          });
+        }
+      }
       await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
       subscribeToCouple();
+    }
+
+    // Also persist our own email in case it wasn't saved yet
+    if (_session?.user?.email) {
+      sb.from('profiles').upsert({ id: _myUserId, email: _session.user.email }).catch(() => {});
     }
 
     if (profile?.name) State.set('onboarded', true);
@@ -1243,7 +1264,7 @@ const SupabaseDB = (() => {
     isReady,
     initAuthListener: _initAuthListener,
     signUp, signIn, signOut, signInWithGoogle, getSession,
-    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getPartnerUserId,
+    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getMyEmail, getPartnerUserId,
     saveProfile, loadProfile,
     saveCommSelf, saveCommReadOfPartner, loadCommPrefs,
     saveFamilyMember, deleteFamilyMember, loadFamily,
@@ -2555,9 +2576,10 @@ Router.register('home', () => {
               ${U.initials(partner.name || '?')}
             </div>
           </div>
-          <div class="partner-info">
-            <div class="partner-names">${user.name || 'You'} & ${partner.name || 'Partner'}</div>
-            <div class="partner-status">${partner.connected ? '🟢 Connected' : '⏳ Awaiting partner'}</div>
+          <div class="partner-info" style="flex:1;min-width:0;">
+            <div class="partner-names">${user.name || 'You'} &amp; ${partner.name || 'Partner'}</div>
+            <div class="partner-status" style="font-size:.68rem;">${partner.connected ? '🟢 Connected' : '⏳ Awaiting partner'}</div>
+            ${SupabaseDB.configured ? `<div style="font-size:.62rem;color:rgba(250,246,241,.3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${SupabaseDB.getMyEmail?.() || ''}</div>` : ''}
           </div>
           <div class="partner-streak">
             <div class="streak-num">${streak}</div>
@@ -5059,17 +5081,31 @@ Router.register('setup', () => {
         const appUrl = 'https://stevegiovi.github.io/parlay/';
         const magicLink = appUrl + '?invite=' + code;
         if (isConnected) {
-          const connectedLabel = isSpouse1 ? `${themName} is connected` : `Connected with ${themName}`;
-          const connectedSub   = isSpouse1
-            ? 'Both accounts are linked. Parlay is fully active.'
-            : `Your account is linked to ${themName}. Parlay is fully active.`;
+          const myEmail   = SupabaseDB.getMyEmail?.() || '';
+          const themEmail = State.get('partner')?.email || '';
           return `
           <div style="background:rgba(122,158,138,.1);border:1.5px solid rgba(122,158,138,.35);border-radius:16px;padding:16px 18px;margin-bottom:4px;">
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
               <div style="font-size:1.4rem;">🟢</div>
               <div>
-                <div style="font-size:.82rem;font-weight:700;color:var(--espresso);">${connectedLabel}</div>
-                <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">${connectedSub}</div>
+                <div style="font-size:.82rem;font-weight:700;color:var(--espresso);">Both accounts connected</div>
+                <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">Parlay is fully active for both of you.</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.6);border-radius:10px;">
+                <div style="width:30px;height:30px;border-radius:50%;background:#3d2510;color:var(--amber);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0;">${myName.charAt(0).toUpperCase()}</div>
+                <div style="min-width:0;">
+                  <div style="font-size:.8rem;font-weight:700;color:var(--espresso);">${myName} <span style="font-size:.65rem;font-weight:400;color:var(--sage);">· You</span></div>
+                  ${myEmail ? `<div style="font-size:.68rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${myEmail}</div>` : ''}
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.6);border-radius:10px;">
+                <div style="width:30px;height:30px;border-radius:50%;background:#1a2d24;color:#7A9E8A;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0;">${themName.charAt(0).toUpperCase()}</div>
+                <div style="min-width:0;">
+                  <div style="font-size:.8rem;font-weight:700;color:var(--espresso);">${themName} <span style="font-size:.65rem;font-weight:400;color:var(--muted);">· Partner</span></div>
+                  ${themEmail ? `<div style="font-size:.68rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${themEmail}</div>` : ''}
+                </div>
               </div>
             </div>
           </div>`;
