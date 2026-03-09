@@ -184,17 +184,18 @@ body{font-family:var(--font-body);background:var(--parchment);color:var(--espres
   padding: 0 28px;
   padding-top: max(52px, env(safe-area-inset-top));
   padding-bottom: max(40px, env(safe-area-inset-bottom));
+  background: var(--parchment);
 }
 
 .ob-header { margin-bottom: 40px; }
 .ob-step-dots { display: flex; gap: 6px; margin-bottom: 32px; }
 .ob-dot { width: 24px; height: 3px; border-radius: 2px; background: var(--border); transition: all .3s var(--ease); }
 .ob-dot.active { width: 40px; background: var(--terra); }
-.ob-dot.done { background: var(--amber); }
+.ob-dot.done { background: rgba(196,113,74,.4); }
 
-.ob-title { font-family: var(--font-display); font-size: 2.2rem; font-weight: 300; line-height: 1.1; margin-bottom: 8px; }
+.ob-title { font-family: var(--font-display); font-size: 2.6rem; font-weight: 300; line-height: 1.1; margin-bottom: 8px; color: var(--espresso); }
 .ob-title em { font-style: italic; color: var(--terra); }
-.ob-sub { font-size: .875rem; color: var(--muted); line-height: 1.6; }
+.ob-sub { font-size: .875rem; color: var(--muted); line-height: 1.65; }
 .ob-body { flex: 1; display: flex; flex-direction: column; gap: 20px; }
 .ob-footer { margin-top: 32px; display: flex; flex-direction: column; gap: 10px; }
 
@@ -1965,7 +1966,7 @@ Router.register('ob1', () => `
         <input class="input" id="ob-partner-name" type="text" placeholder="e.g. Alex" autocomplete="off">
       </div>
 
-      <div style="background:var(--parchment);border-radius:var(--r-md);padding:14px 16px;" class="a3">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;" class="a3">
         <div style="font-size:.75rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 A private space</div>
         <div style="font-size:.78rem;color:var(--muted);line-height:1.5;">Parlay is just for the two of you. No social feeds, no public profiles.</div>
       </div>
@@ -2078,7 +2079,6 @@ Router.register('ob-self', () => {
           <div class="ob-dot done"></div>
           <div class="ob-dot active"></div>
           <div class="ob-dot"></div>
-          <div class="ob-dot"></div>
         </div>
       </div>
 
@@ -2111,13 +2111,17 @@ Router.register('ob-self', () => {
       </div>
 
       <div style="margin:10px 0 4px;font-size:.72rem;color:var(--muted);text-align:center;">
-        <span id="ob-self-count" style="font-weight:700;color:var(--sage);">${selected.size}</span> selected — you can update anytime in your profile
+        <span id="ob-self-count" style="font-weight:700;color:var(--terra);">${selected.size}</span> selected — you can update anytime in your profile
       </div>
 
       <div class="ob-footer a5" style="margin-top:12px;">
         <button class="btn btn-primary btn-full" id="ob-self-next">Continue →</button>
         <button class="btn btn-muted btn-full" onclick="Router.navigate('ob2')" style="font-size:.82rem;">Back</button>
-        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob3')" style="font-size:.78rem;opacity:.6;">Skip for now</button>
+        <button class="btn btn-muted btn-full" onclick="
+          if (SupabaseDB.configured && SupabaseDB.coupleRow) Router.navigate('ob-intro');
+          else if (localStorage.getItem('parlay_signup_intent')==='start') Router.navigate('ob4');
+          else Router.navigate('ob-connect');
+        " style="font-size:.78rem;opacity:.6;">Skip for now</button>
       </div>
     </div>
   `;
@@ -2162,131 +2166,7 @@ Router.register('ob-self', () => {
       ...existing,
       [myRole]: { ...roleData, self: { traits: [...selectedSet], setupDone: selectedSet.size > 0 } }
     });
-    Router.navigate('ob3');
-  });
-});
-
-/* ================================================
-   MODULE: ONBOARDING — Step 4 (Partner Communication Style)
-   ================================================ */
-Router.register('ob3', () => {
-  const _v0b3 = State.get('currentView') || 'user';
-  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null)
-                   || (_v0b3 === 'partner' ? State.get('user')?.name : State.get('partner')?.name)
-                   || 'your partner';
-  const cp      = State.get('commPrefs') || {};
-  const legacy  = State.get('partnerProfile') || {};
-  const _v      = State.get('currentView') || 'user';
-  const _mr     = _v === 'partner' ? 'partner' : 'user';
-  const existing = cp[_mr]?.readOfThem || {};
-  const selected = new Set(existing.traits || legacy.traits || []);
-
-  return `
-    <div class="onboarding-wrap" style="padding-bottom:40px;">
-      <div class="ob-header">
-        <div class="ob-step-dots">
-          <div class="ob-dot done"></div>
-          <div class="ob-dot done"></div>
-          <div class="ob-dot done"></div>
-          <div class="ob-dot active"></div>
-          <div class="ob-dot"></div>
-        </div>
-      </div>
-
-      <div class="a1" style="margin-bottom:20px;">
-        <div class="ob-title">How does <em>${partnerName}</em><br>tick?</div>
-        <div class="ob-sub" style="margin-top:8px;">Your honest read of them — not what's ideal, but what's real. Parlay uses this to approach ${partnerName} in ways that actually land, and to avoid patterns that cause them to shut down.</div>
-      </div>
-
-      <div class="ob-body" id="ob3-traits" style="max-height:52vh;overflow-y:auto;padding-right:4px;">
-        ${PARTNER_PROFILE_TRAITS.map(cat => `
-          <div style="margin-bottom:18px;">
-            <div style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-              <span>${cat.icon}</span>${cat.category}
-            </div>
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              ${cat.traits.map(t => {
-                const isSelected = selected.has(t.id);
-                return `
-                  <label class="ob3-trait-row" data-id="${t.id}" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid ${isSelected ? 'var(--terra)' : 'var(--border)'};background:${isSelected ? '#FDF0EA' : 'var(--surface)'};border-radius:var(--r-md);cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;">
-                    <div class="ob3-check" style="width:18px;height:18px;border-radius:5px;border:2px solid ${isSelected ? 'var(--terra)' : 'var(--border)'};background:${isSelected ? 'var(--terra)' : 'transparent'};flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s;">
-                      ${isSelected ? '<svg width="10" height="7" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6L9 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ''}
-                    </div>
-                    <span style="font-size:.83rem;font-weight:500;color:var(--espresso);line-height:1.4;">${t.label}</span>
-                  </label>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        `).join('')}
-      </div>
-
-      <div style="margin:12px 0 4px;font-size:.72rem;color:var(--muted);text-align:center;">
-        <span id="ob3-count" style="font-weight:700;color:var(--terra);">${selected.size}</span> selected — you can always update this later
-      </div>
-
-      <div class="ob-footer a5" style="margin-top:12px;">
-        <button class="btn btn-primary btn-full" id="ob3-next">Continue →</button>
-        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob-self')" style="font-size:.82rem;">Back</button>
-        <button class="btn btn-muted btn-full" onclick="Router.navigate(localStorage.getItem('parlay_signup_intent')==='start' ? 'ob4' : (SupabaseDB.configured && SupabaseDB.coupleRow ? 'ob-intro' : 'ob-connect'))" style="font-size:.78rem;opacity:.6;">Skip for now</button>
-      </div>
-    </div>
-  `;
-}, (el) => {
-  const cp0  = State.get('commPrefs') || {};
-  const leg0 = State.get('partnerProfile') || {};
-  const _v0  = State.get('currentView') || 'user';
-  const _mr0 = _v0 === 'partner' ? 'partner' : 'user';
-  const selectedSet = new Set((cp0[_mr0]?.readOfThem?.traits || leg0.traits || []));
-
-  function updateCount() {
-    const c = el.querySelector('#ob3-count');
-    if (c) c.textContent = selectedSet.size;
-  }
-
-  el.querySelectorAll('.ob3-trait-row').forEach(row => {
-    row.addEventListener('click', () => {
-      const id = row.dataset.id;
-      const now = !selectedSet.has(id);
-      now ? selectedSet.add(id) : selectedSet.delete(id);
-      row.style.borderColor = now ? 'var(--terra)' : 'var(--border)';
-      row.style.background  = now ? '#FDF0EA' : 'var(--surface)';
-      const check = row.querySelector('.ob3-check');
-      if (check) {
-        check.style.background  = now ? 'var(--terra)' : 'transparent';
-        check.style.borderColor = now ? 'var(--terra)' : 'var(--border)';
-        check.innerHTML = now
-          ? '<svg width="10" height="7" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6L9 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-          : '';
-      }
-      updateCount();
-    });
-  });
-
-  el.querySelector('#ob3-next')?.addEventListener('click', () => {
-    const existing = State.get('commPrefs') || {};
-    const view     = State.get('currentView') || 'user';
-    const myRole   = view === 'partner' ? 'partner' : 'user';
-    const leg      = State.get('partnerProfile') || {};
-    const roleData = existing[myRole] || { self: {}, readOfThem: {} };
-    const existRead= roleData.readOfThem || {};
-    State.set('commPrefs', {
-      ...existing,
-      [myRole]: {
-        ...roleData,
-        readOfThem: {
-          ...existRead,
-          traits: [...selectedSet],
-          endearment: existRead.endearment ?? leg.endearment ?? '',
-          notes: existRead.notes ?? leg.notes ?? '',
-          setupDone: selectedSet.size > 0
-        }
-      }
-    });
-    // Route based on who this is:
-    // - Already coupled (Spouse 2 who joined via auth-join) → ob-intro
-    // - Came via "Start your Parlay" (Spouse 1, no couple yet) → ob4 directly
-    // - Unknown/other → ob-connect fork
+    // Route directly — no partner-read step
     if (SupabaseDB.configured && SupabaseDB.coupleRow) {
       Router.navigate('ob-intro');
     } else if (localStorage.getItem('parlay_signup_intent') === 'start') {
@@ -2297,6 +2177,14 @@ Router.register('ob3', () => {
   });
 });
 
+/* ob3 — retired: partner-read step removed. Redirect forward if hit. */
+Router.register('ob3', () => {
+  // No longer part of flow — skip forward silently
+  if (SupabaseDB.configured && SupabaseDB.coupleRow) Router.navigate('ob-intro');
+  else if (localStorage.getItem('parlay_signup_intent') === 'start') Router.navigate('ob4');
+  else Router.navigate('ob-connect');
+  return '';
+});
 /* ================================================
    MODULE: ONBOARDING — Connect Your Couple (fork)
    Shown after ob3. Spouse 1 to ob4 (invite code). Spouse 2 to ob-join.
@@ -2334,7 +2222,7 @@ Router.register('ob-connect', () => {
       </div>
 
       <div class="ob-footer a3">
-        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob3')" style="font-size:.82rem;">Back</button>
+        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob-self')" style="font-size:.82rem;">Back</button>
       </div>
     </div>
   `;
@@ -2392,7 +2280,7 @@ Router.register('ob4', () => {
           📋 &nbsp;Copy invite code
         </button>
 
-        <div style="background:var(--parchment);border-radius:var(--r-md);padding:14px 16px;" class="a4">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;" class="a4">
           <div style="font-size:.78rem;color:var(--muted);line-height:1.6;">
             💡 <strong style="color:var(--espresso);">They don't have the app yet?</strong> Send them the code — they'll use it when they sign up. You can also skip and connect later from Settings.
           </div>
@@ -2534,7 +2422,7 @@ const MediatorView = {
    MODULE: ONBOARDING — How Parlay Works
    ================================================ */
 Router.register('ob-intro', () => `
-  <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));">
+  <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));background:var(--parchment);">
     <div style="font-family:var(--font-display);font-size:2.2rem;font-weight:300;color:var(--espresso);margin-bottom:6px;" class="a1">
       How Parlay<br><em style="color:var(--terra)">works</em>
     </div>
@@ -2746,17 +2634,12 @@ Router.register('home', () => {
       <!-- SETUP HUB CARD -->
       ${(() => {
         const sc = _setupCompletion();
-        const done = [sc.loveLanguage.done, sc.myComm.done, sc.partnerComm.done, sc.tone.done, sc.family.done].filter(Boolean).length;
-        const total = 5;
+        const done = [sc.loveLanguage.done, sc.myComm.done, sc.tone.done, sc.family.done].filter(Boolean).length;
+        const total = 4;
         const allDone = done === total;
         const incomplete = [
           !sc.loveLanguage.done && 'Love Language',
           !sc.myComm.done && 'My Communication Style',
-          !sc.partnerComm.done && (() => {
-            const _tName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null)
-                        || (view === 'partner' ? (user.name || '') : (partner.name || ''));
-            return (_tName ? _tName + "'s" : "Partner's") + ' Communication Style';
-          })(),
           !sc.tone.done && 'Mediator Tone',
           !sc.family.done && 'Family Setup',
         ].filter(Boolean);
@@ -3161,68 +3044,27 @@ function getSenderPrefsPrompt(senderRole) {
   return block;
 }
 
-// How the RECIPIENT wants to receive communication — dual-source authority model
-// Primary source: recipient's self-report (commPrefs[recipientRole].self)
-// Supporting source: sender's read of recipient (commPrefs[senderRole].readOfThem)
-// Self-report wins on conflicts; sender's read fills gaps
+// How the RECIPIENT wants to receive communication
+// Single source of truth: the recipient's own self-report only.
+// Each person fills out their own preferences; Parlay applies those when they are the recipient.
 function getRecipientPrefsPrompt(recipientRole, recipientName) {
-  const commPrefs    = State.get('commPrefs') || {};
-  const senderRole   = recipientRole === 'user' ? 'partner' : 'user';
+  const commPrefs  = State.get('commPrefs') || {};
+  const selfPrefs  = commPrefs[recipientRole]?.self || {};
+  const selfTraits = selfPrefs.traits || [];
 
-  // Recipient's own self-report — highest authority
-  const selfPrefs    = commPrefs[recipientRole]?.self || {};
-  const selfTraits   = selfPrefs.traits || [];
+  if (selfTraits.length === 0) return '';
 
-  // Sender's read of the recipient — observed perspective, fills gaps
-  const senderRead   = commPrefs[senderRole]?.readOfThem || {};
-  const senderTraits = senderRead.traits || [];
+  const byCategory = {};
+  MY_COMM_PREFS_TRAITS.forEach(cat => {
+    const sel = cat.traits.filter(t => selfTraits.includes(t.id));
+    if (sel.length > 0) byCategory[cat.category] = sel.map(t => t.label);
+  });
 
-  // Endearment + notes always come from the SENDER's readOfThem
-  // (only the sender knows what they call their partner)
-  const legacy     = State.get('partnerProfile') || {};
-  const endearment = (senderRead.endearment ?? legacy.endearment ?? '').trim();
-  const notes      = senderRead.notes ?? legacy.notes ?? '';
-
-  const hasData = selfTraits.length > 0 || senderTraits.length > 0 || endearment || notes;
-  if (!hasData) return '';
-
-  let block = `\nRECIPIENT PROFILE — How ${recipientName} wants to be communicated with (HARD CONSTRAINT — every word must reflect this):\n`;
-
-  // Endearment rule
-  if (!endearment || endearment === 'none') {
-    block += `• Do NOT use any term of endearment. Address neutrally or by first name only.\n`;
-  } else {
-    block += `• Term of endearment: use ONLY "${endearment}" if a greeting is natural — never invent a different one.\n`;
-  }
-
-  // Self-report (authoritative — ${recipientName} filled this out themselves)
-  if (selfTraits.length > 0) {
-    const byCategory = {};
-    MY_COMM_PREFS_TRAITS.forEach(cat => {
-      const sel = cat.traits.filter(t => selfTraits.includes(t.id));
-      if (sel.length > 0) byCategory[cat.category] = sel.map(t => t.label);
-    });
-    block += `${recipientName}'s own self-reported preferences (authoritative — weight heavily):\n`;
-    Object.entries(byCategory).forEach(([cat, items]) => {
-      block += `  • ${cat}: ${items.join('; ')}\n`;
-    });
-  }
-
-  // Sender's observed read of recipient — uses PARTNER_PROFILE_TRAITS (behavioral observation)
-  if (senderTraits.length > 0) {
-    const byCategory = {};
-    PARTNER_PROFILE_TRAITS.forEach(cat => {
-      const sel = cat.traits.filter(t => senderTraits.includes(t.id));
-      if (sel.length > 0) byCategory[cat.category] = sel.map(t => t.label);
-    });
-    block += `Partner's behavioral read of ${recipientName} (supporting context — use where self-report has gaps; defer to self-report on conflicts):\n`;
-    Object.entries(byCategory).forEach(([cat, items]) => {
-      block += `  • ${cat}: ${items.join('; ')}\n`;
-    });
-  }
-
-  if (notes) block += `• Private context about ${recipientName}: ${notes}\n`;
-  block += `This profile is non-negotiable. Shape every word, every framing choice, and every tone decision around these preferences.\n`;
+  let block = `\nRECIPIENT PROFILE — ${recipientName}'s self-reported communication preferences (HARD CONSTRAINT — every word must reflect this):\n`;
+  Object.entries(byCategory).forEach(([cat, items]) => {
+    block += `  • ${cat}: ${items.join('; ')}\n`;
+  });
+  block += `Address ${recipientName} by first name only unless they've indicated otherwise. Shape every tone, framing, and pacing decision around these preferences.\n`;
   return block;
 }
 
@@ -4985,20 +4827,16 @@ function _setupCompletion() {
   const view     = State.get('currentView') || 'user';
   const myRole   = view === 'partner' ? 'partner' : 'user';
   const cp       = State.get('commPrefs') || {};
-  const mySelf   = cp[myRole]?.self       || {};   // my self-report
-  const myRead   = cp[myRole]?.readOfThem || {};   // my read of partner
+  const mySelf   = cp[myRole]?.self || {};   // my self-report only
   const ll       = State.get('loveLanguage') || {};
   const family   = State.get('family') || {};
   const tone     = State.get('mediatorTone') || '';
 
-  const mySelfCount  = (mySelf.traits||[]).length;
-  const myReadCount  = (myRead.traits||[]).length;
-  const myReadDone   = myReadCount > 0 || !!myRead.endearment || !!myRead.notes;
+  const mySelfCount = (mySelf.traits||[]).length;
 
   return {
     loveLanguage: { done: !!ll.primary, count: ll.primary ? 1 : 0 },
-    myComm:       { done: mySelfCount > 0,  count: mySelfCount },
-    partnerComm:  { done: myReadDone,        count: myReadCount, hasEndearment: !!myRead.endearment },
+    myComm:       { done: mySelfCount > 0, count: mySelfCount },
     tone:         { done: !!tone, label: tone },
     family:       { done: (family.kids||[]).length > 0, count: (family.kids||[]).length,
                     hasProviders: (family.providers||[]).length > 0,
@@ -5011,7 +4849,6 @@ function _nextIncomplete(skipRoute) {
   const c = _setupCompletion();
   const order = [
     { key: 'myComm',       route: 'setup-my-comm',       label: 'Your communication style' },
-    { key: 'partnerComm',  route: 'setup-partner-comm',  label: 'Your read on partner' },
     { key: 'tone',         route: 'setup-tone',          label: 'Mediator tone' },
     { key: 'loveLanguage', route: 'setup-love-language', label: 'Your love language' },
     { key: 'family',       route: 'family-setup',        label: 'Family setup' },
@@ -5046,7 +4883,7 @@ Router.register('setup-next-prompt', (params) => {
   const label = params?.label || 'next section';
   const route = params?.route || 'setup';
   const c = _setupCompletion();
-  const weights = { myComm: 25, partnerComm: 25, tone: 15, loveLanguage: 15, family: 20 };
+  const weights = { myComm: 35, tone: 20, loveLanguage: 20, family: 25 };
   const progress = Object.entries(weights).reduce((sum, [k, w]) => sum + (c[k] && c[k].done ? w : 0), 0);
 
   return `
@@ -5086,10 +4923,10 @@ Router.register('setup', () => {
   const ll       = State.get('loveLanguage') || {};
   const llMap    = { words:'💬 Words of Affirmation', acts:'🤝 Acts of Service', gifts:'🎁 Gifts', time:'⏰ Quality Time', touch:'🤗 Physical Touch' };
 
-  const weights  = { myComm: 25, partnerComm: 25, tone: 15, loveLanguage: 15, family: 20 };
+  const weights  = { myComm: 35, tone: 20, loveLanguage: 20, family: 25 };
   const progress = Object.entries(weights).reduce((sum, [k, w]) => sum + (c[k] && c[k].done ? w : 0), 0);
-  const doneCount= [c.loveLanguage.done, c.myComm.done, c.partnerComm.done, c.tone.done, c.family.done].filter(Boolean).length;
-  const allDone  = doneCount === 5;
+  const doneCount= [c.loveLanguage.done, c.myComm.done, c.tone.done, c.family.done].filter(Boolean).length;
+  const allDone  = doneCount === 4;
 
   const isSpouse1 = SupabaseDB.configured
     ? (SupabaseDB.coupleRow?.spouse_1_id === SupabaseDB.getMyUserId())
@@ -5114,7 +4951,7 @@ Router.register('setup', () => {
         <div style="height:100%;width:${progress}%;background:linear-gradient(to right,var(--amber),var(--terra));border-radius:6px;transition:width .4s ease;"></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;" class="a2">
-        <div style="font-size:.72rem;color:rgba(250,246,241,.5);">${doneCount} of 5 sections complete</div>
+        <div style="font-size:.72rem;color:rgba(250,246,241,.5);">${doneCount} of 4 sections complete</div>
         ${allDone ? '<div style="font-size:.72rem;color:var(--amber);font-weight:600;">All set ✓</div>' : ''}
       </div>
     </div>
@@ -5208,14 +5045,6 @@ Router.register('setup', () => {
         c.loveLanguage.done ? (llMap[ll.primary] || ll.primary) : 'How you feel most loved — shapes suggested actions',
         c.loveLanguage.done, '✓ Set', 'setup-love-language')}
 
-      <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;">Your read on ${themName}</div>
-
-      ${_setupRow('🧠', 'How ' + themName + ' receives messages',
-        c.partnerComm.done
-          ? c.partnerComm.count + ' trait' + (c.partnerComm.count !== 1 ? 's' : '') + ' noted' + (c.partnerComm.hasEndearment ? ' · endearment set' : '')
-          : 'Your observations about ' + themName + ' — they fill out their own self-report independently',
-        c.partnerComm.done, c.partnerComm.count + ' noted', 'setup-partner-comm')}
-
       <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;">Shared Settings</div>
 
       ${_setupRow('⚖️', 'Mediator Tone',
@@ -5232,7 +5061,7 @@ Router.register('setup', () => {
 
     <div style="margin:20px 20px 0;padding:14px 16px;background:rgba(122,158,138,.07);border:1px solid rgba(122,158,138,.2);border-radius:14px;" class="a4">
       <div style="font-size:.75rem;color:var(--espresso);line-height:1.65;">
-        <strong>Both spouses fill in their own profiles.</strong> Parlay merges your self-report with your partner's read of you — so every message is calibrated from both sides.
+        <strong>Each person fills in their own profile.</strong> When Parlay filters a message to you, it uses your preferences — and only yours. What you want is what you get.
       </div>
     </div>
 
@@ -5435,173 +5264,9 @@ Router.register('setup-my-comm', () => {
 });
 
 
-/* ================================================
-   SETUP: Your Read on Partner  (reads/writes commPrefs[myRole].readOfThem)
-   ================================================ */
-Router.register('setup-partner-comm', () => {
-  const view     = State.get('currentView') || 'user';
-  const myRole   = view === 'partner' ? 'partner' : 'user';
-  const user     = State.get('user');
-  const partner  = State.get('partner');
-  const themName = view === 'partner' ? (user.name||'Partner') : (partner.name||'Partner');
-  const cp       = State.get('commPrefs') || {};
-  // Read from MY readOfThem — not from their role
-  const myRead   = cp[myRole]?.readOfThem || {};
-  const legacy   = State.get('partnerProfile') || {};
-  const selected = new Set(myRead.traits || []);
-  const storedEnd  = (myRead.endearment ?? legacy.endearment) || '';
-  const storedNotes= myRead.notes ?? legacy.notes ?? '';
-  const presetOpts = ['babe','love','honey','darling'];
-  const isPreset   = presetOpts.includes(storedEnd);
-  const customVal  = (storedEnd && !isPreset && storedEnd !== 'none') ? storedEnd : '';
-
-  return `
-  <div style="padding-bottom:calc(var(--nav-h) + 32px);">
-    <div style="background:var(--terra);padding:0 24px 28px;padding-top:max(52px,env(safe-area-inset-top));position:relative;overflow:hidden;">
-      <div style="position:absolute;top:-30px;right:-30px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.1),transparent 70%);pointer-events:none;"></div>
-      <button onclick="Router.navigate('setup')" style="background:rgba(255,255,255,.15);border:none;color:rgba(255,255,255,.8);font-size:.8rem;padding:10px 16px;border-radius:10px;cursor:pointer;margin-bottom:18px;display:inline-block;font-family:var(--font-body);">‹ Setup</button>
-      <div style="font-family:var(--font-display);font-size:1.8rem;font-weight:300;color:#fff;margin-bottom:6px;" class="a1">
-        Your read on <em style="font-style:italic;color:rgba(255,255,255,.85)">${themName}</em>
-      </div>
-      <div style="font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.6;" class="a1">Your behavioral observations of ${themName} — what you know about how they actually respond, not just how they'd ideally like to be treated. Parlay cross-references this with their own self-report.</div>
-    </div>
-    <div style="padding:20px 20px 0;">
-      <!-- TRAITS FIRST — the substantive data -->
-      <div class="a2" id="pc-trait-list">
-        ${PARTNER_PROFILE_TRAITS.map(cat => `
-          <div style="margin-bottom:20px;">
-            <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-              <span>${cat.icon}</span>${cat.category}
-            </div>
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              ${cat.traits.map(t => {
-                const isSel = selected.has(t.id);
-                return `<label class="pc-trait-row" data-id="${t.id}" role="checkbox" aria-checked="${isSel}"
-                  style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1.5px solid ${isSel?'var(--terra)':'var(--border)'};background:${isSel?'#FDF0EA':'var(--surface)'};border-radius:12px;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;">
-                  <div class="pc-check" aria-hidden="true" style="width:20px;height:20px;border-radius:5px;border:2px solid ${isSel?'var(--terra)':'var(--border)'};background:${isSel?'var(--terra)':'transparent'};flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s;">
-                    ${isSel?'<svg width="10" height="7" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6L9 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
-                  </div>
-                  <span style="font-size:.85rem;font-weight:500;color:var(--espresso);line-height:1.4;">${t.label}</span>
-                </label>`;
-              }).join('')}
-            </div>
-          </div>`).join('')}
-      </div>
-
-      <!-- ENDEARMENT — after traits, a finishing touch -->
-      <div style="margin-bottom:20px;" class="a3">
-        <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">What do you call them?</div>
-        <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">Parlay uses only this — leave blank to skip.</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;" id="endearment-presets-spc">
-          ${presetOpts.map(opt => {
-            const active = storedEnd === opt;
-            return `<button class="endearment-preset-spc" data-val="${opt}"
-              style="border:1.5px solid ${active?'var(--terra)':'var(--border)'};background:${active?'#FDF0EA':'var(--surface)'};color:${active?'var(--terra)':'var(--espresso)'};border-radius:20px;padding:8px 16px;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .15s;min-height:36px;">${opt}</button>`;
-          }).join('')}
-        </div>
-        <!-- Chip tap populates this field; typing here clears chip selection -->
-        <input id="endearment-custom-spc" class="input" type="text"
-          placeholder="Or type something custom…"
-          style="font-size:.88rem;"
-          value="${customVal}">
-      </div>
-
-      <!-- NOTES — with prompt questions -->
-      <div style="margin-bottom:20px;" class="a4">
-        <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Private notes</div>
-        <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;line-height:1.55;">What topics are they most sensitive about? What's your go-to word when things feel tense between you?</div>
-        <textarea id="pc-notes" class="input" rows="3"
-          placeholder="e.g. Avoid criticism about household tasks — she shuts down. She responds better to questions than statements."
-          style="resize:none;line-height:1.6;font-size:.88rem;">${storedNotes}</textarea>
-        <div style="font-size:.68rem;color:var(--muted);margin-top:6px;">Private — never shared with ${themName} or shown in messages.</div>
-      </div>
-
-      <div style="font-size:.72rem;color:var(--muted);margin-bottom:16px;"><span id="pc-count" style="font-weight:700;color:var(--terra);">${selected.size}</span> traits selected</div>
-      <button id="pc-save-btn" style="width:100%;padding:16px;background:var(--espresso);color:var(--cream);border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:600;cursor:pointer;margin-bottom:20px;">Save my read of ${themName} →</button>
-    </div>
-  </div>`;
-}, (el) => {
-  const view   = State.get('currentView') || 'user';
-  const myRole = view === 'partner' ? 'partner' : 'user';
-  const cp     = State.get('commPrefs') || {};
-  // IMPORTANT: read from MY readOfThem
-  const myRead = cp[myRole]?.readOfThem || {};
-  const legacy = State.get('partnerProfile') || {};
-  const sel    = new Set(myRead.traits || []);
-  const presets= ['babe','love','honey','darling'];
-  let   selEnd = myRead.endearment ?? legacy.endearment ?? '';
-  const custom = el.querySelector('#endearment-custom-spc');
-
-  function refreshCount() { const c=el.querySelector('#pc-count'); if(c) c.textContent=sel.size; }
-  function syncChipUI(val) {
-    el.querySelectorAll('.endearment-preset-spc').forEach(b => {
-      const a = b.dataset.val === val;
-      b.style.borderColor = a ? 'var(--terra)' : 'var(--border)';
-      b.style.background  = a ? '#FDF0EA' : 'var(--surface)';
-      b.style.color       = a ? 'var(--terra)' : 'var(--espresso)';
-    });
-  }
-  syncChipUI(selEnd);
-
-  el.querySelectorAll('.endearment-preset-spc').forEach(btn => {
-    btn.addEventListener('click', () => {
-      selEnd = btn.dataset.val;
-      if (custom) custom.value = selEnd; // chip tap → populate text field
-      syncChipUI(selEnd);
-    });
-  });
-
-  custom?.addEventListener('input', () => {
-    const v = custom.value.trim();
-    if (v) { selEnd = ''; syncChipUI(''); } // typing → deselect chips
-    else   { selEnd = ''; }
-  });
-
-  el.querySelectorAll('.pc-trait-row').forEach(row => {
-    row.addEventListener('click', () => {
-      const id=row.dataset.id; const now=!sel.has(id); now?sel.add(id):sel.delete(id);
-      row.style.borderColor=now?'var(--terra)':'var(--border)';
-      row.style.background =now?'#FDF0EA':'var(--surface)';
-      row.setAttribute('aria-checked', now);
-      const ck=row.querySelector('.pc-check');
-      if (ck) {
-        ck.style.background  = now?'var(--terra)':'transparent';
-        ck.style.borderColor = now?'var(--terra)':'var(--border)';
-        ck.innerHTML = now?'<svg width="10" height="7" viewBox="0 0 10 7" fill="none"><path d="M1 3.5L3.5 6L9 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':'';
-      }
-      refreshCount();
-    });
-  });
-
-  el.querySelector('#pc-save-btn').addEventListener('click', () => {
-    const finalEnd  = custom?.value.trim() || selEnd;
-    const notes     = el.querySelector('#pc-notes')?.value.trim() || '';
-    const existing  = State.get('commPrefs') || {};
-    const roleData  = existing[myRole] || { self: {}, readOfThem: {} };
-    State.set('commPrefs', {
-      ...existing,
-      [myRole]: {
-        ...roleData,
-        readOfThem: {
-          traits: [...sel],
-          endearment: finalEnd,
-          notes,
-          setupDone: sel.size > 0 || !!finalEnd || !!notes
-        }
-      }
-    });
-    SupabaseDB.saveCommReadOfPartner([...sel], finalEnd, notes).catch(() => {});
-    U.toast('Saved ✓');
-    const _next = _nextIncomplete('setup-partner-comm');
-    if (_next) {
-      Router.navigate('setup-next-prompt', { label: _next.label, route: _next.route });
-    } else {
-      Router.navigate('setup');
-    }
-  });
-});
-
-
+/* setup-partner-comm — retired. Redirect to setup hub. */
+Router.register('setup-partner-comm', () => { Router.navigate('setup'); return ''; });
+Router.register('partner-profile',    () => { Router.navigate('setup'); return ''; });
 /* ================================================
    SETUP: Mediator Tone
    ================================================ */
@@ -5669,7 +5334,6 @@ Router.register('setup-tone', () => {
 
 /* Legacy redirects */
 Router.register('comm-prefs', () => { Router.navigate('setup'); return ''; });
-Router.register('partner-profile', () => { Router.navigate('setup-partner-comm'); return ''; });
 
 
 /* ================================================
