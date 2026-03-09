@@ -1010,15 +1010,25 @@ const SupabaseDB = (() => {
     _realtimeSub = sb.channel('couple-' + coupleId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'negotiations',
           filter: `couple_id=eq.${coupleId}` }, async () => {
+        const oldCount = MediatorState.all.length;
         await loadNegotiations();
+        const newCount = MediatorState.all.length;
+        try { Parlays.updateBadge(); } catch(e) {}
         const cur = Router.current();
         if (cur === 'plan') Router.navigate('plan');
+        else if (cur === 'home') Router.navigate('home');
+        if (newCount > oldCount) U.toast('📬 New parlay from your partner');
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks',
           filter: `couple_id=eq.${coupleId}` }, async () => {
+        const oldCount = TaskState._data.length;
         await loadTasks();
+        const newCount = TaskState._data.length;
+        try { Tasks.updateBadge(); } catch(e) {}
         const cur = Router.current();
         if (cur === 'tasks') Router.navigate('tasks');
+        else if (cur === 'home') Router.navigate('home');
+        if (newCount > oldCount) U.toast('📬 New task from your partner');
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples',
           filter: `id=eq.${coupleId}` }, async (payload) => {
@@ -1467,6 +1477,12 @@ const Router = (() => {
       });
     }
 
+    // Update nav badges on every main screen navigation
+    if (NAV_SCREENS.includes(name)) {
+      try { if (typeof Parlays !== 'undefined') Parlays.updateBadge(); } catch(e) {}
+      try { if (typeof Tasks !== 'undefined') Tasks.updateBadge(); } catch(e) {}
+    }
+
     let el = document.getElementById(`screen-${name}`);
     if (!el) {
       el = document.createElement('div');
@@ -1495,7 +1511,8 @@ const Router = (() => {
         <span class="nav-icon">💛</span>
         <span class="nav-label">Connect</span>
       </button>
-      <button class="nav-item" data-screen="plan">
+      <button class="nav-item" data-screen="plan" style="position:relative;">
+        <span id="plan-nav-badge" style="display:none;position:absolute;top:4px;right:10px;min-width:16px;height:16px;background:var(--terra);color:#fff;border-radius:8px;font-size:.58rem;font-weight:700;padding:0 4px;align-items:center;justify-content:center;"></span>
         <span class="nav-icon">📅</span>
         <span class="nav-label">Plan</span>
       </button>
@@ -2615,6 +2632,67 @@ Router.register('home', () => {
         <button onclick="Router.navigate('ob4')" style="flex-shrink:0;padding:8px 14px;background:var(--terra);color:#fff;border:none;border-radius:10px;font-family:var(--font-body);font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">Share code</button>
       </div>` : ''}
 
+      <!-- ═══════ INBOX — Needs Attention (ALWAYS visible at top) ═══════ -->
+      ${(() => {
+        const view = State.get('currentView') || 'user';
+        const negs = MediatorState.all.filter(n => !n.archived && n.status !== 'resolved');
+        const _myHomeRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (view === 'user' ? 'user' : 'partner');
+        const pendingParlays = negs.filter(n =>
+          (n.status === 'pending_partner' && n.createdBy !== _myHomeRole) ||
+          (n.status === 'partner_replied' && n.createdBy === _myHomeRole) ||
+          (n.status === 'active') ||
+          (n.status === 'countered')
+        );
+        const { myAction } = TaskState.forView(view);
+        const totalPending = pendingParlays.length + myAction.length;
+        if (totalPending === 0) return '';
+        return `
+        <div style="margin:0 20px 4px;" class="a2">
+          <!-- Inbox header -->
+          <div style="background:linear-gradient(135deg,#3d1f0a,#2C1A0E);border:1.5px solid rgba(196,113,74,.4);border-radius:16px;padding:16px 18px;margin-bottom:0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${totalPending > 0 ? '12px' : '0'};">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:rgba(196,113,74,.25);display:flex;align-items:center;justify-content:center;font-size:1rem;">📬</div>
+                <div>
+                  <div style="font-size:.9rem;font-weight:700;color:var(--amber);">${totalPending} item${totalPending !== 1 ? 's' : ''} waiting</div>
+                  <div style="font-size:.68rem;color:rgba(250,246,241,.45);">Your partner is waiting on you</div>
+                </div>
+              </div>
+              <div style="background:var(--terra);color:#fff;font-size:.7rem;font-weight:800;min-width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:0 7px;">${totalPending}</div>
+            </div>
+
+            <!-- Parlay items -->
+            ${pendingParlays.length > 0 ? `
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              ${pendingParlays.slice(0, 3).map(n => {
+                const topic = TOPIC_TYPES.find(t => t.id === n.topicId) || TOPIC_TYPES[7];
+                const label = (n.status === 'pending_partner' && n.createdBy !== _myHomeRole) ? 'Reply needed'
+                  : (n.status === 'partner_replied' && n.createdBy === _myHomeRole) ? 'Reply received'
+                  : n.status === 'active' ? 'Proposal ready' : 'Needs attention';
+                return `
+                <div onclick="MediatorView.openNeg('${n.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;cursor:pointer;transition:background .15s;" onmousedown="this.style.background='rgba(255,255,255,.12)'" onmouseup="this.style.background='rgba(255,255,255,.06)'">
+                  <span style="font-size:1.1rem;">${topic.icon}</span>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:.82rem;font-weight:600;color:var(--cream);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${n.title}</div>
+                    <div style="font-size:.68rem;color:rgba(250,246,241,.45);">${n.date}</div>
+                  </div>
+                  <div style="font-size:.62rem;font-weight:700;color:var(--amber);background:rgba(232,184,138,.15);padding:3px 8px;border-radius:10px;white-space:nowrap;">${label}</div>
+                </div>`;
+              }).join('')}
+              ${pendingParlays.length > 3 ? `<div style="font-size:.72rem;color:rgba(250,246,241,.4);text-align:center;padding:4px;">+${pendingParlays.length - 3} more in Plan tab</div>` : ''}
+            </div>` : ''}
+
+            <!-- Task items -->
+            ${myAction.length > 0 ? `
+            <div style="${pendingParlays.length > 0 ? 'margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);' : ''}display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(122,101,180,.1);border:1px solid rgba(122,101,180,.2);border-radius:12px;cursor:pointer;" onclick="Router.navigate('tasks')">
+              <span style="font-size:1rem;">⚡</span>
+              <div style="flex:1;font-size:.82rem;font-weight:600;color:var(--cream);">${myAction.length} task${myAction.length !== 1 ? 's' : ''} need your response</div>
+              <div style="font-size:.72rem;color:rgba(250,246,241,.5);">View →</div>
+            </div>` : ''}
+          </div>
+        </div>`;
+      })()}
+
       <!-- QUICK ACTIONS -->
       <div class="quick-strip a3">
         <div class="quick-action" onclick="Router.navigate('plan')">
@@ -2680,49 +2758,6 @@ Router.register('home', () => {
       </div>
 
       <!-- Love Language removed - now in Setup hub -->
-
-      <!-- ACTIVE STATUS CARD -->
-      ${(() => {
-        const view = State.get('currentView') || 'user';
-        const negs = MediatorState.all.filter(n => !n.archived && n.status !== 'resolved');
-        const _myHomeRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (view === 'user' ? 'user' : 'partner');
-        const pendingParlays = negs.filter(n =>
-          (n.status === 'pending_partner' && n.createdBy !== _myHomeRole) ||
-          (n.status === 'partner_replied' && n.createdBy === _myHomeRole) ||
-          (n.status === 'countered')
-        ).length;
-        const { myAction } = TaskState.forView(view);
-        const hasPending = pendingParlays > 0 || myAction.length > 0;
-        if (!hasPending) return '';
-        return `
-        <div class="module-section a5" style="padding-top:4px;">
-          <div class="section-label">Needs Attention</div>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            ${pendingParlays > 0 ? `
-            <div class="module-card" onclick="Router.navigate('plan')" style="border-color:rgba(196,113,74,.3);background:linear-gradient(135deg,#FDF5F0,var(--surface));">
-              <div class="mc-header">
-                <div class="mc-icon" style="background:rgba(196,113,74,.12);">⚖️</div>
-                <div class="mc-text">
-                  <div class="mc-title">${pendingParlays} parlay${pendingParlays > 1 ? 's' : ''} awaiting your input</div>
-                  <div class="mc-sub">Your partner is waiting on a response</div>
-                </div>
-                <div class="mc-arrow" style="color:var(--terra);">›</div>
-              </div>
-            </div>` : ''}
-            ${myAction.length > 0 ? `
-            <div class="module-card" onclick="Router.navigate('tasks')" style="border-color:rgba(122,101,180,.25);background:linear-gradient(135deg,#F5F0FB,var(--surface));">
-              <div class="mc-header">
-                <div class="mc-icon" style="background:rgba(122,101,180,.1);">⚡</div>
-                <div class="mc-text">
-                  <div class="mc-title">${myAction.length} task${myAction.length > 1 ? 's' : ''} need${myAction.length === 1 ? 's' : ''} your attention</div>
-                  <div class="mc-sub">Accept, decline, or suggest changes</div>
-                </div>
-                <div class="mc-arrow" style="color:#7C65B4;">›</div>
-              </div>
-            </div>` : ''}
-          </div>
-        </div>`;
-      })()}
 
       <!-- SETUP HUB CARD -->
       ${(() => {
@@ -3611,7 +3646,8 @@ Router.register('plan', () => {
     card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--terra)'; card.style.background = '#FDF5F0'; });
     card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--border)'; card.style.background = 'var(--surface)'; });
   });
-
+  Parlays.updateBadge();
+  Tasks.updateBadge();
 });
 
 /* ---- MEDIATOR HOME (proposals list) ---- */
@@ -4674,6 +4710,19 @@ Router.register('parlay-detail', ({ negId } = {}) => {
         style="width:100%;padding:16px;background:linear-gradient(135deg,#4A3568,#7A6A9B);color:#fff;border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:600;cursor:pointer;margin-bottom:10px;">
         <span id="proposal-btn-text">⚖️ Generate Parlay Proposal</span>
       </button>`;
+  } else if (neg.status === 'active' && neg.proposal) {
+    // Both spouses can accept the proposal or flag it for discussion
+    actionHtml = `
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button id="accept-proposal-btn"
+          style="width:100%;padding:16px;background:var(--sage);color:#fff;border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:700;cursor:pointer;">
+          ✓ Accept Proposal
+        </button>
+        <button id="discuss-proposal-btn"
+          style="width:100%;padding:13px;background:none;color:var(--muted);border:1.5px solid var(--border);border-radius:14px;font-family:var(--font-body);font-size:.82rem;font-weight:600;cursor:pointer;">
+          💬 This needs a conversation
+        </button>
+      </div>`;
   } else if (neg.status === 'resolved') {
     actionHtml = `<div style="text-align:center;padding:12px;font-size:.82rem;color:var(--sage);font-weight:600;">✓ Resolved</div>`;
   }
@@ -4798,6 +4847,29 @@ Router.register('parlay-detail', ({ negId } = {}) => {
         btnText.textContent = '⚖️ Generate Parlay Proposal';
         U.toast('AI error: ' + (err.message || 'unknown').slice(0, 100));
       }
+    });
+  }
+
+  // Accept proposal button (both spouses, when status = active)
+  const acceptBtn = el.querySelector('#accept-proposal-btn');
+  if (acceptBtn) {
+    acceptBtn.addEventListener('click', () => {
+      MediatorState.update(neg.id, { status: 'resolved', resolution: 'accepted' });
+      _incrementEquity(neg.topicId);
+      try { Parlays.updateBadge(); } catch(e) {}
+      U.toast('Proposal accepted ✓');
+      Router.navigate('parlay-detail', { negId: neg.id });
+    });
+  }
+
+  // Needs discussion button
+  const discussBtn = el.querySelector('#discuss-proposal-btn');
+  if (discussBtn) {
+    discussBtn.addEventListener('click', () => {
+      U.toast('💬 Time to talk this one through in person');
+      MediatorState.update(neg.id, { status: 'resolved', resolution: 'needs_discussion' });
+      try { Parlays.updateBadge(); } catch(e) {}
+      Router.navigate('plan');
     });
   }
 });
@@ -6027,7 +6099,7 @@ Router.register('tasks', () => {
     </div>` : ''}
 
   </div>`;
-}, () => { Tasks.updateBadge(); });
+}, () => { Tasks.updateBadge(); Parlays.updateBadge(); });
 
 /* ---- NEW TASK FORM ---- */
 Router.register('task-new', () => {
@@ -6524,6 +6596,33 @@ Router.register('task-reply', (params) => {
     }
   });
 });
+
+/* ---- GLOBAL PARLAY HELPERS ---- */
+const Parlays = {
+  /** Count parlays that need the current user's attention */
+  pendingCount() {
+    const myRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (State.get('currentView') === 'partner' ? 'partner' : 'user');
+    return MediatorState.all.filter(n =>
+      !n.archived && n.status !== 'resolved' && (
+        (n.status === 'pending_partner' && n.createdBy !== myRole) ||
+        (n.status === 'partner_replied' && n.createdBy === myRole) ||
+        (n.status === 'active') ||
+        (n.status === 'countered')
+      )
+    ).length;
+  },
+  updateBadge() {
+    const count = Parlays.pendingCount();
+    const badge = document.getElementById('plan-nav-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+};
 
 /* ---- GLOBAL TASK ACTIONS ---- */
 const Tasks = {
