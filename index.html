@@ -705,7 +705,7 @@ const SupabaseDB = (() => {
 
   // ── Identity ──────────────────────────────────────────────
   let _session           = null;   // supabase Session
-  let _signingInViaForm  = false;   // true during email/password sign-in to suppress onAuthStateChange
+  let _handledByForm  = false;   // true from signIn() call through end of bootstrap() — suppresses onAuthStateChange routing
   let _coupleRow  = null;   // couples row
   let _myUserId   = null;
   let _myRole     = 'user'; // 'user' | 'partner'  (spouse_1 = user, spouse_2 = partner)
@@ -735,14 +735,17 @@ const SupabaseDB = (() => {
 
   async function signIn(email, password) {
     if (!configured) return { error: 'Supabase not configured' };
-    _signingInViaForm = true;
+    _handledByForm = true;   // keep true until auth-signin clears it after bootstrap()
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    _signingInViaForm = false;
-    if (error) return { error: error.message };
+    if (error) {
+      _handledByForm = false;
+      return { error: error.message };
+    }
     _session  = data.session;
     _myUserId = data.user?.id || null;
     return { data };
   }
+  function clearFormFlag() { _handledByForm = false; }
 
   async function signOut() {
     if (!configured) return;
@@ -804,6 +807,7 @@ const SupabaseDB = (() => {
     _myRole    = 'partner';
     State.set('currentView', 'partner');
     State.set('mediatorTone', couple.mediator_tone || 'neutral');
+    if (couple.mediator_tone) localStorage.setItem('parlay_tone_set', '1');
     State.set('partner', { ...State.get('partner'), connected: true });
     return { data: couple };
   }
@@ -880,46 +884,29 @@ const SupabaseDB = (() => {
               { onConflict: 'user_id' });
   }
 
-  async function saveCommReadOfPartner(traits, endearment, notes) {
-    if (!isReady()) return;
-    const partnerId = getPartnerUserId();
-    if (!partnerId) return;
-    await sb.from('comm_read_of_partner')
-      .upsert({
-        author_id: _myUserId,
-        about_id:  partnerId,
-        couple_id: _coupleRow.id,
-        traits, endearment, notes,
-        setup_done: traits.length > 0 || !!endearment || !!notes
-      }, { onConflict: 'author_id,about_id' });
-  }
 
-  // Load all four commPref records and map to State's commPrefs shape
   async function loadCommPrefs() {
     if (!isReady()) return;
     const partId = getPartnerUserId();
     if (!partId) return;
 
-    const [selfRes, partnerSelfRes, myReadRes, partnerReadRes] = await Promise.all([
-      sb.from('comm_self').select('*').eq('user_id', _myUserId).single(),
-      sb.from('comm_self').select('*').eq('user_id', partId).single(),
-      sb.from('comm_read_of_partner').select('*').eq('author_id', _myUserId).eq('about_id', partId).single(),
-      sb.from('comm_read_of_partner').select('*').eq('author_id', partId).eq('about_id', _myUserId).single(),
+    const [selfRes, partnerSelfRes] = await Promise.all([
+      sb.from('comm_self').select('*').eq('user_id', _myUserId).maybeSingle(),
+      sb.from('comm_self').select('*').eq('user_id', partId).maybeSingle(),
     ]);
 
-    const myRole  = _myRole;
+    const myRole   = _myRole;
     const themRole = myRole === 'user' ? 'partner' : 'user';
+    const existing = State.get('commPrefs') || {};
 
     State.set('commPrefs', {
       [myRole]: {
-        self:       { traits: selfRes.data?.traits || [],        setupDone: selfRes.data?.setup_done || false },
-        readOfThem: { traits: myReadRes.data?.traits || [],      setupDone: myReadRes.data?.setup_done || false,
-                      endearment: myReadRes.data?.endearment || '', notes: myReadRes.data?.notes || '' }
+        ...(existing[myRole] || {}),
+        self: { traits: selfRes.data?.traits || [], setupDone: selfRes.data?.setup_done || false },
       },
       [themRole]: {
-        self:       { traits: partnerSelfRes.data?.traits || [], setupDone: partnerSelfRes.data?.setup_done || false },
-        readOfThem: { traits: partnerReadRes.data?.traits || [], setupDone: partnerReadRes.data?.setup_done || false,
-                      endearment: partnerReadRes.data?.endearment || '', notes: partnerReadRes.data?.notes || '' }
+        ...(existing[themRole] || {}),
+        self: { traits: partnerSelfRes.data?.traits || [], setupDone: partnerSelfRes.data?.setup_done || false },
       }
     });
   }
@@ -1240,10 +1227,9 @@ const SupabaseDB = (() => {
 
     sb.auth.onAuthStateChange(async (event, session) => {
       // SIGNED_IN fires for: Google OAuth redirect, email confirmation click, AND email/password sign-in.
-      // We only want to run the full onboarding-nav logic for Google/confirmation flows.
-      // Email/password sign-in is handled directly in the auth-signin handler via bootstrap().
-      // Guard: skip if this is a programmatic email/password sign-in (_signingInViaForm flag).
-      if (event === 'SIGNED_IN' && session && !_signingInViaForm) {
+      // For email/password sign-in the auth-signin handler calls bootstrap() directly — skip here.
+      // The _handledByForm flag is set BEFORE signInWithPassword and cleared AFTER bootstrap() returns.
+      if (event === 'SIGNED_IN' && session && !_handledByForm) {
         // Fresh auth event — Google OAuth redirect or email confirmation link clicked
         _session  = session;
         _myUserId = session.user.id;
@@ -1339,7 +1325,7 @@ const SupabaseDB = (() => {
     signUp, signIn, signOut, signInWithGoogle, getSession,
     createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getMyEmail, getMyName, getPartnerName, getPartnerUserId, getSession,
     saveProfile, loadProfile,
-    saveCommSelf, saveCommReadOfPartner, loadCommPrefs,
+    saveCommSelf, loadCommPrefs, clearFormFlag,
     saveFamilyMember, deleteFamilyMember, loadFamily,
     saveCoupleSettings,
     saveNegotiation, updateNegotiation, softDeleteNegotiation, loadNegotiations,
@@ -1892,9 +1878,17 @@ Router.register('auth-signin', () => `
       result = await SupabaseDB.bootstrap();
     } catch (err) {
       console.error('[Parlay] bootstrap failed after sign-in:', err);
+      SupabaseDB.clearFormFlag?.();
       btn.textContent = 'Sign in →'; btn.disabled = false;
       errEl.textContent = 'Signed in but could not load your account — check your connection and try again.';
       errEl.style.display = 'block';
+      return;
+    }
+    SupabaseDB.clearFormFlag?.();
+    if (result.mode === 'unauthenticated') {
+      errEl.textContent = 'Sign-in failed — please try again.';
+      errEl.style.display = 'block';
+      btn.textContent = 'Sign in →'; btn.disabled = false;
       return;
     }
     if (result.coupled) {
@@ -2187,6 +2181,8 @@ Router.register('ob-self', () => {
       ...existing,
       [myRole]: { ...roleData, self: { traits: [...selectedSet], setupDone: selectedSet.size > 0 } }
     });
+    // Persist to Supabase
+    SupabaseDB.saveCommSelf([...selectedSet]).catch(() => {});
     // Route directly — no partner-read step
     if (SupabaseDB.configured && SupabaseDB.coupleRow) {
       Router.navigate('ob-intro');
@@ -2435,6 +2431,9 @@ Router.register('ob-join', () => `
 
 const MediatorView = {
   openNeg(negId) {
+    Router.navigate('parlay-detail', { negId });
+  },
+  manage(negId) {
     ParlayActions.show(negId, () => Router.navigate('plan'));
   }
 };
@@ -2491,7 +2490,7 @@ Router.register('home', () => {
   const user = State.get('user');
   const partner = State.get('partner');
   const equity = State.get('equity');
-  const events = State.get('events').slice(0, 3);
+  const events = (State.get('events') || []).slice(0, 3);
   const ll = State.get('loveLanguage');
   const streak = State.get('streak');
   const commPrefs = State.get('commPrefs') || {};
@@ -2507,7 +2506,7 @@ Router.register('home', () => {
   const llPartner = { icon: '💜', name: 'Not shared' };
 
   const dnTotal = 4;
-  const dnDone = equity.dateNights;
+  const dnDone = equity.dateNights || 0;
 
   return `
     <div id="screen-home-inner">
@@ -2618,7 +2617,12 @@ Router.register('home', () => {
       ${(() => {
         const view = State.get('currentView') || 'user';
         const negs = MediatorState.all.filter(n => !n.archived && n.status !== 'resolved');
-        const pendingParlays = negs.filter(n => n.status === 'pending' || n.status === 'countered').length;
+        const _myHomeRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (view === 'user' ? 'user' : 'partner');
+        const pendingParlays = negs.filter(n =>
+          (n.status === 'pending_partner' && n.createdBy !== _myHomeRole) ||
+          (n.status === 'partner_replied' && n.createdBy === _myHomeRole) ||
+          (n.status === 'countered')
+        ).length;
         const { myAction } = TaskState.forView(view);
         const hasPending = pendingParlays > 0 || myAction.length > 0;
         if (!hasPending) return '';
@@ -3180,8 +3184,9 @@ async function runToneFilter(rawText, userName, tone = 'neutral', intentContext 
   const partner     = State.get('partner');
   const partnerName = partner?.name || '';
 
-  // Determine sender/recipient roles from name
-  const senderRole      = userName === partnerName ? 'partner' : 'user';
+  // Determine sender role: prefer the live auth role, fall back to name comparison
+  const _authRole       = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : null;
+  const senderRole      = _authRole || (userName === partnerName ? 'user' : (userName === (user?.name || '') ? 'user' : 'partner'));
   const recipientRole   = senderRole === 'user' ? 'partner' : 'user';
   const recipientName   = senderRole === 'user' ? partnerName : (user?.name || '');
 
@@ -3364,8 +3369,15 @@ Router.register('plan', () => {
   const negs = allNegs.filter(n => !n.archived && n.status !== 'resolved');
   const resolved = allNegs.filter(n => !n.archived && n.status === 'resolved');
   const archived = allNegs.filter(n => n.archived);
-  const statusColor = { pending: '#E8B88A', active: '#C4714A', resolved: '#7A9E8A', countered: '#9B6B8A' };
-  const statusLabel = { pending: 'Awaiting Partner', active: 'In Progress', resolved: 'Resolved ✓', countered: 'Countered' };
+  const _planRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (State.get('currentView') === 'partner' ? 'partner' : 'user');
+  const statusColor = { pending: '#E8B88A', pending_partner: '#E8B88A', partner_replied: '#7A6A9B', active: '#C4714A', resolved: '#7A9E8A', countered: '#9B6B8A' };
+  const statusLabel = { pending: 'Awaiting Partner', pending_partner: 'Awaiting Partner', partner_replied: 'Partner Replied ↩', active: 'In Progress', resolved: 'Resolved ✓', countered: 'Countered' };
+  // Role-aware label override: recipient sees "Your turn" on pending_partner
+  const negLabel = (neg) => {
+    if (neg.status === 'pending_partner' && neg.createdBy !== _planRole) return 'Your turn ↩';
+    if (neg.status === 'partner_replied' && neg.createdBy === _planRole) return 'Reply received ↩';
+    return statusLabel[neg.status] || neg.status;
+  };
 
   return `
   <div style="padding-bottom:calc(var(--nav-h) + 20px);">
@@ -3418,7 +3430,7 @@ Router.register('plan', () => {
           ${negs.map(neg => {
             const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[7];
             const sc = statusColor[neg.status] || '#9B8880';
-            const sl = statusLabel[neg.status] || neg.status;
+            const sl = negLabel(neg);
             return `
               <div class="card card-p" style="cursor:pointer;transition:all .2s;" onclick="MediatorView.openNeg('${neg.id}')"
                    onmouseenter="this.style.borderColor='var(--terra)'" onmouseleave="this.style.borderColor='var(--border)'">
@@ -3507,6 +3519,9 @@ Router.register('plan', () => {
 
 /* ---- MEDIATOR HOME (proposals list) ---- */
 Router.register('mediator', () => {
+  const negs = MediatorState.all.filter(n => !n.archived);
+  const statusColor = { pending: '#E8B88A', pending_partner: '#E8B88A', partner_replied: '#7A6A9B', active: '#C4714A', resolved: '#7A9E8A', countered: '#9B6B8A' };
+  const statusLabel = { pending: 'Awaiting Partner', pending_partner: 'Awaiting Partner', partner_replied: 'Partner Replied ↩', active: 'In Progress', resolved: 'Resolved ✓', countered: 'Countered' };
   return `
   <div style="padding-bottom:calc(var(--nav-h) + 20px);">
     <!-- Header -->
@@ -3576,7 +3591,7 @@ Router.register('mediator', () => {
           ${negs.map(neg => {
             const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[5];
             const sc = statusColor[neg.status] || '#9B8880';
-            const sl = statusLabel[neg.status] || neg.status;
+            const sl = negLabel(neg);
             return `
               <div class="card card-p" style="cursor:pointer;transition:all .2s;" onclick="MediatorView.openNeg('${neg.id}')" 
                    onmouseenter="this.style.borderColor='var(--terra)'" onmouseleave="this.style.borderColor='var(--border)'">
@@ -4473,7 +4488,7 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
       intentContext,
       dateOptions,
       status: 'pending_partner',
-      createdBy: 'user',
+      createdBy: (SupabaseDB.configured ? SupabaseDB.getMyRole() : null) || (State.get('currentView') === 'partner' ? 'partner' : 'user'),
       partnerRawReply: null,
       partnerFilteredReply: null,
       partnerDateResponse: null,
@@ -4507,6 +4522,353 @@ Router.register('parlay-sent', ({ negId } = {}) => {
     </div>
   </div>`;
 });
+
+/* ================================================
+   MODULE: PARLAY DETAIL
+   Both spouses — shows the conversation thread, filtered message,
+   date options, partner reply, and proposal.
+   Recipient sees a "Reply" CTA when status = pending_partner.
+   Initiator sees "Generate Proposal" when status = partner_replied.
+   ================================================ */
+Router.register('parlay-detail', ({ negId } = {}) => {
+  const neg = negId ? MediatorState.find(negId) : null;
+  if (!neg) return `<div style="padding:60px 24px;text-align:center;font-family:var(--font-display);font-size:1.2rem;color:var(--espresso);">Parlay not found<br><br><button onclick="Router.navigate('plan')" style="margin-top:8px;padding:10px 20px;border:1px solid var(--border);border-radius:10px;background:none;cursor:pointer;font-family:var(--font-body);">‹ Back</button></div>`;
+
+  const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[7];
+  const view  = State.get('currentView') || 'user';
+  const myRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (view === 'partner' ? 'partner' : 'user');
+  const myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (myRole === 'partner' ? State.get('partner')?.name : State.get('user')?.name) || 'You';
+  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (myRole === 'partner' ? State.get('user')?.name    : State.get('partner')?.name) || 'Partner';
+
+  const iAmCreator   = neg.createdBy === myRole;
+  const iAmRecipient = !iAmCreator;
+  const creatorName  = neg.createdBy === myRole ? myName : partnerName;
+  const recipName    = neg.createdBy === myRole ? partnerName : myName;
+
+  const statusColor = { pending_partner:'#E8B88A', partner_replied:'#7A6A9B', active:'#C4714A', resolved:'#7A9E8A', countered:'#9B6B8A' };
+  const sc = statusColor[neg.status] || '#9B8880';
+
+  // Date options renderer
+  const dateOptionsHtml = (neg.dateOptions && neg.dateOptions.length > 0) ? `
+    <div style="margin-top:12px;">
+      <div style="font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">📅 Proposed dates</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        ${neg.dateOptions.map(o => {
+          const d = new Date(o.date + 'T12:00:00');
+          const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+          const isSelected = neg.partnerDateResponse === o.id;
+          return `<div class="date-option-card${isSelected ? ' selected' : ''}" data-opt-id="${o.id}"
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1.5px solid ${isSelected ? 'var(--sage)' : 'var(--border)'};border-radius:12px;background:${isSelected ? '#EDF4F0' : 'var(--surface)'};cursor:${iAmRecipient && neg.status === 'pending_partner' ? 'pointer' : 'default'};">
+            <div>
+              <div style="font-size:.88rem;font-weight:600;color:var(--espresso);">${label}</div>
+              ${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}
+            </div>
+            ${isSelected ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Selected</span>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+  // Proposal block
+  let proposalHtml = '';
+  if (neg.proposal) {
+    let p;
+    try { p = typeof neg.proposal === 'string' ? JSON.parse(neg.proposal) : neg.proposal; } catch { p = null; }
+    const proposalText = p?.proposal || (typeof neg.proposal === 'string' ? neg.proposal : '');
+    const reasoning    = p?.reasoning || '';
+    const uConc        = p?.userConcession || '';
+    const pConc        = p?.partnerConcession || '';
+    proposalHtml = `
+    <div style="margin-top:16px;padding:16px;background:linear-gradient(135deg,rgba(122,106,155,.08),rgba(122,158,138,.06));border:1.5px solid rgba(122,106,155,.25);border-radius:16px;">
+      <div style="font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7A6A9B;margin-bottom:8px;">⚖️ Parlay's Proposal</div>
+      <div style="font-size:.88rem;color:var(--espresso);line-height:1.65;margin-bottom:${reasoning?'12px':'0'}">${proposalText}</div>
+      ${reasoning ? `<div style="font-size:.76rem;color:var(--muted);line-height:1.55;padding-top:10px;border-top:1px solid rgba(122,106,155,.15);font-style:italic;">${reasoning}</div>` : ''}
+      ${(uConc || pConc) ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+        ${uConc ? `<div style="padding:10px;background:rgba(196,113,74,.07);border-radius:10px;"><div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--terra);margin-bottom:4px;">${creatorName} gives</div><div style="font-size:.78rem;color:var(--espresso);line-height:1.5;">${uConc}</div></div>` : ''}
+        ${pConc ? `<div style="padding:10px;background:rgba(122,158,138,.07);border-radius:10px;"><div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--sage);margin-bottom:4px;">${recipName} gives</div><div style="font-size:.78rem;color:var(--espresso);line-height:1.5;">${pConc}</div></div>` : ''}
+      </div>` : ''}
+    </div>`;
+  }
+
+  // Action area
+  let actionHtml = '';
+  if (neg.status === 'pending_partner' && iAmRecipient) {
+    actionHtml = `
+      <button onclick="Router.navigate('parlay-reply',{negId:'${neg.id}'})"
+        style="width:100%;padding:16px;background:var(--espresso);color:var(--cream);border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:600;cursor:pointer;margin-bottom:10px;">
+        Share your position →
+      </button>`;
+  } else if (neg.status === 'partner_replied' && iAmCreator) {
+    actionHtml = `
+      <button id="generate-proposal-btn"
+        style="width:100%;padding:16px;background:linear-gradient(135deg,#4A3568,#7A6A9B);color:#fff;border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:600;cursor:pointer;margin-bottom:10px;">
+        <span id="proposal-btn-text">⚖️ Generate Parlay Proposal</span>
+      </button>`;
+  } else if (neg.status === 'resolved') {
+    actionHtml = `<div style="text-align:center;padding:12px;font-size:.82rem;color:var(--sage);font-weight:600;">✓ Resolved</div>`;
+  }
+
+  return `
+  <div style="min-height:100dvh;padding:0 20px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(60px,env(safe-area-inset-bottom));overflow-y:auto;">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;" class="a1">
+      <button onclick="Router.navigate('plan')" style="padding:8px 14px;border:1px solid var(--border);border-radius:10px;background:none;font-family:var(--font-body);font-size:.82rem;color:var(--espresso);cursor:pointer;">‹ Plans</button>
+      <button onclick="MediatorView.manage('${neg.id}')" style="padding:8px 14px;border:1px solid var(--border);border-radius:10px;background:none;font-family:var(--font-body);font-size:.75rem;color:var(--muted);cursor:pointer;">⋯ Manage</button>
+    </div>
+
+    <!-- Topic identity -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;" class="a2">
+      <div style="width:48px;height:48px;border-radius:14px;background:${topic.color}18;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">${topic.icon}</div>
+      <div>
+        <div style="font-family:var(--font-display);font-size:1.35rem;font-weight:400;color:var(--espresso);">${neg.title}</div>
+        <div style="font-size:.72rem;color:var(--muted);">${neg.date} · ${creatorName} started this</div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:${sc}18;border:1px solid ${sc}44;border-radius:var(--r-pill);margin-bottom:20px;" class="a2">
+      <div style="width:6px;height:6px;border-radius:50%;background:${sc};"></div>
+      <div style="font-size:.72rem;font-weight:700;color:${sc};">${{ pending_partner:'Awaiting your partner', partner_replied:'Partner has replied', active:'In progress', resolved:'Resolved', countered:'Countered' }[neg.status] || neg.status}</div>
+    </div>
+
+    <!-- Creator's filtered message -->
+    <div style="margin-bottom:16px;" class="a3">
+      <div style="font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">${creatorName}'s position</div>
+      <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;">
+        <div style="font-size:.88rem;color:var(--espresso);line-height:1.65;">${neg.filteredInput || neg.rawInput || ''}</div>
+        <div style="font-size:.62rem;color:var(--muted);margin-top:8px;display:flex;align-items:center;gap:4px;"><span style="color:var(--sage);">✓</span> Tone-filtered by Parlay</div>
+      </div>
+      ${dateOptionsHtml}
+    </div>
+
+    <!-- Partner's reply (if exists) -->
+    ${neg.partnerFilteredReply ? `
+    <div style="margin-bottom:16px;" class="a4">
+      <div style="font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">${recipName}'s response</div>
+      <div style="padding:14px 16px;background:var(--surface);border:1px solid rgba(122,106,155,.25);border-radius:14px;">
+        <div style="font-size:.88rem;color:var(--espresso);line-height:1.65;">${neg.partnerFilteredReply}</div>
+        <div style="font-size:.62rem;color:var(--muted);margin-top:8px;display:flex;align-items:center;gap:4px;"><span style="color:var(--sage);">✓</span> Tone-filtered by Parlay</div>
+      </div>
+    </div>` : ''}
+
+    <!-- Proposal -->
+    ${proposalHtml ? `<div class="a5">${proposalHtml}</div>` : ''}
+
+    <!-- Actions -->
+    <div style="margin-top:20px;" class="a6">${actionHtml}</div>
+
+    <!-- Manage link -->
+    <div style="text-align:center;margin-top:12px;">
+      <button onclick="MediatorView.manage('${neg.id}')" style="font-size:.75rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:8px;">Archive or delete this parlay</button>
+    </div>
+
+  </div>`;
+}, (el, { negId } = {}) => {
+  const neg = negId ? MediatorState.find(negId) : null;
+  if (!neg) return;
+
+  const view   = State.get('currentView') || 'user';
+  const myRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (view === 'partner' ? 'partner' : 'user');
+  const iAmCreator = neg.createdBy === myRole;
+
+  // Date option selection (only active when recipient and pending)
+  if (!iAmCreator && neg.status === 'pending_partner') {
+    el.querySelectorAll('.date-option-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const optId = card.dataset.optId;
+        el.querySelectorAll('.date-option-card').forEach(c => {
+          const sel = c.dataset.optId === optId;
+          c.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
+          c.style.background  = sel ? '#EDF4F0' : 'var(--surface)';
+          const badge = c.querySelector('span[style*="color:var(--sage)"]');
+          if (sel && !badge) {
+            const b = document.createElement('span');
+            b.style.cssText = 'font-size:.72rem;font-weight:700;color:var(--sage);';
+            b.textContent = '✓ Selected';
+            c.appendChild(b);
+          } else if (!sel && badge) badge.remove();
+        });
+        // Store selection on neg for use when reply is submitted
+        MediatorState.update(neg.id, { partnerDateResponse: optId });
+      });
+    });
+  }
+
+  // Generate proposal button (creator, after partner replied)
+  const genBtn = el.querySelector('#generate-proposal-btn');
+  if (genBtn) {
+    genBtn.addEventListener('click', async () => {
+      const btnText = genBtn.querySelector('#proposal-btn-text');
+      genBtn.disabled = true;
+      btnText.textContent = 'Generating proposal…';
+
+      const user    = State.get('user');
+      const partner = State.get('partner');
+      const tone    = State.get('mediatorTone') || 'neutral';
+      const myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (myRole === 'partner' ? partner?.name : user?.name) || 'You';
+      const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (myRole === 'partner' ? user?.name    : partner?.name) || 'Partner';
+
+      const creatorName = neg.createdBy === myRole ? myName : partnerName;
+      const recipName   = neg.createdBy === myRole ? partnerName : myName;
+
+      try {
+        const raw = await generateProposal(
+          neg.title,
+          neg.filteredInput || neg.rawInput,
+          neg.partnerFilteredReply || neg.partnerRawReply,
+          creatorName, recipName, tone, neg.intentContext || ''
+        );
+        const parsed = parseProposal(raw);
+        MediatorState.update(neg.id, { proposal: JSON.stringify(parsed), status: 'active' });
+        Router.navigate('parlay-detail', { negId: neg.id });
+      } catch (err) {
+        console.error('[Parlay] generateProposal failed:', err);
+        genBtn.disabled = false;
+        btnText.textContent = '⚖️ Generate Parlay Proposal';
+        U.toast('Could not reach AI right now — try again in a moment');
+      }
+    });
+  }
+});
+
+/* ================================================
+   MODULE: PARLAY REPLY
+   Spouse 2 (recipient) shares their position.
+   Raw text → AI filter → saved to neg → status → partner_replied
+   ================================================ */
+Router.register('parlay-reply', ({ negId } = {}) => {
+  const neg = negId ? MediatorState.find(negId) : null;
+  if (!neg) return `<div style="padding:60px 24px;text-align:center;">Parlay not found.<br><button onclick="Router.navigate('plan')" style="margin-top:16px;padding:10px 20px;border:1px solid var(--border);border-radius:10px;background:none;cursor:pointer;font-family:var(--font-body);">‹ Back</button></div>`;
+
+  const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[7];
+  const view  = State.get('currentView') || 'user';
+  const myRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (view === 'partner' ? 'partner' : 'user');
+  const myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (myRole === 'partner' ? State.get('partner')?.name : State.get('user')?.name) || 'You';
+  const creatorName = neg.createdBy === myRole
+    ? myName
+    : ((SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (myRole === 'partner' ? State.get('user')?.name : State.get('partner')?.name) || 'Partner');
+
+  const hasDateOptions = neg.dateOptions && neg.dateOptions.length > 0;
+
+  return `
+  <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));overflow-y:auto;">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
+      <button onclick="Router.navigate('parlay-detail',{negId:'${neg.id}'})" style="padding:8px 14px;border:1px solid var(--border);border-radius:10px;background:none;font-family:var(--font-body);font-size:.82rem;color:var(--espresso);cursor:pointer;">‹ Back</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:1.2rem;">${topic.icon}</span>
+        <span style="font-family:var(--font-display);font-size:1.1rem;">${topic.label}</span>
+      </div>
+    </div>
+
+    <!-- What they said (filtered) -->
+    <div style="background:var(--espresso);border-radius:18px;padding:18px;margin-bottom:24px;position:relative;overflow:hidden;" class="a2">
+      <div style="position:absolute;top:-20px;right:-20px;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,.04);pointer-events:none;"></div>
+      <div style="font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(232,184,138,.7);margin-bottom:8px;">${creatorName}'s position</div>
+      <div style="font-size:.85rem;color:rgba(250,246,241,.88);line-height:1.65;font-style:italic;">"${neg.filteredInput || neg.rawInput || ''}"</div>
+      ${hasDateOptions ? `
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);">
+        <div style="font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(232,184,138,.6);margin-bottom:8px;">📅 Proposed dates</div>
+        <div style="display:flex;flex-direction:column;gap:6px;" id="reply-date-opts">
+          ${neg.dateOptions.map(o => {
+            const d = new Date(o.date + 'T12:00:00');
+            const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+            const isSelected = neg.partnerDateResponse === o.id;
+            return `<div class="reply-date-card" data-opt-id="${o.id}"
+              style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1.5px solid ${isSelected?'rgba(122,158,138,.6)':'rgba(255,255,255,.15)'};border-radius:10px;cursor:pointer;background:${isSelected?'rgba(122,158,138,.15)':'rgba(255,255,255,.05)'};transition:all .15s;">
+              <div>
+                <div style="font-size:.82rem;font-weight:600;color:rgba(250,246,241,.9);">${label}</div>
+                ${o.timeLabel ? `<div style="font-size:.68rem;color:rgba(250,246,241,.5);">${o.timeLabel}</div>` : ''}
+              </div>
+              <div class="date-check" style="width:18px;height:18px;border-radius:50%;border:2px solid ${isSelected?'rgba(122,158,138,.8)':'rgba(255,255,255,.25)'};background:${isSelected?'rgba(122,158,138,.4)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:.7rem;color:rgba(122,158,138,1);">${isSelected?'✓':''}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
+    </div>
+
+    <!-- My position -->
+    <div class="a3" style="margin-bottom:16px;">
+      <div style="font-family:var(--font-display);font-size:1.7rem;font-weight:300;color:var(--espresso);margin-bottom:6px;">Your <em style="color:var(--terra)">position</em></div>
+      <div style="font-size:.8rem;color:var(--muted);line-height:1.6;">Be honest — Parlay will filter everything before ${creatorName} sees it.</div>
+    </div>
+
+    <div class="input-wrap a4" style="margin-bottom:16px;">
+      <label class="input-label">What do you want or need? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">speak freely</span></label>
+      <textarea id="reply-main" class="input" rows="4" placeholder="e.g. That works for me but I need to know the details earlier so I can plan around it." style="resize:none;line-height:1.6;"></textarea>
+    </div>
+
+    <div style="background:var(--parchment);border-radius:var(--r-md);padding:12px 14px;margin-bottom:20px;" class="a4">
+      <div style="font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 Private until filtered</div>
+      <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">${creatorName} only sees Parlay's rewrite — not your raw words.</div>
+    </div>
+
+    <button class="btn btn-accent btn-full" id="reply-submit-btn" style="border-radius:var(--r-md);">
+      <span id="reply-btn-text">Send my position →</span>
+    </button>
+    <button class="btn btn-muted btn-full" style="font-size:.82rem;margin-top:10px;" onclick="Router.navigate('parlay-detail',{negId:'${neg.id}'})">Cancel</button>
+
+  </div>`;
+}, (el, { negId } = {}) => {
+  const neg = negId ? MediatorState.find(negId) : null;
+  if (!neg) return;
+
+  const view   = State.get('currentView') || 'user';
+  const myRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (view === 'partner' ? 'partner' : 'user');
+
+  // Date option selection
+  el.querySelectorAll('.reply-date-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const optId = card.dataset.optId;
+      el.querySelectorAll('.reply-date-card').forEach(c => {
+        const sel = c.dataset.optId === optId;
+        c.style.borderColor = sel ? 'rgba(122,158,138,.6)' : 'rgba(255,255,255,.15)';
+        c.style.background  = sel ? 'rgba(122,158,138,.15)' : 'rgba(255,255,255,.05)';
+        const check = c.querySelector('.date-check');
+        if (check) { check.style.background = sel ? 'rgba(122,158,138,.4)' : 'transparent'; check.textContent = sel ? '✓' : ''; check.style.borderColor = sel ? 'rgba(122,158,138,.8)' : 'rgba(255,255,255,.25)'; }
+      });
+      MediatorState.update(neg.id, { partnerDateResponse: optId });
+    });
+  });
+
+  // Submit
+  el.querySelector('#reply-submit-btn').addEventListener('click', async () => {
+    const raw = el.querySelector('#reply-main').value.trim();
+    if (!raw) { U.toast('Share your position first'); return; }
+
+    const user    = State.get('user');
+    const partner = State.get('partner');
+    const tone    = State.get('mediatorTone') || 'neutral';
+    const myName  = (SupabaseDB.configured ? SupabaseDB.getMyName() : null) || (myRole === 'partner' ? partner?.name : user?.name) || 'You';
+
+    const btn     = el.querySelector('#reply-submit-btn');
+    const btnText = el.querySelector('#reply-btn-text');
+    btn.disabled = true; btnText.textContent = 'Filtering your message…';
+
+    let filtered;
+    try {
+      filtered = await runToneFilter(raw, myName, tone, neg.intentContext || '');
+    } catch (err) {
+      console.error('[Parlay] reply filter failed:', err);
+      btn.disabled = false; btnText.textContent = 'Send my position →';
+      U.toast(err.name === 'AbortError' ? 'Request timed out — try again' : 'Couldn\u2019t reach AI right now — try again');
+      return;
+    }
+
+    MediatorState.update(neg.id, {
+      partnerRawReply:      raw,
+      partnerFilteredReply: filtered,
+      status:               'partner_replied',
+    });
+
+    Router.navigate('parlay-detail', { negId: neg.id });
+    U.toast('Position sent \u2714');
+  });
+});
+
 
 /* ================================================
    MODULE: FAMILY SETUP WIZARD
@@ -4891,7 +5253,7 @@ function _setupCompletion() {
   return {
     loveLanguage: { done: !!ll.primary, count: ll.primary ? 1 : 0 },
     myComm:       { done: mySelfCount > 0, count: mySelfCount },
-    tone:         { done: !!tone, label: tone },
+    tone:         { done: !!tone && !!localStorage.getItem('parlay_tone_set'), label: tone },
     family:       { done: (family.kids||[]).length > 0, count: (family.kids||[]).length,
                     hasProviders: (family.providers||[]).length > 0,
                     hasPlaydates: (family.playdateContacts||[]).length > 0 },
@@ -5360,6 +5722,7 @@ Router.register('setup-tone', () => {
     opt.addEventListener('click', () => {
       const id = opt.dataset.id;
       State.set('mediatorTone', id);
+      localStorage.setItem('parlay_tone_set', '1');
       SupabaseDB.saveCoupleSettings({ mediator_tone: id }).catch(() => {});
       el.querySelectorAll('.tone-opt').forEach(o => {
         const a = o.dataset.id === id;
@@ -6053,13 +6416,11 @@ Router.register('task-reply', (params) => {
           : selectedDecision === 'decline'
           ? `TASK: "${task.title}" | DECISION: DECLINED. Preserve the decline clearly. Remove blame, contempt, or harsh language.`
           : `TASK: "${task.title}" | DECISION: COUNTER-SUGGESTION. Make the suggestion clear and constructive.`;
-        const _replyBtn = el.querySelector('#task-reply-submit') || el.querySelector('button[id*="reply"]');
-        if (_replyBtn) { _replyBtn.textContent = 'Filtering…'; _replyBtn.disabled = true; }
         try {
           filteredReply = await runToneFilter(rawReply, myName, tone, decisionCtx);
         } catch(err) {
           console.error('[Parlay] task reply filter failed:', err);
-          if (_replyBtn) { _replyBtn.textContent = 'Send Reply →'; _replyBtn.disabled = false; }
+          btn.textContent = 'Send Response'; btn.disabled = false;
           U.toast('Couldn\'t reach the AI right now. Try again.');
           return;
         }
@@ -6191,6 +6552,17 @@ const Tasks = {
 /* ================================================
    INIT
    ================================================ */
+Router.register('equity', () => {
+  return `
+  <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;text-align:center;background:var(--parchment);">
+    <div style="font-size:3rem;margin-bottom:20px;animation:float 4s ease-in-out infinite;">\u2696\uFE0F</div>
+    <div style="font-family:var(--font-display);font-size:1.8rem;font-weight:300;color:var(--espresso);margin-bottom:8px;">Balance &amp; <em style="color:var(--terra)">Equity</em></div>
+    <div style="font-size:.85rem;color:var(--muted);line-height:1.7;max-width:280px;margin-bottom:32px;">Full equity tracking coming soon. Use Parlay to negotiate and resolve plans fairly in the meantime.</div>
+    <button onclick="Router.navigate('home')" style="padding:14px 28px;background:var(--espresso);color:var(--cream);border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:600;cursor:pointer;">\u2190 Home</button>
+  </div>
+  `;
+});
+
 window.addEventListener('DOMContentLoaded', async () => {
   State.load();
   Router.init();
