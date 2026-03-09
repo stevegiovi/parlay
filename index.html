@@ -818,7 +818,7 @@ const SupabaseDB = (() => {
     const { data, error } = await sb.from('couples')
       .select('id, invite_code, spouse_2_id')
       .eq('invite_code', code.toUpperCase().trim())
-      .single();
+      .maybeSingle();
     if (error || !data) return { valid: false, error: 'Invite code not found' };
     if (data.spouse_2_id) return { valid: false, error: 'This code has already been used' };
     return { valid: true };
@@ -826,10 +826,11 @@ const SupabaseDB = (() => {
 
   async function loadCouple() {
     if (!configured || !_myUserId) return null;
-    const { data } = await sb.from('couples')
+    const { data, error } = await sb.from('couples')
       .select('*')
       .or(`spouse_1_id.eq.${_myUserId},spouse_2_id.eq.${_myUserId}`)
-      .single();
+      .maybeSingle();
+    if (error) { console.warn('[loadCouple] query error:', error.message); return null; }
     if (!data) return null;
     _coupleRow = data;
     _myRole    = data.spouse_1_id === _myUserId ? 'user' : 'partner';
@@ -871,8 +872,9 @@ const SupabaseDB = (() => {
   }
 
   async function loadProfile(userId) {
-    if (!configured) return null;
-    const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
+    if (!configured || !userId) return null;
+    const { data, error } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
+    if (error) { console.warn('[loadProfile] query error:', error.message); return null; }
     return data;
   }
 
@@ -890,10 +892,13 @@ const SupabaseDB = (() => {
     const partId = getPartnerUserId();
     if (!partId) return;
 
-    const [selfRes, partnerSelfRes] = await Promise.all([
-      sb.from('comm_self').select('*').eq('user_id', _myUserId).maybeSingle(),
-      sb.from('comm_self').select('*').eq('user_id', partId).maybeSingle(),
-    ]);
+    let selfRes, partnerSelfRes;
+    try {
+      [selfRes, partnerSelfRes] = await Promise.all([
+        sb.from('comm_self').select('*').eq('user_id', _myUserId).maybeSingle(),
+        sb.from('comm_self').select('*').eq('user_id', partId).maybeSingle(),
+      ]);
+    } catch(e) { console.error('[loadCommPrefs] query error:', e); return; }
 
     const myRole   = _myRole;
     const themRole = myRole === 'user' ? 'partner' : 'user';
@@ -902,11 +907,11 @@ const SupabaseDB = (() => {
     State.set('commPrefs', {
       [myRole]: {
         ...(existing[myRole] || {}),
-        self: { traits: selfRes.data?.traits || [], setupDone: selfRes.data?.setup_done || false },
+        self: { traits: selfRes?.data?.traits || [], setupDone: selfRes?.data?.setup_done || false },
       },
       [themRole]: {
         ...(existing[themRole] || {}),
-        self: { traits: partnerSelfRes.data?.traits || [], setupDone: partnerSelfRes.data?.setup_done || false },
+        self: { traits: partnerSelfRes?.data?.traits || [], setupDone: partnerSelfRes?.data?.setup_done || false },
       }
     });
   }
@@ -924,7 +929,8 @@ const SupabaseDB = (() => {
 
   async function loadFamily() {
     if (!isReady()) return;
-    const { data } = await sb.from('family_members').select('*').eq('couple_id', _coupleRow.id);
+    const { data, error } = await sb.from('family_members').select('*').eq('couple_id', _coupleRow.id);
+    if (error) { console.warn('[loadFamily] query error:', error.message); return; }
     if (!data) return;
     const kids              = data.filter(r => r.type === 'kid').map(r => r.data);
     const providers         = data.filter(r => r.type === 'provider').map(r => r.data);
@@ -958,9 +964,10 @@ const SupabaseDB = (() => {
 
   async function loadNegotiations() {
     if (!isReady()) return;
-    const { data } = await sb.from('negotiations')
+    const { data, error } = await sb.from('negotiations')
       .select('*').eq('couple_id', _coupleRow.id)
       .is('deleted_at', null).order('created_at', { ascending: false });
+    if (error) { console.warn('[loadNegotiations] query error:', error.message); return; }
     if (!data) return;
     MediatorState.negotiations = data.map(_rowToNeg);
     MediatorState.tombstones   = new Set(); // server-side soft-deletes replace tombstones
@@ -987,9 +994,10 @@ const SupabaseDB = (() => {
 
   async function loadTasks() {
     if (!isReady()) return;
-    const { data } = await sb.from('tasks')
+    const { data, error } = await sb.from('tasks')
       .select('*').eq('couple_id', _coupleRow.id)
       .is('deleted_at', null).order('created_at', { ascending: false });
+    if (error) { console.warn('[loadTasks] query error:', error.message); return; }
     if (!data) return;
     TaskState._data = data.map(_rowToTask);
     localStorage.setItem('parlay_tasks', JSON.stringify(TaskState._data));
@@ -1027,80 +1035,106 @@ const SupabaseDB = (() => {
   }
 
   // ── Bootstrap ─────────────────────────────────────────────
+  let _bootstrapping = false;
   async function bootstrap() {
     if (!configured) {
       State.load();
       return { mode: 'local' };
     }
-
-    let session;
-    try { session = await getSession(); } catch(e) { console.warn('[bootstrap] getSession error:', e); }
-    if (!session) return { mode: 'unauthenticated' };
-
-    // Load my own profile
-    let profile;
-    try { profile = await loadProfile(_myUserId); } catch(e) { console.warn('[bootstrap] loadProfile error:', e); }
-    if (profile) {
-      // State.user = Spouse 1's data, State.partner = Spouse 2's data — always.
-      // Load my profile into the correct slot based on my actual role.
-      if (_myRole === 'user') {
-        State.set('user',    { ...State.get('user'),    name: profile.name  || '' });
-      } else {
-        State.set('partner', { ...State.get('partner'), name: profile.name  || '' });
-      }
-      State.set('loveLanguage', { ...(State.get('loveLanguage') || {}), primary: profile.love_language || '' });
+    // Prevent concurrent bootstrap calls (auth listener + manual call race)
+    if (_bootstrapping) {
+      console.warn('[bootstrap] already running — skipping duplicate call');
+      return { mode: 'pending' };
     }
+    _bootstrapping = true;
 
-    // Persist my email in case it wasn't saved yet
-    if (_session?.user?.email) {
-      sb.from('profiles').upsert({ id: _myUserId, email: _session.user.email }).catch(() => {});
-    }
+    try {
+      // 1. Get session
+      let session;
+      try { session = await getSession(); } catch(e) { console.error('[bootstrap] getSession error:', e); }
+      if (!session) { _bootstrapping = false; return { mode: 'unauthenticated' }; }
 
-    // Load or create couple
-    let couple;
-    try { couple = await loadCouple(); } catch(e) { console.warn('[bootstrap] loadCouple error:', e); }
-
-    if (couple) {
-      // Load partner's profile into the OTHER role slot
-      const partnerId = getPartnerUserId();
-      if (partnerId) {
-        let partnerProfile;
-        try { partnerProfile = await loadProfile(partnerId); } catch(e) { console.warn('[bootstrap] partner profile error:', e); }
-        if (partnerProfile) {
+      // 2. Load my own profile
+      let profile;
+      try { profile = await loadProfile(_myUserId); } catch(e) { console.error('[bootstrap] loadProfile error:', e); }
+      if (profile) {
+        try {
           if (_myRole === 'user') {
-            // I am Spouse 1 — partner goes in State.partner
-            State.set('partner', {
-              ...State.get('partner'),
-              name:      partnerProfile.name  || State.get('partner')?.name || '',
-              email:     partnerProfile.email || '',
-              connected: true,
-            });
+            State.set('user',    { ...(State.get('user') || {}),    name: profile.name  || '' });
           } else {
-            // I am Spouse 2 — partner (Spouse 1) goes in State.user
-            State.set('user', {
-              ...State.get('user'),
-              name:  partnerProfile.name  || State.get('user')?.name  || '',
-              email: partnerProfile.email || '',
-            });
-            // Mark couple as connected on the partner slot (my slot)
-            State.set('partner', { ...State.get('partner'), connected: true });
+            State.set('partner', { ...(State.get('partner') || {}), name: profile.name  || '' });
           }
-        }
+          State.set('loveLanguage', { ...(State.get('loveLanguage') || {}), primary: profile.love_language || '' });
+        } catch(e) { console.error('[bootstrap] state set (my profile) error:', e); }
       }
+
+      // 3. Persist my email (fire-and-forget)
       try {
-        await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
-        subscribeToCouple();
-      } catch(e) { console.warn('[bootstrap] data load error:', e); }
+        if (_session?.user?.email) {
+          sb.from('profiles').upsert({ id: _myUserId, email: _session.user.email }).catch(() => {});
+        }
+      } catch(e) { /* ignore */ }
+
+      // 4. Load couple
+      let couple;
+      try { couple = await loadCouple(); } catch(e) { console.error('[bootstrap] loadCouple error:', e); }
+
+      if (couple) {
+        // 5. Load partner's profile into the other role slot
+        try {
+          const partnerId = getPartnerUserId();
+          if (partnerId) {
+            let partnerProfile;
+            try { partnerProfile = await loadProfile(partnerId); } catch(e) { console.error('[bootstrap] partner profile error:', e); }
+            if (partnerProfile) {
+              if (_myRole === 'user') {
+                State.set('partner', {
+                  ...(State.get('partner') || {}),
+                  name:      partnerProfile.name  || State.get('partner')?.name || '',
+                  email:     partnerProfile.email || '',
+                  connected: true,
+                });
+              } else {
+                State.set('user', {
+                  ...(State.get('user') || {}),
+                  name:  partnerProfile.name  || State.get('user')?.name  || '',
+                  email: partnerProfile.email || '',
+                });
+                State.set('partner', { ...(State.get('partner') || {}), connected: true });
+              }
+            }
+          }
+        } catch(e) { console.error('[bootstrap] partner state error:', e); }
+
+        // 6. Load shared data
+        try {
+          await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
+        } catch(e) { console.error('[bootstrap] data load error:', e); }
+        try { subscribeToCouple(); } catch(e) { console.error('[bootstrap] subscribe error:', e); }
+      }
+
+      if (profile?.name) State.set('onboarded', true);
+
+      _bootstrapping = false;
+      return {
+        mode: 'supabase',
+        coupled: !!couple,
+        partnerConnected: !!(couple?.spouse_2_id),
+        onboardingComplete: !!(profile?.love_language),
+      };
+
+    } catch(e) {
+      // Outer safety net — nothing above should reach here, but just in case
+      console.error('[bootstrap] UNHANDLED error:', e);
+      _bootstrapping = false;
+      // Return a usable result even on failure — don't throw up to caller
+      return {
+        mode: 'supabase',
+        coupled: !!_coupleRow,
+        partnerConnected: !!(_coupleRow?.spouse_2_id),
+        onboardingComplete: false,
+      };
     }
-
-    if (profile?.name) State.set('onboarded', true);
-
-    return {
-      mode: 'supabase',
-      coupled: !!couple,
-      partnerConnected: !!(couple?.spouse_2_id),
-      onboardingComplete: !!(profile?.love_language),  // proxy: ob2 save = onboarding started
-    };
   }
 
   // ── Row mappers (camelCase ↔ snake_case) ──────────────────
@@ -1226,81 +1260,99 @@ const SupabaseDB = (() => {
     _authListenerRegistered = true;
 
     sb.auth.onAuthStateChange(async (event, session) => {
+      // INITIAL_SESSION fires on page load in newer supabase-js v2.39+.
+      // bootstrap() already handles cold-load — skip here to avoid racing.
+      if (event === 'INITIAL_SESSION') return;
+
       // SIGNED_IN fires for: Google OAuth redirect, email confirmation click, AND email/password sign-in.
       // For email/password sign-in the auth-signin handler calls bootstrap() directly — skip here.
       // The _handledByForm flag is set BEFORE signInWithPassword and cleared AFTER bootstrap() returns.
       if (event === 'SIGNED_IN' && session && !_handledByForm) {
-        // Fresh auth event — Google OAuth redirect or email confirmation link clicked
-        _session  = session;
-        _myUserId = session.user.id;
+        // Skip if bootstrap is already running (race condition guard)
+        if (_bootstrapping) { console.warn('[authListener] bootstrap already running, skipping'); return; }
 
-        // Ensure profile exists (Google users skip the sign-up form)
-        const profile = await loadProfile(_myUserId);
-        const googleName = session.user.user_metadata?.full_name?.split(' ')[0] || '';
-        const finalName  = profile?.name || googleName || '';
+        try {
+          _session  = session;
+          _myUserId = session.user.id;
 
-        if (!profile?.name && finalName) {
-          await sb.from('profiles').upsert({ id: _myUserId, name: finalName });
-        }
-        // Load name into role-correct slot (role is set by loadCouple below)
-        // For now, stash in a temp var — we'll place it after we know the role
-        const _myNameTemp = finalName;
+          // Ensure profile exists (Google users skip the sign-up form)
+          let profile;
+          try { profile = await loadProfile(_myUserId); } catch(e) { console.error('[authListener] loadProfile error:', e); }
+          const googleName = session.user.user_metadata?.full_name?.split(' ')[0] || '';
+          const finalName  = profile?.name || googleName || '';
 
-        if (profile?.love_language)
-          State.set('loveLanguage', { ...(State.get('loveLanguage') || {}), primary: profile.love_language });
-
-        const couple = await loadCouple();
-
-        // Now _myRole is set — place my name in the correct slot
-        if (_myRole === 'user') {
-          State.set('user',    { ...State.get('user'),    name: _myNameTemp });
-        } else {
-          State.set('partner', { ...State.get('partner'), name: _myNameTemp });
-        }
-
-        if (couple) {
-          // Load partner profile into the other slot
-          const partnerId = getPartnerUserId();
-          if (partnerId) {
-            const partnerProfile = await loadProfile(partnerId);
-            if (partnerProfile?.name) {
-              if (_myRole === 'user') {
-                State.set('partner', { ...State.get('partner'), name: partnerProfile.name, email: partnerProfile.email || '', connected: true });
-              } else {
-                State.set('user',    { ...State.get('user'),    name: partnerProfile.name, email: partnerProfile.email || '' });
-                State.set('partner', { ...State.get('partner'), connected: true });
-              }
-            }
+          if (!profile?.name && finalName) {
+            try { await sb.from('profiles').upsert({ id: _myUserId, name: finalName }); } catch(e) { console.error('[authListener] upsert profile error:', e); }
           }
-          await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
-          subscribeToCouple();
-          State.set('onboarded', true);
-          Router.navigate('home');
-        } else {
-          // Check if there's a pending invite code (Spouse 2 used Google on auth-join)
-          const pendingCode = localStorage.getItem('parlay_pending_invite');
-          if (pendingCode) {
-            localStorage.removeItem('parlay_pending_invite');
-            const joinResult = await joinCouple(pendingCode);
-            if (!joinResult.error) {
-              const partnerId = getPartnerUserId();
-              if (partnerId) {
-                const partnerProfile = await loadProfile(partnerId);
-                if (partnerProfile?.name) {
-                  // After joining, I am Spouse 2 (_myRole = 'partner')
-                  State.set('user', { ...State.get('user'), name: partnerProfile.name, email: partnerProfile.email || '' });
-                  State.set('partner', { ...State.get('partner'), connected: true });
+          const _myNameTemp = finalName;
+
+          if (profile?.love_language)
+            State.set('loveLanguage', { ...(State.get('loveLanguage') || {}), primary: profile.love_language });
+
+          let couple;
+          try { couple = await loadCouple(); } catch(e) { console.error('[authListener] loadCouple error:', e); }
+
+          // Now _myRole is set — place my name in the correct slot
+          if (_myRole === 'user') {
+            State.set('user',    { ...(State.get('user') || {}),    name: _myNameTemp });
+          } else {
+            State.set('partner', { ...(State.get('partner') || {}), name: _myNameTemp });
+          }
+
+          if (couple) {
+            // Load partner profile into the other slot
+            const partnerId = getPartnerUserId();
+            if (partnerId) {
+              let partnerProfile;
+              try { partnerProfile = await loadProfile(partnerId); } catch(e) { console.error('[authListener] partner profile error:', e); }
+              if (partnerProfile?.name) {
+                if (_myRole === 'user') {
+                  State.set('partner', { ...(State.get('partner') || {}), name: partnerProfile.name, email: partnerProfile.email || '', connected: true });
+                } else {
+                  State.set('user',    { ...(State.get('user') || {}),    name: partnerProfile.name, email: partnerProfile.email || '' });
+                  State.set('partner', { ...(State.get('partner') || {}), connected: true });
                 }
               }
+            }
+            try {
               await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
               subscribeToCouple();
-              State.set('onboarded', true);
-              Router.navigate('ob2'); // Spouse 2's personal onboarding
-              return;
+            } catch(e) { console.error('[authListener] data load error:', e); }
+            State.set('onboarded', true);
+            Router.navigate('home');
+          } else {
+            // Check if there's a pending invite code (Spouse 2 used Google on auth-join)
+            const pendingCode = localStorage.getItem('parlay_pending_invite');
+            if (pendingCode) {
+              localStorage.removeItem('parlay_pending_invite');
+              let joinResult = { error: 'unknown' };
+              try { joinResult = await joinCouple(pendingCode); } catch(e) { console.error('[authListener] joinCouple error:', e); }
+              if (!joinResult.error) {
+                const partnerId = getPartnerUserId();
+                if (partnerId) {
+                  let partnerProfile;
+                  try { partnerProfile = await loadProfile(partnerId); } catch(e) {}
+                  if (partnerProfile?.name) {
+                    State.set('user', { ...(State.get('user') || {}), name: partnerProfile.name, email: partnerProfile.email || '' });
+                    State.set('partner', { ...(State.get('partner') || {}), connected: true });
+                  }
+                }
+                try {
+                  await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
+                  subscribeToCouple();
+                } catch(e) { console.error('[authListener] data load (join) error:', e); }
+                State.set('onboarded', true);
+                Router.navigate('ob2');
+                return;
+              }
             }
+            // No couple, no pending code — normal new user onboarding
+            Router.navigate(profile?.love_language ? 'ob-connect' : 'ob2');
           }
-          // No couple, no pending code — normal new user onboarding
-          Router.navigate(profile?.love_language ? 'ob-connect' : 'ob2');
+        } catch(e) {
+          console.error('[authListener] UNHANDLED error in SIGNED_IN handler:', e);
+          // Best-effort fallback — send to auth entry so user isn't stuck
+          Router.navigate('auth-entry');
         }
       }
 
@@ -1880,12 +1932,17 @@ Router.register('auth-signin', () => `
       console.error('[Parlay] bootstrap failed after sign-in:', err);
       SupabaseDB.clearFormFlag?.();
       btn.textContent = 'Sign in →'; btn.disabled = false;
-      errEl.textContent = 'Signed in but could not load your account — check your connection and try again.';
+      errEl.textContent = 'Signed in but could not load your data. Check the browser console for details.';
       errEl.style.display = 'block';
       return;
     }
     SupabaseDB.clearFormFlag?.();
-    if (result.mode === 'unauthenticated') {
+    if (result.mode === 'pending') {
+      // Another bootstrap was already running — wait briefly and retry once
+      await new Promise(r => setTimeout(r, 1500));
+      try { result = await SupabaseDB.bootstrap(); } catch(e) { console.error('[Parlay] retry bootstrap failed:', e); }
+    }
+    if (!result || result.mode === 'unauthenticated') {
       errEl.textContent = 'Sign-in failed — please try again.';
       errEl.style.display = 'block';
       btn.textContent = 'Sign in →'; btn.disabled = false;
