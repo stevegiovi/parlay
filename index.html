@@ -717,8 +717,17 @@ const SupabaseDB = (() => {
     const { data, error } = await sb.auth.signUp({ email, password });
     if (error) return { error: error.message };
     if (data.user) {
+      // Write profile immediately (works even before email confirmation)
       await sb.from('profiles').upsert({ id: data.user.id, name });
     }
+    if (!data.session) {
+      // Email confirmation required — session is null until user clicks the link
+      return { data, confirmEmail: true };
+    }
+    // Auto-confirmed (email confirmation disabled in Supabase settings)
+    _session  = data.session;
+    _myUserId = data.user.id;
+    State.set('user', { ...State.get('user'), name });
     return { data };
   }
 
@@ -726,6 +735,8 @@ const SupabaseDB = (() => {
     if (!configured) return { error: 'Supabase not configured' };
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
+    _session  = data.session;
+    _myUserId = data.user?.id || null;
     return { data };
   }
 
@@ -820,7 +831,7 @@ const SupabaseDB = (() => {
 
   // ── Profile ───────────────────────────────────────────────
   async function saveProfile(updates) {
-    if (!isReady()) return;
+    if (!configured || !_session) return;
     await sb.from('profiles').upsert({ id: _myUserId, ...updates });
   }
 
@@ -832,7 +843,7 @@ const SupabaseDB = (() => {
 
   // ── Comm Prefs ────────────────────────────────────────────
   async function saveCommSelf(traits) {
-    if (!isReady()) return;
+    if (!configured || !_session || !_myUserId) return;
     await sb.from('comm_self')
       .upsert({ user_id: _myUserId, traits, setup_done: traits.length > 0 },
               { onConflict: 'user_id' });
@@ -1000,44 +1011,9 @@ const SupabaseDB = (() => {
   // ── Bootstrap ─────────────────────────────────────────────
   async function bootstrap() {
     if (!configured) {
-      // localStorage-only mode
       State.load();
       return { mode: 'local' };
     }
-
-    // Listen for auth state changes — catches Google OAuth redirects back to the app
-    sb.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session && !_session) {
-        // Fresh sign-in from OAuth redirect (Google)
-        _session   = session;
-        _myUserId  = session.user.id;
-
-        // Ensure a profile row exists (Google users skip the sign-up form)
-        const profile = await loadProfile(_myUserId);
-        const googleName = session.user.user_metadata?.full_name?.split(' ')[0] || '';
-        if (!profile?.name && googleName) {
-          await sb.from('profiles').upsert({ id: _myUserId, name: googleName });
-          State.set('user', { ...State.get('user'), name: googleName });
-        } else if (profile?.name) {
-          State.set('user', { ...State.get('user'), name: profile.name });
-          if (profile.love_language)
-            State.set('loveLanguage', { ...(State.get('loveLanguage') || {}), primary: profile.love_language });
-        }
-
-        const couple = await loadCouple();
-        if (couple) {
-          await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
-          subscribeToCouple();
-          State.set('onboarded', true);
-          Router.navigate('home');
-        } else {
-          Router.navigate(profile?.name ? 'ob4' : 'ob2');
-        }
-      }
-      if (event === 'SIGNED_OUT') {
-        Router.navigate('auth-entry');
-      }
-    });
 
     const session = await getSession();
     if (!session) return { mode: 'unauthenticated' };
@@ -1053,20 +1029,18 @@ const SupabaseDB = (() => {
     const couple = await loadCouple();
 
     if (couple) {
-      // Load all shared data
-      await Promise.all([
-        loadCommPrefs(),
-        loadFamily(),
-        loadNegotiations(),
-        loadTasks(),
-      ]);
+      await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
       subscribeToCouple();
     }
 
-    // If profile has a name, mark onboarded for returning users
     if (profile?.name) State.set('onboarded', true);
 
-    return { mode: 'supabase', coupled: !!couple };
+    return {
+      mode: 'supabase',
+      coupled: !!couple,
+      partnerConnected: !!(couple?.spouse_2_id),
+      onboardingComplete: !!(profile?.love_language),  // proxy: ob2 save = onboarding started
+    };
   }
 
   // ── Row mappers (camelCase ↔ snake_case) ──────────────────
@@ -1184,11 +1158,64 @@ const SupabaseDB = (() => {
     };
   }
 
+  // ── Auth state listener (registered once at module init) ──
+  // Handles: Google OAuth redirect returns, email confirmation callback, session expiry
+  let _authListenerRegistered = false;
+  function _initAuthListener() {
+    if (!configured || _authListenerRegistered) return;
+    _authListenerRegistered = true;
+
+    sb.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session && !_session) {
+        // Fresh auth event — Google OAuth redirect or email confirmation link clicked
+        _session  = session;
+        _myUserId = session.user.id;
+
+        // Ensure profile exists (Google users skip the sign-up form)
+        const profile = await loadProfile(_myUserId);
+        const googleName = session.user.user_metadata?.full_name?.split(' ')[0] || '';
+        const finalName  = profile?.name || googleName || '';
+
+        if (!profile?.name && finalName) {
+          await sb.from('profiles').upsert({ id: _myUserId, name: finalName });
+        }
+        State.set('user', { ...State.get('user'), name: finalName });
+        if (profile?.love_language)
+          State.set('loveLanguage', { ...(State.get('loveLanguage') || {}), primary: profile.love_language });
+
+        const couple = await loadCouple();
+        if (couple) {
+          await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
+          subscribeToCouple();
+          State.set('onboarded', true);
+          Router.navigate('home');
+        } else if (profile?.love_language) {
+          // Has done at least ob2 — send to couple-connect fork
+          Router.navigate('ob-connect');
+        } else {
+          // Brand new (Google first-timer or email-confirmed) — full onboarding
+          Router.navigate('ob2');
+        }
+      }
+
+      if (event === 'SIGNED_OUT') {
+        _session = null; _coupleRow = null; _myUserId = null; _myRole = 'user';
+        State.reset();
+        Router.navigate('auth-entry');
+      }
+
+      if (event === 'TOKEN_REFRESHED' && session) {
+        _session = session;
+      }
+    });
+  }
+
   return {
     get configured() { return configured; },
     get myRole()     { return _myRole; },
     get coupleRow()  { return _coupleRow; },
     isReady,
+    initAuthListener: _initAuthListener,
     signUp, signIn, signOut, signInWithGoogle, getSession,
     createCouple, joinCouple, loadCouple, getCoupleId, getMyRole, getMyUserId, getPartnerUserId,
     saveProfile, loadProfile,
@@ -1232,7 +1259,7 @@ const Router = (() => {
     current = name;
 
     // View banner (localStorage dev mode only — hidden when Supabase is active)
-    const ONBOARDING_SCREENS = ['splash','ob1','ob2','ob-self','ob3','ob4','ob-join','auth-entry','auth-signup','auth-signin'];
+    const ONBOARDING_SCREENS = ['splash','ob1','ob2','ob-self','ob3','ob4','ob-join','ob-connect','ob-intro','auth-entry','auth-signup','auth-signin','auth-confirm-email'];
     const NAV_MAIN_SCREENS = ['home','languages','plan','tasks','equity','setup'];
     const banner = document.getElementById('view-banner');
     const bannerText = document.getElementById('view-banner-text');
@@ -1447,21 +1474,28 @@ Router.register('auth-signup', () => `
     const password = el.querySelector('#signup-password').value;
     const errEl    = el.querySelector('#signup-error');
     errEl.style.display = 'none';
-    if (!name)           { errEl.textContent = 'Enter your name'; errEl.style.display = 'block'; return; }
-    if (!email)          { errEl.textContent = 'Enter your email'; errEl.style.display = 'block'; return; }
+    if (!name)               { errEl.textContent = 'Enter your name'; errEl.style.display = 'block'; return; }
+    if (!email)              { errEl.textContent = 'Enter your email'; errEl.style.display = 'block'; return; }
     if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters'; errEl.style.display = 'block'; return; }
 
     const btn = el.querySelector('#signup-btn');
     btn.textContent = 'Creating account…'; btn.disabled = true;
 
-    const { error } = await SupabaseDB.signUp(email, password, name);
-    if (error) {
-      errEl.textContent = error; errEl.style.display = 'block';
-      btn.textContent = 'Create account →'; btn.disabled = false;
+    const result = await SupabaseDB.signUp(email, password, name);
+    if (result.error) {
+      errEl.textContent = result.error; errEl.style.display = 'block';
+      btn.textContent = 'Sign up with email →'; btn.disabled = false;
       return;
     }
-    State.set('user', { ...State.get('user'), name });
-    // Proceed to onboarding — they still need to complete setup + invite
+    if (result.confirmEmail) {
+      // Email confirmation required — show waiting screen
+      // The onAuthStateChange listener will handle the redirect when they click the link
+      SupabaseDB.initAuthListener();
+      Router.navigate('auth-confirm-email');
+      return;
+    }
+    // Auto-confirmed — session is live, proceed to onboarding
+    SupabaseDB.initAuthListener();
     Router.navigate('ob2');
   });
   el.querySelector('#signup-name').focus();
@@ -1530,6 +1564,28 @@ Router.register('auth-signin', () => `
   el.querySelector('#signin-password').addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
   el.querySelector('#signin-email').focus();
 });
+
+/* ================================================
+   AUTH — Email Confirmation Waiting Screen
+   ================================================ */
+Router.register('auth-confirm-email', () => `
+  <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--espresso);padding:0 32px;text-align:center;">
+    <div style="font-size:3rem;margin-bottom:24px;animation:float 4s ease-in-out infinite;">📬</div>
+    <div style="font-family:var(--font-display);font-size:2rem;font-weight:300;color:var(--cream);margin-bottom:12px;line-height:1.2;">
+      Check your <em style="color:var(--amber)">inbox</em>
+    </div>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.5);line-height:1.65;max-width:300px;margin-bottom:32px;">
+      We sent a confirmation link to your email. Click it to activate your account — then you'll land right back here.
+    </div>
+    <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px 20px;max-width:300px;width:100%;margin-bottom:24px;">
+      <div style="font-size:.72rem;color:rgba(250,246,241,.35);margin-bottom:6px;">💡 Tip</div>
+      <div style="font-size:.76rem;color:rgba(250,246,241,.5);line-height:1.55;">If you don't see it, check spam. You can also disable email confirmation in your Supabase project (Authentication → Settings) for easier testing.</div>
+    </div>
+    <button onclick="Router.navigate('auth-entry')" style="background:none;border:1px solid rgba(255,255,255,.15);color:rgba(250,246,241,.4);padding:10px 20px;border-radius:12px;font-family:var(--font-body);font-size:.78rem;cursor:pointer;">
+      ← Back to sign in
+    </button>
+  </div>
+`);
 
 /* ================================================
    MODULE: SPLASH
@@ -1684,10 +1740,12 @@ Router.register('ob2', () => `
    MODULE: ONBOARDING — Step 3 (My Communication Prefs)
    ================================================ */
 Router.register('ob-self', () => {
+  const view      = State.get('currentView') || 'user';
+  const myRole    = view === 'partner' ? 'partner' : 'user';
   const userName  = State.get('user')?.name || 'you';
   const commPrefs = State.get('commPrefs') || {};
-  const myPrefs   = commPrefs.user || {};
-  const selected  = new Set(myPrefs.traits || []);
+  const myPrefs   = commPrefs[myRole] || {};
+  const selected  = new Set(myPrefs.self?.traits || []);
 
   return `
     <div class="onboarding-wrap" style="padding-bottom:40px;">
@@ -1824,7 +1882,6 @@ Router.register('ob-self', () => {
 });
 
 /* ================================================
-/* ================================================
    MODULE: ONBOARDING — Step 4 (Partner Communication Style)
    ================================================ */
 Router.register('ob3', () => {
@@ -1883,7 +1940,7 @@ Router.register('ob3', () => {
       <div class="ob-footer a5" style="margin-top:12px;">
         <button class="btn btn-primary btn-full" id="ob3-next">Continue →</button>
         <button class="btn btn-muted btn-full" onclick="Router.navigate('ob-self')" style="font-size:.82rem;">Back</button>
-        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob4')" style="font-size:.78rem;opacity:.6;">Skip for now</button>
+        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob-connect')" style="font-size:.78rem;opacity:.6;">Skip for now</button>
       </div>
     </div>
   `;
@@ -1938,8 +1995,62 @@ Router.register('ob3', () => {
         }
       }
     });
-    Router.navigate('ob4');
+    Router.navigate('ob-connect');
   });
+});
+
+/* ================================================
+   MODULE: ONBOARDING — Connect Your Couple (fork)
+   Shown after ob3. Spouse 1 to ob4 (invite code). Spouse 2 to ob-join.
+   ================================================ */
+Router.register('ob-connect', () => {
+  const name = State.get('user')?.name || 'you';
+  return `
+    <div class="onboarding-wrap">
+      <div class="ob-header">
+        <div class="ob-step-dots">
+          <div class="ob-dot done"></div>
+          <div class="ob-dot done"></div>
+          <div class="ob-dot done"></div>
+          <div class="ob-dot done"></div>
+          <div class="ob-dot active"></div>
+        </div>
+      </div>
+
+      <div class="a1" style="margin-bottom:28px;">
+        <div class="ob-title">Connect with your<br><em>partner</em></div>
+        <div class="ob-sub" style="margin-top:8px;">Are you starting a new Parlay space together, or joining one your partner already set up?</div>
+      </div>
+
+      <div class="ob-body a2" style="display:flex;flex-direction:column;gap:14px;">
+        <button id="ob-connect-create" style="text-align:left;padding:20px;border:2px solid var(--border);border-radius:18px;background:var(--surface);cursor:pointer;width:100%;font-family:var(--font-body);transition:all .15s;">
+          <div style="font-size:1.4rem;margin-bottom:8px;">✨</div>
+          <div style="font-size:.92rem;font-weight:700;color:var(--espresso);margin-bottom:4px;">Start our space</div>
+          <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">Create a new couple account. You'll get an invite code to share with your partner.</div>
+        </button>
+        <button id="ob-connect-join" style="text-align:left;padding:20px;border:2px solid var(--border);border-radius:18px;background:var(--surface);cursor:pointer;width:100%;font-family:var(--font-body);transition:all .15s;">
+          <div style="font-size:1.4rem;margin-bottom:8px;">🔗</div>
+          <div style="font-size:.92rem;font-weight:700;color:var(--espresso);margin-bottom:4px;">Join with a code</div>
+          <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">Your partner already created a Parlay space and shared a 6-character invite code with you.</div>
+        </button>
+      </div>
+
+      <div class="ob-footer a3">
+        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob3')" style="font-size:.82rem;">Back</button>
+      </div>
+    </div>
+  `;
+}, (el) => {
+  const addHover = (btn) => {
+    btn.addEventListener('mouseenter', () => { btn.style.borderColor = 'var(--terra)'; btn.style.background = '#FDF0EA'; });
+    btn.addEventListener('mouseleave', () => { btn.style.borderColor = 'var(--border)'; btn.style.background = 'var(--surface)'; });
+  };
+  const createBtn = el.querySelector('#ob-connect-create');
+  const joinBtn   = el.querySelector('#ob-connect-join');
+  addHover(createBtn);
+  addHover(joinBtn);
+  createBtn.addEventListener('click', () => Router.navigate('ob4'));
+  joinBtn.addEventListener('click',   () => Router.navigate('ob-join'));
 });
 
 /* ================================================
@@ -1987,7 +2098,7 @@ Router.register('ob4', () => {
 
       <div class="ob-footer a5">
         <button class="btn btn-primary btn-full" id="ob4-done">Enter Parlay →</button>
-        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob3')" style="font-size:.82rem;">Back</button>
+        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob-connect')" style="font-size:.82rem;">Back</button>
       </div>
     </div>
   `;
@@ -2019,22 +2130,18 @@ Router.register('ob-join', () => `
   <div class="onboarding-wrap">
     <div class="a1" style="margin-bottom:32px;margin-top:20px;">
       <div class="ob-title">Enter your<br><em>invite code</em></div>
-      <div class="ob-sub" style="margin-top:8px;">Your partner shared a 6-character code with you.</div>
+      <div class="ob-sub" style="margin-top:8px;">Your partner's 6-character code links your accounts together.</div>
     </div>
     <div class="ob-body a2">
-      ${!SupabaseDB.configured ? `<div class="input-wrap">
-        <label class="input-label">Your name first</label>
-        <input class="input" id="join-name" type="text" placeholder="Your first name">
-      </div>` : ''}
       <div class="input-wrap">
         <label class="input-label">Invite code</label>
-        <input class="input" id="join-code" type="text" placeholder="e.g. AB12CD" style="text-transform:uppercase;letter-spacing:.15em;font-size:1.3rem;font-family:var(--font-display);" maxlength="6">
+        <input class="input" id="join-code" type="text" placeholder="e.g. AB12CD" style="text-transform:uppercase;letter-spacing:.15em;font-size:1.3rem;font-family:var(--font-display);" maxlength="6" autocomplete="off" autocorrect="off" spellcheck="false">
       </div>
       <div id="join-error" style="display:none;font-size:.78rem;color:var(--terra);background:rgba(196,113,74,.1);border-radius:10px;padding:10px 14px;line-height:1.5;"></div>
     </div>
     <div class="ob-footer a3">
       <button class="btn btn-primary btn-full" id="join-btn">Connect to partner →</button>
-      <button class="btn btn-muted btn-full" onclick="Router.navigate('splash')">Back</button>
+      <button class="btn btn-muted btn-full" onclick="Router.navigate(SupabaseDB.configured ? 'ob-connect' : 'splash')">Back</button>
     </div>
   </div>
 `, async (el) => {
@@ -2069,17 +2176,18 @@ Router.register('ob-join', () => `
         SupabaseDB.loadTasks(),
       ]);
       SupabaseDB.subscribeToCouple();
+      State.set('onboarded', true);
+      Router.navigate('ob-intro'); // ← correct: don't loop back to ob2
     } else {
-      // localStorage-only mode
-      const name = el.querySelector('#join-name')?.value.trim() || '';
-      if (!name) { errEl.textContent = 'Enter your name first'; errEl.style.display = 'block'; btn.textContent = 'Connect to partner →'; btn.disabled = false; return; }
-      State.set({ user: { ...State.get('user'), name }, partner: { ...State.get('partner'), connected: true, inviteCode: code }});
+      // localStorage-only mode — name prompt not needed (user already entered name in ob1)
+      State.set('partner', { ...State.get('partner'), connected: true, inviteCode: code });
+      Router.navigate('ob-intro');
     }
-    Router.navigate('ob2');
   });
   el.querySelector('#join-code').addEventListener('input', e => {
     e.target.value = e.target.value.toUpperCase();
   });
+  el.querySelector('#join-code').focus();
 });
 
 const MediatorView = {
@@ -2184,6 +2292,17 @@ Router.register('home', () => {
           </div>
         </div>
       </div>
+
+      <!-- INVITE PARTNER BANNER — shown when Supabase is active and partner hasn't joined yet -->
+      ${SupabaseDB.configured && SupabaseDB.coupleRow && !SupabaseDB.coupleRow.spouse_2_id ? `
+      <div style="margin:0 20px 4px;background:linear-gradient(135deg,#3d1f0a,#2a1506);border:1px solid rgba(196,113,74,.3);border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:14px;" class="a3">
+        <div style="font-size:1.6rem;flex-shrink:0;">🔗</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.82rem;font-weight:700;color:var(--amber);margin-bottom:3px;">Partner hasn't joined yet</div>
+          <div style="font-size:.72rem;color:rgba(250,246,241,.5);line-height:1.45;">Share your invite code so they can connect their account.</div>
+        </div>
+        <button onclick="Router.navigate('ob4')" style="flex-shrink:0;padding:8px 14px;background:var(--terra);color:#fff;border:none;border-radius:10px;font-family:var(--font-body);font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">Share code</button>
+      </div>` : ''}
 
       <!-- QUICK ACTIONS -->
       <div class="quick-strip a3">
@@ -5934,8 +6053,11 @@ const Tasks = {
    INIT
    ================================================ */
 window.addEventListener('DOMContentLoaded', async () => {
-  State.load(); // always load localStorage cache first (fast paint)
+  State.load();
   Router.init();
+
+  // Register the auth state listener once (handles Google OAuth redirects, email confirms, token refresh)
+  SupabaseDB.initAuthListener();
 
   // Update streak on open
   try {
@@ -5950,7 +6072,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   } catch(e) {}
 
   if (SupabaseDB.configured) {
-    // Show a brief loading state while Supabase boots
     const app = document.getElementById('app');
     if (app) app.innerHTML = `<div style="height:100dvh;display:flex;align-items:center;justify-content:center;background:var(--espresso);"><div style="font-family:var(--font-display);font-size:2.5rem;font-weight:300;color:var(--cream);">Par<em style="color:var(--amber)">lay</em></div></div>`;
 
@@ -5962,12 +6083,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (result.mode === 'supabase') {
-      // currentView is set by SupabaseDB.loadCouple() based on auth identity
-      const onboarded = State.get('onboarded') || !!State.get('user')?.name;
-      if (!onboarded) {
-        Router.navigate('ob2'); // signed up but hasn't finished onboarding
-      } else if (!result.coupled) {
-        Router.navigate('ob4'); // logged in but partner not linked yet
+      if (!result.coupled) {
+        // Signed in but no couple yet — check if onboarding was completed
+        if (result.onboardingComplete) {
+          Router.navigate('ob-connect'); // finished personal setup, needs couple step
+        } else {
+          Router.navigate('ob2'); // hasn't done anything yet
+        }
       } else {
         Router.navigate('home');
       }
