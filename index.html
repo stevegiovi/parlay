@@ -835,6 +835,12 @@ const SupabaseDB = (() => {
   function getMyRole()    { return _myRole; }
   function getMyUserId()  { return _myUserId; }
   function getMyEmail()   { return _session?.user?.email || ''; }
+  function getMyName()    {
+    // Returns the signed-in person's own first name, regardless of spouse role
+    if (_myRole === 'user')    return State.get('user')?.name    || '';
+    if (_myRole === 'partner') return State.get('partner')?.name || '';
+    return '';
+  }
 
   function getPartnerUserId() {
     if (!_coupleRow) return null;
@@ -1032,37 +1038,55 @@ const SupabaseDB = (() => {
     const session = await getSession();
     if (!session) return { mode: 'unauthenticated' };
 
-    // Load profile
+    // Load my own profile
     const profile = await loadProfile(_myUserId);
     if (profile) {
-      State.set('user', { ...State.get('user'), name: profile.name || '' });
+      // State.user = Spouse 1's data, State.partner = Spouse 2's data — always.
+      // Load my profile into the correct slot based on my actual role.
+      if (_myRole === 'user') {
+        State.set('user',    { ...State.get('user'),    name: profile.name  || '' });
+      } else {
+        State.set('partner', { ...State.get('partner'), name: profile.name  || '' });
+      }
       State.set('loveLanguage', { ...(State.get('loveLanguage') || {}), primary: profile.love_language || '' });
+    }
+
+    // Persist my email in case it wasn't saved yet
+    if (_session?.user?.email) {
+      sb.from('profiles').upsert({ id: _myUserId, email: _session.user.email }).catch(() => {});
     }
 
     // Load or create couple
     const couple = await loadCouple();
 
     if (couple) {
-      // Load partner's profile so home banner + setup show correct name/email
+      // Load partner's profile into the OTHER role slot
       const partnerId = getPartnerUserId();
       if (partnerId) {
         const partnerProfile = await loadProfile(partnerId);
         if (partnerProfile) {
-          State.set('partner', {
-            ...State.get('partner'),
-            name:      partnerProfile.name  || State.get('partner')?.name || '',
-            email:     partnerProfile.email || '',
-            connected: true,
-          });
+          if (_myRole === 'user') {
+            // I am Spouse 1 — partner goes in State.partner
+            State.set('partner', {
+              ...State.get('partner'),
+              name:      partnerProfile.name  || State.get('partner')?.name || '',
+              email:     partnerProfile.email || '',
+              connected: true,
+            });
+          } else {
+            // I am Spouse 2 — partner (Spouse 1) goes in State.user
+            State.set('user', {
+              ...State.get('user'),
+              name:  partnerProfile.name  || State.get('user')?.name  || '',
+              email: partnerProfile.email || '',
+            });
+            // Mark couple as connected on the partner slot (my slot)
+            State.set('partner', { ...State.get('partner'), connected: true });
+          }
         }
       }
       await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
       subscribeToCouple();
-    }
-
-    // Also persist our own email in case it wasn't saved yet
-    if (_session?.user?.email) {
-      sb.from('profiles').upsert({ id: _myUserId, email: _session.user.email }).catch(() => {});
     }
 
     if (profile?.name) State.set('onboarded', true);
@@ -1211,12 +1235,36 @@ const SupabaseDB = (() => {
         if (!profile?.name && finalName) {
           await sb.from('profiles').upsert({ id: _myUserId, name: finalName });
         }
-        State.set('user', { ...State.get('user'), name: finalName });
+        // Load name into role-correct slot (role is set by loadCouple below)
+        // For now, stash in a temp var — we'll place it after we know the role
+        const _myNameTemp = finalName;
+
         if (profile?.love_language)
           State.set('loveLanguage', { ...(State.get('loveLanguage') || {}), primary: profile.love_language });
 
         const couple = await loadCouple();
+
+        // Now _myRole is set — place my name in the correct slot
+        if (_myRole === 'user') {
+          State.set('user',    { ...State.get('user'),    name: _myNameTemp });
+        } else {
+          State.set('partner', { ...State.get('partner'), name: _myNameTemp });
+        }
+
         if (couple) {
+          // Load partner profile into the other slot
+          const partnerId = getPartnerUserId();
+          if (partnerId) {
+            const partnerProfile = await loadProfile(partnerId);
+            if (partnerProfile?.name) {
+              if (_myRole === 'user') {
+                State.set('partner', { ...State.get('partner'), name: partnerProfile.name, email: partnerProfile.email || '', connected: true });
+              } else {
+                State.set('user',    { ...State.get('user'),    name: partnerProfile.name, email: partnerProfile.email || '' });
+                State.set('partner', { ...State.get('partner'), connected: true });
+              }
+            }
+          }
           await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
           subscribeToCouple();
           State.set('onboarded', true);
@@ -1231,7 +1279,11 @@ const SupabaseDB = (() => {
               const partnerId = getPartnerUserId();
               if (partnerId) {
                 const partnerProfile = await loadProfile(partnerId);
-                if (partnerProfile?.name) State.set('partner', { ...State.get('partner'), name: partnerProfile.name, connected: true });
+                if (partnerProfile?.name) {
+                  // After joining, I am Spouse 2 (_myRole = 'partner')
+                  State.set('user', { ...State.get('user'), name: partnerProfile.name, email: partnerProfile.email || '' });
+                  State.set('partner', { ...State.get('partner'), connected: true });
+                }
               }
               await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
               subscribeToCouple();
@@ -1264,7 +1316,7 @@ const SupabaseDB = (() => {
     isReady,
     initAuthListener: _initAuthListener,
     signUp, signIn, signOut, signInWithGoogle, getSession,
-    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getMyEmail, getPartnerUserId,
+    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getMyEmail, getMyName, getPartnerUserId,
     saveProfile, loadProfile,
     saveCommSelf, saveCommReadOfPartner, loadCommPrefs,
     saveFamilyMember, deleteFamilyMember, loadFamily,
@@ -1329,7 +1381,7 @@ const Router = (() => {
     if (authBar) {
       if (SupabaseDB.configured && SupabaseDB.isReady() && NAV_MAIN_SCREENS.includes(name)) {
         const nameEl = document.getElementById('auth-bar-name');
-        if (nameEl) nameEl.textContent = State.get('user')?.name || 'You';
+        if (nameEl) nameEl.textContent = (SupabaseDB.configured ? SupabaseDB.getMyName() : State.get('user')?.name) || 'You';
         authBar.style.display = 'flex';
       } else {
         authBar.style.display = 'none';
@@ -1731,11 +1783,15 @@ Router.register('auth-join', () => `
       return;
     }
 
-    // 3. Load partner name + shared data
+    // 3. Load partner (Spouse 1) name into State.user; mark State.partner as connected
     const partnerId = SupabaseDB.getPartnerUserId();
     if (partnerId) {
       const profile = await SupabaseDB.loadProfile(partnerId);
-      if (profile?.name) State.set('partner', { ...State.get('partner'), name: profile.name, connected: true });
+      if (profile?.name) {
+        // As Spouse 2, my slot is State.partner; Spouse 1's data goes in State.user
+        State.set('user',    { ...State.get('user'),    name: profile.name, email: profile.email || '' });
+        State.set('partner', { ...State.get('partner'), connected: true });
+      }
     }
     await Promise.all([SupabaseDB.loadCommPrefs(), SupabaseDB.loadFamily(), SupabaseDB.loadNegotiations(), SupabaseDB.loadTasks()]);
     SupabaseDB.subscribeToCouple();
@@ -2456,11 +2512,14 @@ Router.register('ob-join', () => `
           return;
         }
       }
-      // Load partner's profile to get their name
+      // Load partner (Spouse 1) profile into State.user; Spouse 2's slot is State.partner
       const partnerId = SupabaseDB.getPartnerUserId();
       if (partnerId) {
         const profile = await SupabaseDB.loadProfile(partnerId);
-        if (profile?.name) State.set('partner', { ...State.get('partner'), name: profile.name, connected: true });
+        if (profile?.name) {
+          State.set('user',    { ...State.get('user'),    name: profile.name, email: profile.email || '' });
+          State.set('partner', { ...State.get('partner'), connected: true });
+        }
       }
       // Load all shared data now that couple is linked
       await Promise.all([
@@ -2564,7 +2623,7 @@ Router.register('home', () => {
     <div id="screen-home-inner">
       <!-- HEADER -->
       <div class="home-header">
-        <div class="home-greeting a1">Good ${U.timeOfDay()},<br><em>${user.name || 'there'}</em></div>
+        <div class="home-greeting a1">Good ${U.timeOfDay()},<br><em>${(SupabaseDB.configured ? SupabaseDB.getMyName() : null) || user.name || 'there'}</em></div>
         <div class="home-date a1" style="animation-delay:.08s">${U.today()}</div>
 
         <div class="partner-bar a2">
@@ -5082,7 +5141,10 @@ Router.register('setup', () => {
         const magicLink = appUrl + '?invite=' + code;
         if (isConnected) {
           const myEmail   = SupabaseDB.getMyEmail?.() || '';
-          const themEmail = State.get('partner')?.email || '';
+          // State.user.email = Spouse 1's email, State.partner.email = Spouse 2's email
+          const themEmail = isSpouse1
+            ? (State.get('partner')?.email || '')
+            : (State.get('user')?.email    || '');
           return `
           <div style="background:rgba(122,158,138,.1);border:1.5px solid rgba(122,158,138,.35);border-radius:16px;padding:16px 18px;margin-bottom:4px;">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
