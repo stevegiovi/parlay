@@ -1790,7 +1790,12 @@ Router.register('auth-signin', () => `
       return;
     }
     const result = await SupabaseDB.bootstrap();
-    Router.navigate(result.coupled ? 'home' : 'ob-connect');
+    if (result.coupled) {
+      // Go home if onboarding was completed, otherwise finish the last step
+      Router.navigate(result.onboardingComplete ? 'home' : 'ob-intro');
+    } else {
+      Router.navigate(result.onboardingComplete ? 'ob-connect' : 'ob2');
+    }
   };
   el.querySelector('#signin-btn').addEventListener('click', doSignIn);
   el.querySelector('#signin-password').addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
@@ -2227,7 +2232,12 @@ Router.register('ob3', () => {
         }
       }
     });
-    Router.navigate('ob-connect');
+    // If already coupled (Spouse 2 joined via auth-join), skip ob-connect fork
+    if (SupabaseDB.configured && SupabaseDB.coupleRow) {
+      Router.navigate('ob-intro');
+    } else {
+      Router.navigate('ob-connect');
+    }
   });
 });
 
@@ -2273,6 +2283,11 @@ Router.register('ob-connect', () => {
     </div>
   `;
 }, (el) => {
+  // Guard: if already coupled, this screen is irrelevant — skip forward
+  if (SupabaseDB.configured && SupabaseDB.coupleRow) {
+    Router.navigate('ob-intro');
+    return;
+  }
   const addHover = (btn) => {
     btn.addEventListener('mouseenter', () => { btn.style.borderColor = 'var(--terra)'; btn.style.background = '#FDF0EA'; });
     btn.addEventListener('mouseleave', () => { btn.style.borderColor = 'var(--border)'; btn.style.background = 'var(--surface)'; });
@@ -2410,9 +2425,15 @@ Router.register('ob-join', () => `
     if (SupabaseDB.configured) {
       const { error } = await SupabaseDB.joinCouple(code);
       if (error) {
-        errEl.textContent = error; errEl.style.display = 'block';
-        btn.textContent = 'Connect to partner →'; btn.disabled = false;
-        return;
+        // Recovery: if already coupled (they joined earlier and looped back here),
+        // treat "already used" as success and continue
+        if (error.includes('already been used') && SupabaseDB.coupleRow) {
+          // They're already in the couple — just continue
+        } else {
+          errEl.textContent = error; errEl.style.display = 'block';
+          btn.textContent = 'Connect to partner →'; btn.disabled = false;
+          return;
+        }
       }
       // Load partner's profile to get their name
       const partnerId = SupabaseDB.getPartnerUserId();
