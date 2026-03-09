@@ -843,7 +843,7 @@ const SupabaseDB = (() => {
   function getMyRole()    { return _myRole; }
   function getMyUserId()  { return _myUserId; }
   function getMyEmail()   { return _session?.user?.email || ''; }
-  function getSession()   { return _session; }
+  function getCurrentSession() { return _session; }
   function getMyName()      {
     // Signed-in person's own name, regardless of spouse role
     if (_myRole === 'user')    return State.get('user')?.name    || '';
@@ -1323,7 +1323,7 @@ const SupabaseDB = (() => {
     isReady,
     initAuthListener: _initAuthListener,
     signUp, signIn, signOut, signInWithGoogle, getSession,
-    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getMyEmail, getMyName, getPartnerName, getPartnerUserId, getSession,
+    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getMyEmail, getMyName, getPartnerName, getPartnerUserId, getCurrentSession,
     saveProfile, loadProfile,
     saveCommSelf, loadCommPrefs, clearFormFlag,
     saveFamilyMember, deleteFamilyMember, loadFamily,
@@ -3100,7 +3100,7 @@ function getPartnerProfilePrompt(partnerName) {
 
 async function callAI(systemPrompt, userMessage) {
   // Route through Supabase Edge Function so the Anthropic key stays server-side
-  const session = SupabaseDB.getSession?.();
+  const session = SupabaseDB.getCurrentSession?.();
   const token   = session?.access_token || null;
   const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
 
