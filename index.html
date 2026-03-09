@@ -346,19 +346,8 @@ a { color: inherit; text-decoration: none; }
    ╚██████╗╚██████╔╝██║  ██║███████╗
     ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
 
-<<<<<<< HEAD
    Auth · DB · Store · Router · Utils · AI
    ═══════════════════════════════════════════════════════════════ */
-=======
-  const configured = !!(
-    window.supabase &&
-    SUPABASE_URL &&
-    SUPABASE_ANON_KEY &&
-    SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
-    SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY'
-  );
-  const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
 
 // ──────────────────────────────────────────────
 // CONFIG
@@ -507,265 +496,15 @@ const Auth = (() => {
     return { data };
   }
 
-<<<<<<< HEAD
   // ── Bootstrap (THE critical function) ─────────
   async function bootstrap() {
     if (_bootstrapping) return { mode: 'pending' };
-=======
-  async function loadCouple() {
-    if (!configured || !_myUserId) return null;
-    const { data, error } = await sb.from('couples')
-      .select('*')
-      .or(`spouse_1_id.eq.${_myUserId},spouse_2_id.eq.${_myUserId}`)
-      .maybeSingle();
-    if (error) { console.warn('[loadCouple] query error:', error.message); return null; }
-    if (!data) return null;
-    _coupleRow = data;
-    _myRole    = data.spouse_1_id === _myUserId ? 'user' : 'partner';
-    State.set('currentView', _myRole);
-    State.set('mediatorTone', data.mediator_tone || 'neutral');
-    State.set('equity', data.equity || {});
-    return data;
-  }
-
-  function getCoupleId()  { return _coupleRow?.id || null; }
-  function getMyRole()    { return _myRole; }
-  function getMyUserId()  { return _myUserId; }
-  function getMyEmail()   { return _session?.user?.email || ''; }
-  function getCurrentSession() { return _session; }
-  function getMyName()      {
-    // Signed-in person's own name, regardless of spouse role
-    if (_myRole === 'user')    return State.get('user')?.name    || '';
-    if (_myRole === 'partner') return State.get('partner')?.name || '';
-    return '';
-  }
-  function getPartnerName() {
-    // The OTHER person's name, regardless of who is signed in
-    if (_myRole === 'user')    return State.get('partner')?.name || '';
-    if (_myRole === 'partner') return State.get('user')?.name    || '';
-    return '';
-  }
-
-  function getPartnerUserId() {
-    if (!_coupleRow) return null;
-    return _myRole === 'user' ? _coupleRow.spouse_2_id : _coupleRow.spouse_1_id;
-  }
-
-  // ── Profile ───────────────────────────────────────────────
-  async function saveProfile(updates) {
-    if (!configured || !_session) return;
-    // Always persist email alongside profile so partner can display it
-    const email = _session.user?.email || '';
-    await sb.from('profiles').upsert({ id: _myUserId, email, ...updates });
-  }
-
-  async function loadProfile(userId) {
-    if (!configured || !userId) return null;
-    const { data, error } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
-    if (error) { console.warn('[loadProfile] query error:', error.message); return null; }
-    return data;
-  }
-
-  // ── Comm Prefs ────────────────────────────────────────────
-  async function saveCommSelf(traits) {
-    if (!configured || !_session || !_myUserId) return;
-    await sb.from('comm_self')
-      .upsert({ user_id: _myUserId, traits, setup_done: traits.length > 0 },
-              { onConflict: 'user_id' });
-  }
-
-
-  async function loadCommPrefs() {
-    if (!isReady()) return;
-    const partId = getPartnerUserId();
-    if (!partId) return;
-
-    let selfRes, partnerSelfRes;
-    try {
-      [selfRes, partnerSelfRes] = await Promise.all([
-        sb.from('comm_self').select('*').eq('user_id', _myUserId).maybeSingle(),
-        sb.from('comm_self').select('*').eq('user_id', partId).maybeSingle(),
-      ]);
-    } catch(e) { console.error('[loadCommPrefs] query error:', e); return; }
-
-    const myRole   = _myRole;
-    const themRole = myRole === 'user' ? 'partner' : 'user';
-    const existing = State.get('commPrefs') || {};
-
-    State.set('commPrefs', {
-      [myRole]: {
-        ...(existing[myRole] || {}),
-        self: { traits: selfRes?.data?.traits || [], setupDone: selfRes?.data?.setup_done || false },
-      },
-      [themRole]: {
-        ...(existing[themRole] || {}),
-        self: { traits: partnerSelfRes?.data?.traits || [], setupDone: partnerSelfRes?.data?.setup_done || false },
-      }
-    });
-  }
-
-  // ── Family ────────────────────────────────────────────────
-  async function saveFamilyMember(type, data) {
-    if (!isReady()) return;
-    await sb.from('family_members').upsert({ id: data.id, couple_id: _coupleRow.id, type, data });
-  }
-
-  async function deleteFamilyMember(id) {
-    if (!isReady()) return;
-    await sb.from('family_members').delete().eq('id', id);
-  }
-
-  async function loadFamily() {
-    if (!isReady()) return;
-    const { data, error } = await sb.from('family_members').select('*').eq('couple_id', _coupleRow.id);
-    if (error) { console.warn('[loadFamily] query error:', error.message); return; }
-    if (!data) return;
-    const kids              = data.filter(r => r.type === 'kid').map(r => r.data);
-    const providers         = data.filter(r => r.type === 'provider').map(r => r.data);
-    const playdateContacts  = data.filter(r => r.type === 'playdate_contact').map(r => r.data);
-    State.set('family', { kids, providers, playdateContacts });
-  }
-
-  // ── Couple settings (tone, equity) ────────────────────────
-  async function saveCoupleSettings(patch) {
-    if (!isReady()) return;
-    await sb.from('couples').update(patch).eq('id', _coupleRow.id);
-  }
-
-  // ── Negotiations ──────────────────────────────────────────
-  async function saveNegotiation(neg) {
-    if (!isReady()) return;
-    const row = _negToRow(neg);
-    await sb.from('negotiations').upsert(row, { onConflict: 'id' });
-  }
-
-  async function updateNegotiation(id, patch) {
-    if (!isReady()) return;
-    const row = _negPatchToRow(patch);
-    await sb.from('negotiations').update(row).eq('id', id);
-  }
-
-  async function softDeleteNegotiation(id) {
-    if (!isReady()) return;
-    await sb.from('negotiations').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  }
-
-  async function loadNegotiations() {
-    if (!isReady()) return;
-    const { data, error } = await sb.from('negotiations')
-      .select('*').eq('couple_id', _coupleRow.id)
-      .is('deleted_at', null).order('created_at', { ascending: false });
-    if (error) { console.warn('[loadNegotiations] query error:', error.message); return; }
-    if (!data) return;
-    MediatorState.negotiations = data.map(_rowToNeg);
-    MediatorState.tombstones   = new Set(); // server-side soft-deletes replace tombstones
-    localStorage.setItem('parlay_negotiations', JSON.stringify(MediatorState.negotiations));
-  }
-
-  // ── Tasks ─────────────────────────────────────────────────
-  async function saveTask(task) {
-    if (!isReady()) return;
-    const row = _taskToRow(task);
-    await sb.from('tasks').upsert(row, { onConflict: 'id' });
-  }
-
-  async function updateTask(id, patch) {
-    if (!isReady()) return;
-    const row = _taskPatchToRow(patch);
-    await sb.from('tasks').update(row).eq('id', id);
-  }
-
-  async function softDeleteTask(id) {
-    if (!isReady()) return;
-    await sb.from('tasks').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  }
-
-  async function loadTasks() {
-    if (!isReady()) return;
-    const { data, error } = await sb.from('tasks')
-      .select('*').eq('couple_id', _coupleRow.id)
-      .is('deleted_at', null).order('created_at', { ascending: false });
-    if (error) { console.warn('[loadTasks] query error:', error.message); return; }
-    if (!data) return;
-    TaskState._data = data.map(_rowToTask);
-    localStorage.setItem('parlay_tasks', JSON.stringify(TaskState._data));
-  }
-
-  // ── Real-time ─────────────────────────────────────────────
-  function subscribeToCouple() {
-    if (!isReady() || _realtimeSub) return;
-    const coupleId = _coupleRow.id;
-    _realtimeSub = sb.channel('couple-' + coupleId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'negotiations',
-          filter: `couple_id=eq.${coupleId}` }, async (payload) => {
-        await loadNegotiations();
-        try { Parlays.updateBadge(); } catch(e) {}
-        const cur = Router.current();
-        if (cur === 'plan' || cur === 'home') Router.navigate(cur);
-        // Toast only on INSERT from the OTHER person
-        if (payload.eventType === 'INSERT' && payload.new?.created_by && payload.new.created_by !== _myUserId) {
-          U.toast('📬 New parlay from your partner');
-        }
-        // Toast on UPDATE that changes status (partner replied, proposal ready)
-        if (payload.eventType === 'UPDATE' && payload.old?.status !== payload.new?.status) {
-          const newStatus = payload.new?.status;
-          if (newStatus === 'partner_replied') U.toast('💬 Your partner responded');
-          else if (newStatus === 'active') U.toast('⚖️ Proposal is ready');
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks',
-          filter: `couple_id=eq.${coupleId}` }, async (payload) => {
-        await loadTasks();
-        try { Tasks.updateBadge(); } catch(e) {}
-        const cur = Router.current();
-        if (cur === 'tasks' || cur === 'home') Router.navigate(cur);
-        // Toast only on INSERT from the OTHER person
-        if (payload.eventType === 'INSERT' && payload.new?.created_by && payload.new.created_by !== _myUserId) {
-          U.toast('📬 New task from your partner');
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples',
-          filter: `id=eq.${coupleId}` }, async (payload) => {
-        _coupleRow = payload.new;
-        State.set('mediatorTone', payload.new.mediator_tone);
-        State.set('equity', payload.new.equity);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'comm_self' }, async () => {
-        await loadCommPrefs();
-        const cur = Router.current();
-        if (cur === 'setup') Router.navigate('setup');
-      })
-      .subscribe();
-  }
-
-  // ── Bootstrap ─────────────────────────────────────────────
-  let _bootstrapping = false;
-  let _bootstrapPromise = null;
-  async function bootstrap() {
-    if (!configured) {
-      State.load();
-      return { mode: 'local' };
-    }
-    // Prevent concurrent bootstrap calls (auth listener + manual call race)
-    if (_bootstrapping && _bootstrapPromise) {
-      console.warn('[bootstrap] already running — awaiting existing call');
-      return _bootstrapPromise;
-    }
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
     _bootstrapping = true;
 
-    _bootstrapPromise = (async () => {
     try {
-<<<<<<< HEAD
       // 1. Session
       await refreshSession();
       if (!_session) { _bootstrapping = false; return { mode: 'unauthenticated' }; }
-=======
-      // 1. Get session
-      let session;
-      try { session = await getSession(); } catch(e) { console.error('[bootstrap] getSession error:', e); }
-      if (!session) return { mode: 'unauthenticated' };
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
 
       // 2. Load couple FIRST — determines which slot I am
       const { data: coupleData } = await sb.from('couples')
@@ -917,44 +656,7 @@ const Auth = (() => {
             _subscribeRealtime();
           }, 3000);
         }
-<<<<<<< HEAD
       });
-=======
-        // 7. Load shared data + subscribe
-        try { await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]); } catch(e) { console.error('[bootstrap] data:', e); }
-        try { subscribeToCouple(); } catch(e) {}
-      }
-
-      if (profile?.name) State.set('onboarded', true);
-      console.log('[bootstrap] Done. Me:', getMyName(), '| Partner:', getPartnerName());
-
-      return {
-        mode: 'supabase',
-        coupled: !!couple,
-        partnerConnected: !!(couple?.spouse_2_id),
-        onboardingComplete: !!(profile?.love_language),
-      };
-
-    } catch(e) {
-      // Outer safety net — nothing above should reach here, but just in case
-      console.error('[bootstrap] UNHANDLED error:', e);
-      // Return a usable result even on failure — don't throw up to caller
-      return {
-        mode: 'supabase',
-        coupled: !!_coupleRow,
-        partnerConnected: !!(_coupleRow?.spouse_2_id),
-        onboardingComplete: false,
-      };
-    }
-    })();
-
-    try {
-      return await _bootstrapPromise;
-    } finally {
-      _bootstrapping = false;
-      _bootstrapPromise = null;
-    }
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
   }
 
   // ── Manual refresh (called by pull-to-refresh / refresh button) ──
@@ -1460,33 +1162,12 @@ UNIVERSAL LANGUAGE RULES (apply to every word — no exceptions):
 7. For family visits, never use territorial phrasing or score-keeping references.
 `;
 
-<<<<<<< HEAD
 // ── The complete tone filter ────────────────────
 async function runToneFilter(rawText, intentContext = '') {
   const tone = Store.get('mediatorTone') || 'neutral';
   const profile = TONES[tone] || TONES.neutral;
   const senderBlock = getSenderPrefsPrompt();
   const recipientBlock = getRecipientPrefsPrompt();
-=======
-async function runToneFilter(rawText, userName, tone = 'neutral', intentContext = '') {
-  const profile     = TONE_PROFILES[tone] || TONE_PROFILES.neutral;
-
-  // Determine sender role via auth (reliable) — not name comparison (fragile)
-  const _authRole       = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : null;
-  const senderRole      = _authRole || 'user';
-  const recipientRole   = senderRole === 'user' ? 'partner' : 'user';
-
-  // Resolve recipient name via auth helpers — not raw State reads
-  const _myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || State.get('user')?.name || '';
-  const _partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || '';
-  // Recipient is always "the other spouse" relative to the sender.
-  // Using _myName when senderRole === 'partner' causes prompts to name the recipient as the sender.
-  const recipientName = _partnerName;
-
-  const senderBlock    = getSenderPrefsPrompt(senderRole);
-  const recipientBlock = getRecipientPrefsPrompt(recipientRole, recipientName);
-
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
   const intentBlock = intentContext
     ? `\nCRITICAL INTENT CONSTRAINT (non-negotiable — must be preserved exactly):\n${intentContext}\nDo NOT change who is going, who stays home, or any logistical facts.\n`
     : '';
@@ -1566,49 +1247,6 @@ ${recipN}'s position: "${parlay.partnerFilteredReply || parlay.partnerRawReply}"
 Generate a fair compromise.`
   );
 
-<<<<<<< HEAD
-=======
-async function detectTension(text) {
-  let result;
-  try { result = await callAI(
-    `You are a couples communication analyst trained in the Gottman Four Horsemen framework. Analyze the text for destructive communication patterns.
-
-The Four Horsemen and their indicators:
-• CRITICISM: Attacks character or personality ("you're so selfish", "you never", "you always", "what's wrong with you")
-• CONTEMPT: Superiority, mockery, sarcasm, disgust, eye-rolling in text, name-calling — the most dangerous pattern
-• DEFENSIVENESS: Counter-attacks, playing victim, "but you...", making excuses, righteous indignation
-• STONEWALLING: Shutdown language, "forget it", "whatever", "I don't care anymore", emotional withdrawal
-
-Return ONLY a JSON object with exactly this shape:
-{
-  "level": "low|medium|high",
-  "flag": true|false,
-  "horseman": "criticism|contempt|defensiveness|stonewalling|none",
-  "note": "one short, specific sentence describing what was detected, or empty string if flag is false"
-}
-
-Flag true if any Horseman is present. Level "high" if contempt is detected (it's the strongest predictor of relationship damage). Return ONLY JSON.`,
-    text
-  );
-  } catch { return { level: 'low', flag: false, horseman: 'none', note: '' }; }
-  try { return JSON.parse(result); }
-  catch { return { level: 'low', flag: false, horseman: 'none', note: '' }; }
-}
-
-// Safely parse a proposal response from the AI.
-// The model sometimes wraps JSON in ```json ... ``` fences despite instructions — strip them first.
-function _proposalPreviewText(proposal) {
-  if (!proposal) return '';
-  if (typeof proposal === 'string') return proposal;
-  if (typeof proposal === 'object') {
-    if (typeof proposal.proposal === 'string') return proposal.proposal;
-    try { return JSON.stringify(proposal); } catch { return ''; }
-  }
-  return String(proposal || '');
-}
-
-function parseProposal(raw) {
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
   try {
     return JSON.parse(raw.replace(/^```json?\s*/i,'').replace(/```\s*$/,'').trim());
   } catch {
@@ -1695,41 +1333,12 @@ function renderIntentQuestions(topicId) {
         <div class="radio-opt" data-val="game"><div class="dot"></div><div>Game night</div></div>
       </div>
     </div>
-<<<<<<< HEAD
     <div style="margin-bottom:12px;">
       <div class="input-label">${U.esc(theirN)}'s role</div>
       <div class="radio-group" id="iq-role">
         <div class="radio-opt" data-val="share-prep"><div class="dot"></div><div>Share cooking & prep</div></div>
         <div class="radio-opt" data-val="i-handle"><div class="dot"></div><div>I handle it, just need the OK</div></div>
         <div class="radio-opt" data-val="plan-together"><div class="dot"></div><div>Plan it together</div></div>
-=======
-
-    <!-- Active parlays -->
-    ${negs.length > 0 ? `
-      <div style="padding:20px 20px 0;" class="a5">
-        <div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">In Progress (${negs.length})</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          ${negs.map(neg => {
-            const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[7];
-            const sc = statusColor[neg.status] || '#9B8880';
-            const sl = negLabel(neg);
-            return `
-              <div class="card card-p" style="cursor:pointer;transition:all .2s;" onclick="MediatorView.openNeg('${neg.id}')"
-                   onmouseenter="this.style.borderColor='var(--terra)'" onmouseleave="this.style.borderColor='var(--border)'">
-                <div style="display:flex;align-items:center;gap:12px;">
-                  <div style="width:38px;height:38px;border-radius:12px;background:${topic.color}18;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">${topic.icon}</div>
-                  <div style="flex:1;">
-                    <div style="font-size:.88rem;font-weight:600;color:var(--espresso);">${neg.title}</div>
-                    <div style="font-size:.7rem;color:var(--muted);">${neg.date}</div>
-                  </div>
-                  <div style="font-size:.62rem;font-weight:600;color:${sc};background:${sc}18;padding:3px 9px;border-radius:var(--r-pill);">${sl}</div>
-                </div>
-                ${(() => { const _pt = _proposalPreviewText(neg.proposal); return _pt ? `<div style="margin-top:10px;padding:9px 11px;background:var(--parchment);border-radius:var(--r-sm);font-size:.76rem;color:var(--muted);line-height:1.5;border-left:3px solid ${sc};">${_pt.slice(0,100)}${_pt.length > 100 ? '…' : ''}</div>` : ''; })()}
-              </div>
-            `;
-          }).join('')}
-        </div>
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
       </div>
     </div>`;
   }
@@ -1786,157 +1395,8 @@ Router.register('auth-signup', () => `
         <div class="input-label" style="color:rgba(250,246,241,.4);">Password</div>
         <input id="su-pass" class="input" type="password" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);" placeholder="6+ characters">
       </div>
-<<<<<<< HEAD
       <div id="su-error" style="display:none;font-size:.8rem;color:#EF4444;"></div>
       <button class="btn btn-accent" id="su-submit">Create Account</button>
-=======
-    </div>
-
-    <!-- Start new -->
-    <div style="padding:20px 20px 8px;" class="a3">
-      <button class="btn btn-accent btn-full" id="new-parlay-btn" style="border-radius:var(--r-md);padding:16px;">
-        + Start a New Parlay
-      </button>
-    </div>
-
-    <!-- Tone Setting -->
-    <div style="padding:4px 20px 16px;" class="a4">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div>
-            <div style="font-size:.72rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);">Mediator Tone</div>
-            <div style="font-size:.75rem;color:var(--muted);margin-top:2px;" id="tone-desc-text">${TONE_PROFILES[State.get('mediatorTone') || 'neutral'].desc}</div>
-          </div>
-          <div style="font-size:.65rem;font-weight:600;color:var(--terra);background:#FDF0EA;padding:3px 10px;border-radius:var(--r-pill);">Always safe ✓</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;" id="tone-selector">
-          ${Object.entries(TONE_PROFILES).map(([key, p]) => {
-            const active = (State.get('mediatorTone') || 'neutral') === key;
-            return `
-              <button class="tone-btn" data-tone="${key}" style="
-                border:1.5px solid ${active ? 'var(--terra)' : 'var(--border)'};
-                background:${active ? '#FDF0EA' : 'var(--parchment)'};
-                border-radius:var(--r-md);padding:10px 8px;cursor:pointer;
-                transition:all .2s;-webkit-tap-highlight-color:transparent;
-                display:flex;flex-direction:column;align-items:center;gap:4px;
-              ">
-                <span style="font-size:1.1rem;">${p.icon}</span>
-                <span style="font-size:.75rem;font-weight:600;color:${active ? 'var(--terra)' : 'var(--espresso)'};">${p.label}</span>
-              </button>
-            `;
-          }).join('')}
-        </div>
-        <div style="margin-top:10px;font-size:.72rem;color:var(--muted);line-height:1.5;padding-top:10px;border-top:1px solid var(--border);">
-          🔒 Regardless of tone, Parlay always removes blame, contempt, and any unsafe language before your partner sees it.
-        </div>
-      </div>
-    </div>
-
-    <!-- Active negotiations -->
-    ${negs.length > 0 ? `
-      <div style="padding:16px 20px 8px;" class="a4">
-        <div style="font-size:.68rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">Your Parlays</div>
-        <div id="neg-list" style="display:flex;flex-direction:column;gap:10px;">
-          ${negs.map(neg => {
-            const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[5];
-            const sc = statusColor[neg.status] || '#9B8880';
-            const sl = negLabel(neg);
-            return `
-              <div class="card card-p" style="cursor:pointer;transition:all .2s;" onclick="MediatorView.openNeg('${neg.id}')" 
-                   onmouseenter="this.style.borderColor='var(--terra)'" onmouseleave="this.style.borderColor='var(--border)'">
-                <div style="display:flex;align-items:center;gap:12px;">
-                  <div style="width:40px;height:40px;border-radius:12px;background:${topic.color}18;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">${topic.icon}</div>
-                  <div style="flex:1;">
-                    <div style="font-size:.9rem;font-weight:600;color:var(--espresso);margin-bottom:2px;">${neg.title}</div>
-                    <div style="font-size:.72rem;color:var(--muted);">${neg.date}</div>
-                  </div>
-                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-                    <div style="font-size:.65rem;font-weight:600;color:${sc};background:${sc}18;padding:3px 10px;border-radius:var(--r-pill);white-space:nowrap;">${sl}</div>
-                    <div style="font-size:1rem;color:var(--border);">›</div>
-                  </div>
-                </div>
-                ${(() => { const _pt = _proposalPreviewText(neg.proposal); return _pt ? `
-                  <div style="margin-top:12px;padding:10px 12px;background:var(--parchment);border-radius:var(--r-sm);font-size:.78rem;color:var(--muted);line-height:1.5;border-left:3px solid ${sc};">
-                    ${_pt.slice(0, 100)}${_pt.length > 100 ? '…' : ''}
-                  </div>
-                ` : ''; })()}
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    ` : `
-      <div style="padding:32px 24px;text-align:center;" class="a4">
-        <div style="font-size:2.5rem;margin-bottom:16px;animation:float 4s ease-in-out infinite;">⚖️</div>
-        <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--espresso);margin-bottom:8px;">No active parlays</div>
-        <div style="font-size:.82rem;color:var(--muted);line-height:1.6;max-width:260px;margin:0 auto;">
-          When you need to coordinate something tricky — a date night, family visit, or time apart — start a Parlay and let the AI find common ground.
-        </div>
-      </div>
-    `}
-
-    <!-- How this works section -->
-    <div style="padding:16px 20px;margin-top:8px;" class="a5">
-      <div style="font-size:.68rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">How a Parlay works</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        ${[
-          ['1', 'You share your position privately — no filter needed, say what you feel.'],
-          ['2', 'Parlay rewrites your message to remove tension before your partner sees it.'],
-          ['3', "Each side's AI agent negotiates a balanced proposal."],
-          ['4', 'Both partners see the same proposal. Accept, counter, or talk it out.'],
-        ].map(([n, t]) => `
-          <div style="display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);">
-            <div style="width:24px;height:24px;border-radius:50%;background:var(--espresso);color:var(--cream);font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${n}</div>
-            <div style="font-size:.8rem;color:var(--muted);line-height:1.55;flex:1;">${t}</div>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  </div>
-  `;
-}, (el) => {
-  el.querySelector('#new-parlay-btn')?.addEventListener('click', () => Router.navigate('mediator-new'));
-
-  // Tone selector
-  el.querySelectorAll('.tone-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tone = btn.dataset.tone;
-      State.set('mediatorTone', tone);
-      // Update visual state
-      el.querySelectorAll('.tone-btn').forEach(b => {
-        const active = b.dataset.tone === tone;
-        b.style.borderColor = active ? 'var(--terra)' : 'var(--border)';
-        b.style.background = active ? '#FDF0EA' : 'var(--parchment)';
-        b.querySelector('span:last-child').style.color = active ? 'var(--terra)' : 'var(--espresso)';
-      });
-      const desc = el.querySelector('#tone-desc-text');
-      if (desc) desc.textContent = TONE_PROFILES[tone].desc;
-      U.toast(`Tone set to ${TONE_PROFILES[tone].label}`);
-    });
-  });
-});
-
-/* ---- NEW PARLAY: TOPIC SELECTION ---- */
-Router.register('mediator-new', () => `
-  <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px;" class="a1">
-      <button class="btn btn-muted btn-sm" onclick="Router.navigate('mediator')" style="padding:8px 14px;border-radius:10px;">‹ Back</button>
-      <div style="font-family:var(--font-display);font-size:1.2rem;">New Parlay</div>
-    </div>
-
-    <div class="a2" style="margin-bottom:24px;">
-      <div style="font-family:var(--font-display);font-size:2rem;font-weight:300;margin-bottom:6px;">What's this<br><em style="font-style:italic;color:var(--terra)">about?</em></div>
-      <div style="font-size:.85rem;color:var(--muted);line-height:1.6;">Choose a topic. This helps Parlay apply the right context to your negotiation.</div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;" class="a3">
-      ${TOPIC_TYPES.map(t => `
-        <div class="topic-card" data-id="${t.id}" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:20px 16px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;-webkit-tap-highlight-color:transparent;">
-          <div style="font-size:2rem;">${t.icon}</div>
-          <div style="font-size:.85rem;font-weight:600;color:var(--espresso);">${t.label}</div>
-        </div>
-      `).join('')}
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
     </div>
   </div>
 `, (el) => {
@@ -2532,29 +1992,6 @@ Router.register('parlay-sent', ({ id, aiWorked = true } = {}) => {
   </div>`;
 });
 
-<<<<<<< HEAD
-=======
-function _resolveDisplayNames() {
-  const view = State.get('currentView') || 'user';
-  const fallbackMy = view === 'partner' ? State.get('partner')?.name : State.get('user')?.name;
-  const fallbackPartner = view === 'partner' ? State.get('user')?.name : State.get('partner')?.name;
-  const canTrustSupabaseIdentity = !!(SupabaseDB.configured && SupabaseDB.getMyUserId && SupabaseDB.getMyUserId());
-  const myName = (canTrustSupabaseIdentity ? SupabaseDB.getMyName() : null) || fallbackMy || 'You';
-  const partnerName = (canTrustSupabaseIdentity ? SupabaseDB.getPartnerName() : null) || fallbackPartner || 'Partner';
-  return { myName, partnerName };
-}
-
-/* ================================================
-   MODULE: PARLAY DETAIL
-   Both spouses — shows the conversation thread, filtered message,
-   date options, partner reply, and proposal.
-   Recipient sees a "Reply" CTA when status = pending_partner.
-   Initiator sees "Generate Proposal" when status = partner_replied.
-   ================================================ */
-Router.register('parlay-detail', ({ negId } = {}) => {
-  const neg = negId ? MediatorState.find(negId) : null;
-  if (!neg) return `<div style="padding:60px 24px;text-align:center;font-family:var(--font-display);font-size:1.2rem;color:var(--espresso);">Parlay not found<br><br><button onclick="Router.navigate('plan')" style="margin-top:8px;padding:10px 20px;border:1px solid var(--border);border-radius:10px;background:none;cursor:pointer;font-family:var(--font-body);">‹ Back</button></div>`;
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
 
 // ──────────────────────────────────────────────
 // PARLAY DETAIL
@@ -2563,18 +2000,12 @@ Router.register('parlay-detail', ({ id } = {}) => {
   const p = Store.findParlay(id);
   if (!p) return `<div style="padding:60px 24px;text-align:center;"><div style="font-size:1.2rem;">Parlay not found</div><button class="btn btn-outline btn-sm" style="margin-top:16px;" onclick="Router.go('plan')">‹ Back</button></div>`;
 
-<<<<<<< HEAD
   const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
   const isMine = p.isMine;
   const myN = Auth.myName();
   const theirN = Auth.theirName();
   const creatorN = isMine ? myN : theirN;
   const recipN = isMine ? theirN : myN;
-=======
-  // ── ROLE DETECTION — UUID-based, not role-string-based ─────
-  const myUid = SupabaseDB.configured ? SupabaseDB.getMyUserId() : null;
-  const { myName, partnerName } = _resolveDisplayNames();
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
 
   const statusText = {
     pending_partner: isMine ? `Waiting for ${recipN}` : 'Your turn to respond',
@@ -2594,21 +2025,10 @@ Router.register('parlay-detail', ({ id } = {}) => {
         ${p.dateOptions.map(o => {
           const d = new Date(o.date + 'T12:00:00');
           const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
-<<<<<<< HEAD
           const sel = p.partnerDateResponse === o.id;
           return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1.5px solid ${sel ? 'var(--sage)' : 'var(--border)'};border-radius:12px;background:${sel ? '#EDF4F0' : 'var(--surface)'};">
             <div><div style="font-size:.88rem;font-weight:600;">${label}</div>${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}</div>
             ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Selected</span>` : ''}
-=======
-          const isSelected = neg.partnerDateResponse === o.id;
-          return `<div class="date-option-card${isSelected ? ' selected' : ''}" data-opt-id="${o.id}"
-            style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1.5px solid ${isSelected ? 'var(--sage)' : 'var(--border)'};border-radius:12px;background:${isSelected ? '#EDF4F0' : 'var(--surface)'};cursor:${iAmRecipient && neg.status === 'pending_partner' ? 'pointer' : 'default'};">
-            <div>
-              <div style="font-size:.88rem;font-weight:600;color:var(--espresso);">${label}</div>
-              ${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}
-            </div>
-            <span class="date-selected-badge" style="font-size:.72rem;font-weight:700;color:var(--sage);display:${isSelected ? 'inline' : 'none'};">✓ Selected</span>
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
           </div>`;
         }).join('')}
       </div>
@@ -2702,7 +2122,6 @@ Router.register('parlay-detail', ({ id } = {}) => {
     const txt = el.querySelector('#gen-btn-text');
     btn.disabled = true; txt.textContent = 'Generating…';
 
-<<<<<<< HEAD
     try {
       const parsed = await generateProposal(p);
       await Store.updateParlay(p.id, { proposal: parsed, status: 'active' });
@@ -2712,29 +2131,6 @@ Router.register('parlay-detail', ({ id } = {}) => {
       U.toast('AI error — try again');
     }
   });
-=======
-  // Date option selection (only active when recipient and pending)
-  if (!iAmCreator && neg.status === 'pending_partner') {
-    el.querySelectorAll('.date-option-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const optId = card.dataset.optId;
-        const currentlySelected = neg.partnerDateResponse === optId;
-        const nextSelection = currentlySelected ? null : optId;
-
-        el.querySelectorAll('.date-option-card').forEach(c => {
-          const sel = c.dataset.optId === nextSelection;
-          c.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
-          c.style.background  = sel ? '#EDF4F0' : 'var(--surface)';
-          const badge = c.querySelector('.date-selected-badge');
-          if (badge) badge.style.display = sel ? 'inline' : 'none';
-        });
-
-        neg.partnerDateResponse = nextSelection;
-        MediatorState.update(neg.id, { partnerDateResponse: nextSelection });
-      });
-    });
-  }
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
 
   // Accept
   el.querySelector('#accept-btn')?.addEventListener('click', async () => {
@@ -2779,16 +2175,8 @@ Router.register('parlay-reply', ({ id } = {}) => {
     return '<div></div>';
   }
 
-<<<<<<< HEAD
   const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
   const creatorN = Auth.theirName();
-=======
-  const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[7];
-  const { myName, partnerName } = _resolveDisplayNames();
-  const creatorName = iAmCreator ? myName : partnerName;
-
-  const hasDateOptions = neg.dateOptions && neg.dateOptions.length > 0;
->>>>>>> 81f0d004f6a3201de4f1c75f1ddc7b5259f7eaf6
 
   return `
   <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
