@@ -312,6 +312,23 @@ a { color: inherit; text-decoration: none; }
 .radio-opt.selected .dot::after {
   content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff;
 }
+/* ═══════════════════════════════════════════════
+   DEV TOOLBAR
+   ═══════════════════════════════════════════════ */
+#dev-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: #1a1a2e; color: #e0e0e0;
+  font-size: .65rem; font-family: monospace;
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 12px; height: 28px;
+}
+#dev-bar button {
+  background: rgba(255,255,255,.12); border: none; color: #e0e0e0;
+  font-size: .6rem; font-family: monospace; padding: 2px 8px;
+  border-radius: 4px; cursor: pointer;
+}
+#dev-bar button:hover { background: rgba(255,255,255,.25); }
+#dev-bar .sep { width: 1px; height: 16px; background: rgba(255,255,255,.15); }
 </style>
 </head>
 <body>
@@ -352,7 +369,20 @@ a { color: inherit; text-decoration: none; }
 // ──────────────────────────────────────────────
 // CONFIG
 // ──────────────────────────────────────────────
-const VERSION = '2.0.2';
+const VERSION = '2.0.5';
+
+// ── DEV MODE ────────────────────────────────────
+// Activate: add ?dev=1 to URL
+// Auto-login: ?as=1 (Partner 1) or ?as=2 (Partner 2)
+// Set your test credentials here:
+const DEV = {
+  enabled: new URLSearchParams(location.search).has('dev'),
+  autoAs:  new URLSearchParams(location.search).get('as'),
+  accounts: {
+    '1': { email: 'stevegiovi+1234@gmail.com', password: 'parlay123', label: 'Steve (P1)' },
+    '2': { email: 'stevegiovi+4567@gmail.com', password: 'parlay123', label: 'Taryn (P2)' },
+  },
+};
 
 const CONFIG = {
   SUPABASE_URL:  'https://oevfeeymescxynikkqkx.supabase.co',
@@ -595,16 +625,8 @@ const Auth = (() => {
           filter: `couple_id=eq.${_couple.id}` }, (payload) => {
         Store.loadParlays().then(() => {
           Badges.update();
-          const cur = Router.current();
-          // Refresh list screens
-          if (cur === 'plan' || cur === 'home') Router.go(cur);
-          // Refresh detail screen if viewing the changed parlay
-          if (cur === 'parlay-detail') {
-            const viewingId = document.querySelector('[data-parlay-id]')?.dataset.parlayId;
-            if (!viewingId || viewingId === payload.new?.id) {
-              Router.go('parlay-detail', { id: payload.new?.id || viewingId });
-            }
-          }
+          // Re-render whatever screen is active (Router.reload preserves params like parlay id)
+          Router.reload();
           // Toast for other person's actions
           if (payload.eventType === 'INSERT' && payload.new?.created_by !== _uid) {
             U.toast('📬 New parlay from ' + theirName());
@@ -620,15 +642,7 @@ const Auth = (() => {
           filter: `couple_id=eq.${_couple.id}` }, (payload) => {
         Store.loadTasks().then(() => {
           Badges.update();
-          const cur = Router.current();
-          if (cur === 'tasks' || cur === 'home') Router.go(cur);
-          // Refresh task-detail if viewing the changed task
-          if (cur === 'task-detail') {
-            const viewingId = document.querySelector('[data-task-id]')?.dataset.taskId;
-            if (!viewingId || viewingId === payload.new?.id) {
-              Router.go('task-detail', { id: payload.new?.id || viewingId });
-            }
-          }
+          Router.reload();
           if (payload.eventType === 'INSERT' && payload.new?.created_by !== _uid) {
             U.toast('📬 New task from ' + theirName());
           }
@@ -642,10 +656,22 @@ const Auth = (() => {
         });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples',
-          filter: `id=eq.${_couple.id}` }, (payload) => {
+          filter: `id=eq.${_couple.id}` }, async (payload) => {
         _couple = payload.new;
         Store.set('mediatorTone', payload.new.mediator_tone);
         Store.set('equity', payload.new.equity);
+
+        // If partner just joined, load their profile
+        const newPartnerUid = them().uid;
+        if (newPartnerUid && !_themProfile) {
+          try {
+            const { data: theirP } = await sb.from('profiles')
+              .select('*').eq('id', newPartnerUid).maybeSingle();
+            _themProfile = theirP || null;
+            console.log('[realtime] Partner joined:', _themProfile?.name);
+          } catch(e) {}
+        }
+        Router.reload();
       })
       .subscribe((status) => {
         console.log('[realtime] Status:', status);
@@ -662,11 +688,35 @@ const Auth = (() => {
 
   // ── Manual refresh (called by pull-to-refresh / refresh button) ──
   async function refresh() {
-    if (!isReady()) return;
-    await Promise.all([Store.loadParlays(), Store.loadTasks(), Store.loadCommPrefs()]);
+    if (!_session || !_uid) return;
+
+    // Reload couple row (catches partner joining)
+    const { data: coupleData } = await sb.from('couples')
+      .select('*').or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`)
+      .maybeSingle();
+    if (coupleData) {
+      _couple = coupleData;
+      _amSpouse1 = _couple.spouse_1_id === _uid;
+      Store.set('mediatorTone', _couple.mediator_tone);
+      Store.set('equity', _couple.equity);
+    }
+
+    // Reload partner profile if we have a partner but no profile yet
+    const partnerUid = them().uid;
+    if (partnerUid && !_themProfile) {
+      const { data: theirP } = await sb.from('profiles')
+        .select('*').eq('id', partnerUid).maybeSingle();
+      _themProfile = theirP || null;
+    }
+
+    // Reload shared data
+    if (_couple) {
+      await Promise.all([Store.loadParlays(), Store.loadTasks(), Store.loadCommPrefs()]);
+      if (!_realtime) _subscribeRealtime();
+    }
+
     Badges.update();
-    const cur = Router.current();
-    if (cur) Router.go(cur);
+    Router.reload();
   }
 
   return {
@@ -978,6 +1028,7 @@ const Badges = {
 const Router = (() => {
   const _routes = {};
   let _current = null;
+  let _currentParams = {};
   const NAV_SCREENS = ['home','plan','tasks','setup'];
 
   function register(name, renderFn, initFn) {
@@ -989,6 +1040,7 @@ const Router = (() => {
     if (!route) { console.error('[Router] Unknown route:', name); return; }
 
     _current = name;
+    _currentParams = params;
     const app = document.getElementById('app');
 
     // Render
@@ -1027,7 +1079,13 @@ const Router = (() => {
     }
   }
 
+  /** Re-render the current screen with the same params */
+  function reload() {
+    if (_current) go(_current, _currentParams);
+  }
+
   function current() { return _current; }
+  function currentParams() { return _currentParams; }
 
   function initNav() {
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1035,7 +1093,7 @@ const Router = (() => {
     });
   }
 
-  return { register, go, current, initNav };
+  return { register, go, reload, current, currentParams, initNav };
 })();
 
 // ──────────────────────────────────────────────
@@ -2694,7 +2752,96 @@ Router.register('setup-tone', () => {
 (async () => {
   Router.initNav();
 
-  // Check for existing session
+  // ── Dev toolbar ───────────────────────────────
+  if (DEV.enabled) {
+    document.body.style.paddingTop = '28px';
+    const bar = document.createElement('div');
+    bar.id = 'dev-bar';
+    bar.innerHTML = `
+      <span>🔧 v${VERSION}</span>
+      <span class="sep"></span>
+      <span id="dev-user">...</span>
+      <span class="sep"></span>
+      <button onclick="navigator.clipboard?.writeText(Auth.couple()?.invite_code||'none');U.toast('Code copied')">Copy invite</button>
+      <button onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">Refresh</button>
+      <button onclick="Auth.signOut()">Sign out</button>
+      <button onclick="localStorage.clear();sessionStorage.clear();location.reload()" style="color:#f66;">Clear & reload</button>
+      <span style="margin-left:auto;">
+        <button onclick="location.search='?dev&as=1'">→ P1</button>
+        <button onclick="location.search='?dev&as=2'">→ P2</button>
+      </span>
+    `;
+    document.body.prepend(bar);
+  }
+
+  function updateDevBar() {
+    if (!DEV.enabled) return;
+    const el = document.getElementById('dev-user');
+    if (el) {
+      const m = Auth.me();
+      el.textContent = m.name ? `${m.name} (${Auth.amSpouse1() ? 'P1' : 'P2'})` : 'Not signed in';
+    }
+  }
+
+  // ── Auto-login for dev mode ───────────────────
+  if (DEV.autoAs && DEV.accounts[DEV.autoAs]) {
+    const acct = DEV.accounts[DEV.autoAs];
+    console.log(`[DEV] Auto-login as ${acct.label}...`);
+
+    // Try sign in first (account may already exist)
+    let result = await Auth.signIn(acct.email, acct.password);
+    if (result.error && result.error.includes('Invalid login')) {
+      // Account doesn't exist yet — create it
+      console.log('[DEV] Account not found, creating...');
+      result = await Auth.signUp(acct.email, acct.password, acct.label.split(' ')[0]);
+      if (result.error) {
+        console.error('[DEV] Signup failed:', result.error);
+        Router.go('auth-entry');
+        updateDevBar();
+        return;
+      }
+      if (result.confirmEmail) {
+        console.warn('[DEV] Email confirmation required — disable in Supabase Auth settings for dev');
+        U.toast('⚠️ Disable email confirmation in Supabase for dev mode');
+        Router.go('auth-entry');
+        updateDevBar();
+        return;
+      }
+    }
+
+    if (result.error) {
+      console.error('[DEV] Login failed:', result.error);
+      Router.go('auth-entry');
+      updateDevBar();
+      return;
+    }
+
+    // Bootstrap
+    const boot = await Auth.bootstrap();
+    console.log('[DEV] Bootstrap:', boot);
+
+    // Auto-create/join couple for dev
+    if (!boot.coupled) {
+      if (DEV.autoAs === '1') {
+        // Partner 1 creates the couple
+        const { code } = await Auth.createCouple();
+        console.log(`[DEV] Created couple. Invite code: ${code}`);
+        await Auth.bootstrap();
+        Router.go('home');
+      } else {
+        // Partner 2 needs to join — find Partner 1's couple
+        // Sign in as P1 briefly to get the code, then switch back
+        // Actually simpler: just go to the join screen
+        Router.go('ob-join');
+      }
+    } else {
+      Router.go('home');
+    }
+    updateDevBar();
+    return;
+  }
+
+  // ── Normal flow ───────────────────────────────
   const boot = await Auth.bootstrap();
   console.log('[init] Bootstrap result:', boot);
 
@@ -2707,18 +2854,21 @@ Router.register('setup-tone', () => {
   } else {
     Router.go('home');
   }
+  updateDevBar();
 
   // Auth state change listener (handles page reload, OAuth redirect)
   Auth.sb().auth.onAuthStateChange(async (event, session) => {
-    if (event === 'INITIAL_SESSION') return; // handled by bootstrap above
+    if (event === 'INITIAL_SESSION') return;
     if (event === 'SIGNED_IN' && session) {
       const b = await Auth.bootstrap();
       if (b.coupled && b.hasPartner) Router.go('home');
       else if (b.coupled) Router.go('ob-invite');
       else Router.go('ob-couple');
+      updateDevBar();
     }
     if (event === 'SIGNED_OUT') {
       Router.go('auth-entry');
+      updateDevBar();
     }
   });
 })();
