@@ -4078,20 +4078,20 @@ function renderIntentQuestions(topicId, family, partner) {
 }
 
 Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
+  /* ── Render: compute display values for HTML template ────────── */
   const topic = TOPIC_TYPES.find(t => t.id === topicId) || TOPIC_TYPES[5];
-  const view  = State.get('currentView') || 'user';
-  const user = State.get('user');
-  const partner = State.get('partner');
-  // role-correct names: always "me" and "the recipient"
-  const _myNameMC   = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (view === 'partner' ? partner.name : user.name) || 'You';
-  const _themNameMC = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name    : partner.name) || 'your partner';
-  const family = State.get('family') || { kids: [], providers: [], playdateContacts: [] };
+  const myRole    = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (State.get('currentView') === 'partner' ? 'partner' : 'user');
+  const myName    = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (myRole === 'partner' ? State.get('partner')?.name : State.get('user')?.name) || 'You';
+  const themName  = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (myRole === 'partner' ? State.get('user')?.name    : State.get('partner')?.name) || 'your partner';
+  const family    = State.get('family') || { kids: [], providers: [], playdateContacts: [] };
   const needsIntent = INTENT_TOPICS.includes(topicId);
 
+  /* Store names as data attributes so the init function can read them without closure leakage */
   return `
-  <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));overflow-y:auto;">
+  <div id="compose-root" data-topic-id="${topicId}" data-my-name="${myName.replace(/"/g,'&quot;')}" data-them-name="${themName.replace(/"/g,'&quot;')}" data-my-role="${myRole}"
+       style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));overflow-y:auto;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px;" class="a1">
-      <button class="btn btn-muted btn-sm" onclick="Router.navigate('mediator-new')" style="padding:8px 14px;border-radius:10px;">‹ Back</button>
+      <button class="btn btn-muted btn-sm" onclick="Router.navigate('plan')" style="padding:8px 14px;border-radius:10px;">‹ Back</button>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:1.2rem;">${topic.icon}</span>
         <span style="font-family:var(--font-display);font-size:1.1rem;">${topic.label}</span>
@@ -4103,12 +4103,12 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
       <div style="font-size:.82rem;color:var(--muted);line-height:1.6;">
         ${needsIntent
           ? 'First clarify the basics — then tell Parlay exactly what you want. It filters everything before your partner sees it.'
-          : `Say exactly what you want or feel. Don't filter yourself — Parlay will do that before ${_themNameMC} sees it.`}
+          : `Say exactly what you want or feel. Don't filter yourself — Parlay will do that before ${themName} sees it.`}
       </div>
     </div>
 
     <div class="a3" style="display:flex;flex-direction:column;gap:16px;">
-      ${needsIntent ? renderIntentQuestions(topicId, family, { ...partner, name: _themNameMC }) : ''}
+      ${needsIntent ? renderIntentQuestions(topicId, family, { name: themName }) : ''}
 
       <!-- Tone warning — Gottman-aware -->
       <div id="tone-warning" style="display:none;padding:12px 14px;background:#FFF5E0;border:1px solid #E8B88A;border-radius:var(--r-md);font-size:.78rem;color:#8A6A2A;line-height:1.5;">
@@ -4164,7 +4164,7 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
 
       <div style="background:var(--parchment);border-radius:var(--r-md);padding:12px 14px;">
         <div style="font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 Private until filtered</div>
-        <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">${_themNameMC || 'Your partner'} only sees the calm rewritten version — not your raw words above.</div>
+        <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">${themName} only sees the calm rewritten version — not your raw words above.</div>
       </div>
     </div>
 
@@ -4172,31 +4172,44 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
       <button class="btn btn-accent btn-full" id="compose-submit" style="border-radius:var(--r-md);">
         <span id="compose-btn-text">Let Parlay Mediate →</span>
       </button>
-      <button class="btn btn-muted btn-full" style="font-size:.82rem;" onclick="Router.navigate('mediator')">Cancel</button>
+      <button class="btn btn-muted btn-full" style="font-size:.82rem;" onclick="Router.navigate('plan')">Cancel</button>
     </div>
   </div>
   `;
-}, (el, { topicId = 'other' } = {}) => {
-  const textarea = el.querySelector('#compose-main');
-  const warning = el.querySelector('#tone-warning');
-  let toneTimer;
+}, (el) => {
+  /* ══════════════════════════════════════════════════════════════
+     INIT — 100% self-contained, zero reliance on render closure.
+     All names, roles, and state are read fresh here.
+     ══════════════════════════════════════════════════════════════ */
+  const root      = el.querySelector('#compose-root');
+  const topicId   = root?.dataset.topicId || 'other';
+  const textarea  = el.querySelector('#compose-main');
+  const warning   = el.querySelector('#tone-warning');
 
-  // Intent block interactivity
-  const whoRadios = el.querySelectorAll('input[name="who-going"]');
-  const kidsPicker = el.querySelector('#kids-picker');
-  const spouseBlock = el.querySelector('#spouse-block');
+  /* ── Resolve identity (works for both spouses) ───────────── */
+  function _getMyRole() {
+    return (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (State.get('currentView') === 'partner' ? 'partner' : 'user');
+  }
+  function _getMyName() {
+    const role = _getMyRole();
+    return (SupabaseDB.configured ? SupabaseDB.getMyName() : null) || (role === 'partner' ? State.get('partner')?.name : State.get('user')?.name) || 'You';
+  }
+
+  /* ── Intent block interactivity (inlaw / family / date) ──── */
+  const whoRadios     = el.querySelectorAll('input[name="who-going"]');
+  const kidsPicker    = el.querySelector('#kids-picker');
+  const spouseBlock   = el.querySelector('#spouse-block');
   const allKidsToggle = el.querySelector('#all-kids-toggle');
-  const family = State.get('family') || {};
-  const kCount = (family.kids || []).length;
+  const familyData    = State.get('family') || {};
+  const kidCount      = (familyData.kids || []).length;
 
-  function styleGroup(container, inputName) {
+  function styleGroup(container) {
     if (!container) return;
     container.querySelectorAll('label').forEach(lbl => {
-      const input = lbl.querySelector('input');
-      if (!input) return;
-      const active = input.type === 'checkbox' ? input.checked : input.checked;
-      lbl.style.borderColor = active ? 'var(--terra)' : 'var(--border)';
-      lbl.style.background  = active ? '#FDF0EA' : 'var(--surface)';
+      const inp = lbl.querySelector('input');
+      if (!inp) return;
+      lbl.style.borderColor = inp.checked ? 'var(--terra)' : 'var(--border)';
+      lbl.style.background  = inp.checked ? '#FDF0EA' : 'var(--surface)';
     });
   }
 
@@ -4204,12 +4217,9 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
     const selected = el.querySelector('input[name="who-going"]:checked')?.value || '';
     const involvesKids = ['me-and-kids', 'whole-family', 'partner-kids', 'with-kids'].includes(selected);
     const spouseNotComing = ['just-me', 'me-and-kids'].includes(selected);
-
-    // Kids picker: only relevant if 2+ kids (1-kid case: name is already in the label)
-    if (kidsPicker) kidsPicker.style.display = (involvesKids && kCount >= 2) ? 'block' : 'none';
+    if (kidsPicker) kidsPicker.style.display = (involvesKids && kidCount >= 2) ? 'block' : 'none';
     if (spouseBlock) spouseBlock.style.display = spouseNotComing ? 'block' : 'none';
-
-    styleGroup(el.querySelector('#who-options'), 'who-going');
+    styleGroup(el.querySelector('#who-options'));
   }
 
   whoRadios.forEach(r => {
@@ -4217,205 +4227,158 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
     r.closest('label')?.addEventListener('click', () => setTimeout(updateIntentVisibility, 10));
   });
 
-  // All-kids shortcut toggle
   if (allKidsToggle) {
     allKidsToggle.addEventListener('change', () => {
-      const checked = allKidsToggle.checked;
-      el.querySelectorAll('#kids-chips input[type="checkbox"]').forEach(cb => {
-        cb.checked = checked;
-      });
-      styleGroup(el.querySelector('#kids-chips'), 'kid-select');
+      el.querySelectorAll('#kids-chips input[type="checkbox"]').forEach(cb => { cb.checked = allKidsToggle.checked; });
+      styleGroup(el.querySelector('#kids-chips'));
     });
   }
 
-  // Individual kid chips
   el.querySelectorAll('.kid-chip-label').forEach(lbl => {
     lbl.addEventListener('change', () => {
       const cb = lbl.querySelector('input');
-      lbl.style.borderColor = cb.checked ? 'var(--terra)' : 'var(--border)';
-      lbl.style.background  = cb.checked ? '#FDF0EA' : 'var(--surface)';
-      // Sync all-kids toggle
-      if (allKidsToggle) {
-        const allChecked = [...el.querySelectorAll('#kids-chips input[type="checkbox"]')].every(c => c.checked);
-        allKidsToggle.checked = allChecked;
-      }
+      lbl.style.borderColor = cb?.checked ? 'var(--terra)' : 'var(--border)';
+      lbl.style.background  = cb?.checked ? '#FDF0EA' : 'var(--surface)';
+      if (allKidsToggle) allKidsToggle.checked = [...el.querySelectorAll('#kids-chips input[type="checkbox"]')].every(c => c.checked);
     });
   });
 
-  // Spouse radio styling
   el.querySelectorAll('input[name="spouse-role"]').forEach(r => {
-    r.addEventListener('change', () => styleGroup(el.querySelector('#spouse-block'), 'spouse-role'));
+    r.addEventListener('change', () => styleGroup(el.querySelector('#spouse-block')));
   });
 
   updateIntentVisibility();
 
-  // ── HOST intent block interactivity ──────────────────────
-  function styleRadioGroup(selector) {
+  /* ── HOST intent interactivity ───────────────────────────── */
+  function styleRadioCards(selector, activeColor, activeBg) {
     el.querySelectorAll(selector).forEach(lbl => {
-      const inp = lbl.querySelector('input[type="radio"]');
-      if (!inp) return;
-      lbl.style.borderColor = inp.checked ? (selector.includes('host') ? '#7A6A9B' : '#5A9E8A') : 'var(--border)';
-      lbl.style.background  = inp.checked ? (selector.includes('host') ? 'rgba(122,106,155,.1)' : 'rgba(90,158,138,.1)') : 'var(--surface)';
-    });
-  }
-  function styleCheckboxGroup(selector, activeColor, activeBg) {
-    el.querySelectorAll(selector).forEach(lbl => {
-      const inp = lbl.querySelector('input[type="checkbox"]');
+      const inp = lbl.querySelector('input');
       if (!inp) return;
       lbl.style.borderColor = inp.checked ? activeColor : 'var(--border)';
       lbl.style.background  = inp.checked ? activeBg   : 'var(--surface)';
     });
   }
 
-  // Host: radio groups
   ['input[name="host-format"]','input[name="host-kids"]','input[name="host-partner-role"]'].forEach(sel => {
     el.querySelectorAll(sel).forEach(inp => {
-      inp.addEventListener('change', () => {
-        const labelSel = sel.replace('input[name="','').replace('"]','');
-        el.querySelectorAll(`.intent-host-label`).forEach(lbl => {
-          const r = lbl.querySelector('input[type="radio"]');
-          if (!r) return;
-          const active = r.checked;
-          lbl.style.borderColor = active ? '#7A6A9B' : 'var(--border)';
-          lbl.style.background  = active ? 'rgba(122,106,155,.1)' : 'var(--surface)';
-        });
-      });
+      inp.addEventListener('change', () => styleRadioCards('.intent-host-label', '#7A6A9B', 'rgba(122,106,155,.1)'));
     });
   });
 
-  // Host: scale pill cards
   el.querySelectorAll('.host-scale-chip').forEach(lbl => {
     lbl.addEventListener('click', () => {
       const inp = lbl.querySelector('input[type="radio"]');
       if (inp) inp.checked = true;
-      el.querySelectorAll('.host-scale-chip').forEach(l => {
-        const r = l.querySelector('input[type="radio"]');
-        l.style.borderColor = (r && r.checked) ? '#7A6A9B' : 'var(--border)';
-        l.style.background  = (r && r.checked) ? 'rgba(122,106,155,.1)' : 'var(--surface)';
+      styleRadioCards('.host-scale-chip', '#7A6A9B', 'rgba(122,106,155,.1)');
+    });
+  });
+
+  el.querySelectorAll('.host-guest-chip').forEach(lbl => {
+    lbl.addEventListener('change', () => {
+      el.querySelectorAll('.host-guest-chip').forEach(l => {
+        const cb = l.querySelector('input[type="checkbox"]');
+        if (!cb) return;
+        l.style.borderColor = cb.checked ? '#7A6A9B' : 'var(--border)';
+        l.style.background  = cb.checked ? 'rgba(122,106,155,.1)' : 'var(--surface)';
       });
     });
   });
 
-  // Host: guest checkboxes
-  el.querySelectorAll('.host-guest-chip').forEach(lbl => {
-    lbl.addEventListener('change', () => styleCheckboxGroup('.host-guest-chip', '#7A6A9B', 'rgba(122,106,155,.1)'));
-  });
-
-  // Playdate: location pill cards
+  /* ── PLAYDATE intent interactivity ───────────────────────── */
   el.querySelectorAll('.playdate-loc-chip').forEach(lbl => {
     lbl.addEventListener('click', () => {
       const inp = lbl.querySelector('input[type="radio"]');
       if (inp) inp.checked = true;
-      el.querySelectorAll('.playdate-loc-chip').forEach(l => {
-        const r = l.querySelector('input[type="radio"]');
-        l.style.borderColor = (r && r.checked) ? '#5A9E8A' : 'var(--border)';
-        l.style.background  = (r && r.checked) ? 'rgba(90,158,138,.1)' : 'var(--surface)';
-      });
+      styleRadioCards('.playdate-loc-chip', '#5A9E8A', 'rgba(90,158,138,.1)');
     });
   });
 
-  // Playdate: radio groups
   ['.playdate-contact-label','.playdate-sup-label','.playdate-other-label','.playdate-kid-chip'].forEach(sel => {
     el.querySelectorAll(sel).forEach(lbl => {
-      lbl.addEventListener('change', () => {
-        el.querySelectorAll(sel).forEach(l => {
-          const r = l.querySelector('input');
-          if (!r) return;
-          const active = r.type === 'checkbox' ? r.checked : r.checked;
-          l.style.borderColor = active ? '#5A9E8A' : 'var(--border)';
-          l.style.background  = active ? 'rgba(90,158,138,.1)' : 'var(--surface)';
-        });
-      });
+      lbl.addEventListener('change', () => styleRadioCards(sel, '#5A9E8A', 'rgba(90,158,138,.1)'));
     });
   });
 
-  // Playdate: "Someone else" shows custom text field
   el.querySelectorAll('input[name="playdate-friend"]').forEach(inp => {
     inp.addEventListener('change', () => {
       const custom = el.querySelector('#playdate-friend-custom');
-      if (custom) {
-        if (inp.value === '__other__' && inp.checked) {
-          custom.focus();
-        }
-      }
+      if (custom && inp.value === '__other__' && inp.checked) custom.focus();
     });
   });
 
-  // Date slot visual fill state
+  /* ── Date slot fill state ────────────────────────────────── */
   el.querySelectorAll('.date-slot-date, .date-slot-time').forEach(inp => {
     inp.addEventListener('change', () => {
       const n = inp.dataset.slot;
       const slot = el.querySelector(`#date-slot-${n}`);
-      const hasDate = el.querySelector(`.date-slot-date[data-slot="${n}"]`)?.value;
-      if (slot) slot.classList.toggle('filled', !!hasDate);
+      if (slot) slot.classList.toggle('filled', !!el.querySelector(`.date-slot-date[data-slot="${n}"]`)?.value);
     });
   });
 
-  // Tone detection on textarea
+  /* ── Gottman tension detection (debounced) ────────────────── */
+  let toneTimer;
   textarea?.addEventListener('input', () => {
     clearTimeout(toneTimer);
     if (textarea.value.length > 40) {
       toneTimer = setTimeout(async () => {
-        const tension = await detectTension(textarea.value);
-        if (tension.flag) {
-          const horseman = tension.horseman || 'none';
-          const headlines = {
-            criticism:     '⚡ Sounds like a character attack — Parlay will reframe it as a specific complaint',
-            contempt:      '🚨 Contempt detected — the most corrosive pattern. Parlay will replace it with a direct need',
-            defensiveness: '⚡ Reads as defensive — Parlay will shift it to ownership',
-            stonewalling:  '⚡ Sounds like a shutdown — Parlay will reframe it as a request for space',
-            none:          '⚡ Your message sounds heated'
-          };
-          const bodies = {
-            criticism:     tension.note || 'Parlay will turn the character attack into a complaint about a specific behaviour.',
-            contempt:      tension.note || 'Raw contempt will be completely replaced. Your underlying need will still come through clearly.',
-            defensiveness: tension.note || 'Parlay will remove the counter-attack and lead with your actual position.',
-            stonewalling:  tension.note || 'Parlay will replace the shutdown language with a request your partner can actually respond to.',
-            none:          'That\'s okay — Parlay will cool it down before it reaches your partner.'
-          };
-          if (warning) {
+        try {
+          const tension = await detectTension(textarea.value);
+          if (tension.flag && warning) {
+            const horseman = tension.horseman || 'none';
+            const headlines = {
+              criticism:     '⚡ Sounds like a character attack — Parlay will reframe it as a specific complaint',
+              contempt:      '🚨 Contempt detected — the most corrosive pattern. Parlay will replace it with a direct need',
+              defensiveness: '⚡ Reads as defensive — Parlay will shift it to ownership',
+              stonewalling:  '⚡ Sounds like a shutdown — Parlay will reframe it as a request for space',
+              none:          '⚡ Your message sounds heated'
+            };
+            const bodies = {
+              criticism:     tension.note || 'Parlay will turn the character attack into a complaint about a specific behaviour.',
+              contempt:      tension.note || 'Raw contempt will be completely replaced. Your underlying need will still come through clearly.',
+              defensiveness: tension.note || 'Parlay will remove the counter-attack and lead with your actual position.',
+              stonewalling:  tension.note || 'Parlay will replace the shutdown language with a request your partner can actually respond to.',
+              none:          "That's okay — Parlay will cool it down before it reaches your partner."
+            };
             warning.style.display = 'block';
-            const headline = warning.querySelector('#warning-headline');
-            const body = warning.querySelector('#warning-body');
-            if (headline) headline.textContent = headlines[horseman] || headlines.none;
-            if (body) body.textContent = bodies[horseman] || bodies.none;
-            // Escalate colour for contempt
-            warning.style.background = horseman === 'contempt' ? '#FFF0F0' : '#FFF5E0';
-            warning.style.borderColor = horseman === 'contempt' ? '#E8A0A0' : '#E8B88A';
-            warning.style.color = horseman === 'contempt' ? '#8A2A2A' : '#8A6A2A';
+            const h = warning.querySelector('#warning-headline');
+            const b = warning.querySelector('#warning-body');
+            if (h) h.textContent = headlines[horseman] || headlines.none;
+            if (b) b.textContent = bodies[horseman] || bodies.none;
+            warning.style.background   = horseman === 'contempt' ? '#FFF0F0' : '#FFF5E0';
+            warning.style.borderColor  = horseman === 'contempt' ? '#E8A0A0' : '#E8B88A';
+            warning.style.color        = horseman === 'contempt' ? '#8A2A2A' : '#8A6A2A';
+          } else if (warning) {
+            warning.style.display = 'none';
           }
-        } else {
-          if (warning) warning.style.display = 'none';
-        }
+        } catch(e) { console.warn('[detectTension] error:', e); }
       }, 800);
-    } else {
-      if (warning) warning.style.display = 'none';
+    } else if (warning) {
+      warning.style.display = 'none';
     }
   });
 
-  el.querySelector('#compose-submit').addEventListener('click', async () => {
-    const raw = textarea.value.trim();
+  /* ══════════════════════════════════════════════════════════════
+     SUBMIT — Gather intent, filter via AI, save parlay
+     ══════════════════════════════════════════════════════════════ */
+  el.querySelector('#compose-submit')?.addEventListener('click', async () => {
+    const raw         = textarea?.value.trim() || '';
     const constraints = el.querySelector('#compose-constraints')?.value.trim() || '';
     if (!raw) { U.toast('Tell Parlay what you need first'); return; }
 
-    // Gather structured intent
-    const whoGoing = el.querySelector('input[name="who-going"]:checked')?.value || null;
+    /* ── Gather structured intent from form ───────────────── */
+    const whoGoing   = el.querySelector('input[name="who-going"]:checked')?.value || null;
     const spouseRole = el.querySelector('input[name="spouse-role"]:checked')?.value || null;
-    const familyState = State.get('family') || {};
-    const allKids = familyState.kids || [];
-    const kCount = allKids.length;
+    const fam     = State.get('family') || {};
+    const allKids = fam.kids || [];
+    const kc      = allKids.length;
 
-    // For 1-kid: the selection is implicit (name is in the radio label), use that kid automatically
-    // For 2+ kids: read checkboxes
     let selectedKids = [];
-    if (kCount === 1 && ['me-and-kids', 'whole-family', 'partner-kids', 'with-kids'].includes(whoGoing)) {
+    if (kc === 1 && ['me-and-kids','whole-family','partner-kids','with-kids'].includes(whoGoing)) {
       selectedKids = [allKids[0].name];
     } else {
-      const selectedKidIds = [...(el.querySelectorAll('#kids-chips input:checked') || [])].map(c => c.value);
-      selectedKids = allKids.filter(k => selectedKidIds.includes(k.id)).map(k => k.name);
+      selectedKids = allKids.filter(k => [...(el.querySelectorAll('#kids-chips input:checked') || [])].map(c => c.value).includes(k.id)).map(k => k.name);
     }
 
-    // Build structured context string to embed in prompt
     let intentContext = '';
     if (whoGoing) {
       const kStr = selectedKids.length ? '(' + selectedKids.join(', ') + ')' : '';
@@ -4430,87 +4393,80 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
       intentContext += `WHO IS GOING: ${whoLabels[whoGoing] || whoGoing}\n`;
     }
     if (spouseRole) {
-      const roleLabels = {
+      const sLabels = {
         'not-involved': 'Spouse is not part of this trip at all — they stay home',
         'aware': 'Spouse just needs to be aware and approve the timing',
         'covering-kids': 'Spouse stays home to cover the kids while user goes',
       };
-      intentContext += `SPOUSE ROLE: ${roleLabels[spouseRole] || spouseRole}\n`;
+      intentContext += `SPOUSE ROLE: ${sLabels[spouseRole] || spouseRole}\n`;
     }
 
-    // ── HOST intent context ──────────────────────────────────
+    /* ── HOST intent ───────────────────────────────────────── */
     if (topicId === 'host') {
-      const hostFormat = el.querySelector('input[name="host-format"]:checked')?.value || '';
-      const hostGuests = [...el.querySelectorAll('input[name="host-guests"]:checked')].map(c => c.value);
-      const hostScale  = el.querySelector('input[name="host-scale"]:checked')?.value || '';
-      const hostKids   = el.querySelector('input[name="host-kids"]:checked')?.value || '';
-      const hostRole   = el.querySelector('input[name="host-partner-role"]:checked')?.value || '';
+      const hf = el.querySelector('input[name="host-format"]:checked')?.value || '';
+      const hg = [...el.querySelectorAll('input[name="host-guests"]:checked')].map(c => c.value);
+      const hs = el.querySelector('input[name="host-scale"]:checked')?.value || '';
+      const hk = el.querySelector('input[name="host-kids"]:checked')?.value || '';
+      const hr = el.querySelector('input[name="host-partner-role"]:checked')?.value || '';
 
-      const formatLabels = { dinner:'Sit-down dinner party', drinks:'Drinks & appetizers (low-key)', bbq:'BBQ / backyard gathering', game:'Game night', holiday:'Holiday or celebration event' };
-      const scaleLabels  = { small:'Intimate (2–4 guests)', medium:'Small gathering (5–8 guests)', large:'Larger party (9+ guests)' };
-      const kidsLabels   = { 'adults-only':'Adults only — need to arrange childcare/kid coverage', 'kids-welcome':'Kids are welcome and included', 'mixed':'Mixed — kids for part of the event' };
-      const roleLabels   = {
-        'just-date':'Just needs to agree on the date — user will handle the rest',
-        'share-prep':'Both partners share cooking and prep equally',
-        'i-cook-clean':'User handles food; partner handles house/cleaning',
-        'they-handle':'Partner takes the lead; user supports',
-        'full-discuss':'Couple needs to plan the full event together',
-      };
-      const guestLabels  = { 'couple-friends':'couple friends', 'my-friends':'user\'s own friends', 'their-friends':'partner\'s friends', 'family':'extended family', 'neighbors':'neighbors', 'work':'work colleagues' };
+      const fmtL = { dinner:'Sit-down dinner party', drinks:'Drinks & appetizers (low-key)', bbq:'BBQ / backyard gathering', game:'Game night', holiday:'Holiday or celebration event' };
+      const scL  = { small:'Intimate (2–4 guests)', medium:'Small gathering (5–8 guests)', large:'Larger party (9+ guests)' };
+      const kL   = { 'adults-only':'Adults only — need childcare', 'kids-welcome':'Kids welcome', 'mixed':'Mixed — kids for part' };
+      const rL   = { 'just-date':'Just agree on date','share-prep':'Share cooking & prep','i-cook-clean':'User handles food, partner handles house','they-handle':'Partner leads, user supports','full-discuss':'Plan it together' };
+      const gL   = { 'couple-friends':'couple friends','my-friends':"user's friends",'their-friends':"partner's friends",'family':'extended family','neighbors':'neighbors','work':'colleagues' };
 
-      if (hostFormat) intentContext += `HOSTING FORMAT: ${formatLabels[hostFormat] || hostFormat}\n`;
-      if (hostGuests.length) intentContext += `GUEST TYPE: ${hostGuests.map(g => guestLabels[g] || g).join(', ')}\n`;
-      if (hostScale)  intentContext += `EVENT SCALE: ${scaleLabels[hostScale] || hostScale}\n`;
-      if (hostKids)   intentContext += `KIDS SITUATION: ${kidsLabels[hostKids] || hostKids}\n`;
-      if (hostRole)   intentContext += `WHAT USER NEEDS FROM PARTNER: ${roleLabels[hostRole] || hostRole}\n`;
-      intentContext += `CONTEXT: This is a "host at home" proposal. The user is proposing to entertain guests at the shared home. The message must establish: (1) who's coming and roughly when, (2) the format/effort level so partner can calibrate expectations, (3) exactly what the user is asking the partner to do or agree to. Do NOT assume the partner is enthusiastic — present this as a proposal that respects both the shared space and the partner's schedule and energy.\n`;
+      if (hf)        intentContext += `HOSTING FORMAT: ${fmtL[hf] || hf}\n`;
+      if (hg.length) intentContext += `GUEST TYPE: ${hg.map(g => gL[g] || g).join(', ')}\n`;
+      if (hs)        intentContext += `EVENT SCALE: ${scL[hs] || hs}\n`;
+      if (hk)        intentContext += `KIDS SITUATION: ${kL[hk] || hk}\n`;
+      if (hr)        intentContext += `WHAT USER NEEDS FROM PARTNER: ${rL[hr] || hr}\n`;
+      intentContext += `CONTEXT: This is a "host at home" proposal. The message must establish: (1) who's coming and roughly when, (2) format/effort so partner can calibrate expectations, (3) exactly what is asked of the partner. Do NOT assume enthusiasm — present as a proposal that respects shared space and partner's schedule.\n`;
     }
 
-    // ── PLAYDATE intent context ──────────────────────────────
+    /* ── PLAYDATE intent ───────────────────────────────────── */
     if (topicId === 'playdate') {
-      const familyState2      = State.get('family') || {};
-      const allKids2          = familyState2.kids || [];
-      const contacts          = familyState2.playdateContacts || [];
-      const pdKidIds          = [...el.querySelectorAll('input[name="playdate-kid"]:checked')].map(c => c.value);
-      const pdKidNames        = allKids2.filter(k => pdKidIds.includes(k.id)).map(k => k.name);
-      const pdFriendId        = el.querySelector('input[name="playdate-friend"]:checked')?.value || '';
-      const pdFriendCustom    = el.querySelector('#playdate-friend-custom')?.value.trim() || '';
-      const pdLocation        = el.querySelector('input[name="playdate-location"]:checked')?.value || '';
-      const pdSupervise       = el.querySelector('input[name="playdate-supervise"]:checked')?.value || '';
-      const pdOtherKids       = el.querySelector('input[name="playdate-other-kids"]:checked')?.value || '';
+      const fam2       = State.get('family') || {};
+      const kids2      = fam2.kids || [];
+      const contacts   = fam2.playdateContacts || [];
+      const pdKids     = kids2.filter(k => [...el.querySelectorAll('input[name="playdate-kid"]:checked')].map(c => c.value).includes(k.id)).map(k => k.name);
+      const pdFriendId = el.querySelector('input[name="playdate-friend"]:checked')?.value || '';
+      const pdCustom   = el.querySelector('#playdate-friend-custom')?.value.trim() || '';
+      const pdLoc      = el.querySelector('input[name="playdate-location"]:checked')?.value || '';
+      const pdSup      = el.querySelector('input[name="playdate-supervise"]:checked')?.value || '';
+      const pdOther    = el.querySelector('input[name="playdate-other-kids"]:checked')?.value || '';
 
-      const friendContact = contacts.find(c => (c.id || c.name) === pdFriendId);
-      const friendName    = pdFriendCustom || (friendContact ? friendContact.name : pdFriendId !== '__other__' ? pdFriendId : '');
+      const fc = contacts.find(c => (c.id || c.name) === pdFriendId);
+      const fn = pdCustom || (fc ? fc.name : pdFriendId !== '__other__' ? pdFriendId : '');
 
-      const locLabels  = { here:'At our home (we host)', there:"At the friend's place", park:'Park or outdoor neutral location', activity:'Activity venue (gym, arts class, etc.)' };
-      const supLabels  = { 'i-supervise':'User will supervise', 'partner-supervise':'Partner will supervise — user is free during this time', 'drop-off':'Drop-off only — no adult staying', 'together':'Both parents stay (social for adults too)' };
-      const otherLabels= { together:"Other kids come too — no separate coverage needed", 'i-cover':'User covers the other kid(s)', 'partner-covers':'Partner covers the other kid(s)', 'need-to-figure':'Coverage for other kids still needs to be figured out' };
+      const locL   = { here:'At our home (we host)', there:"At friend's place", park:'Park / outdoor', activity:'Activity venue' };
+      const supL   = { 'i-supervise':'User supervises', 'partner-supervise':'Partner supervises', 'drop-off':'Drop-off only', 'together':'Both parents stay' };
+      const othL   = { together:"Other kids come too", 'i-cover':'User covers others', 'partner-covers':'Partner covers others', 'need-to-figure':'Coverage TBD' };
 
-      if (pdKidNames.length)  intentContext += `WHICH KID: ${pdKidNames.join(', ')}\n`;
-      if (friendName)         intentContext += `FRIEND: ${friendName}${friendContact?.parentName ? ` (parent: ${friendContact.parentName})` : ''}\n`;
-      if (pdLocation)         intentContext += `LOCATION: ${locLabels[pdLocation] || pdLocation}\n`;
-      if (pdSupervise)        intentContext += `WHO SUPERVISES: ${supLabels[pdSupervise] || pdSupervise}\n`;
-      if (pdOtherKids)        intentContext += `OTHER KIDS COVERAGE: ${otherLabels[pdOtherKids] || pdOtherKids}\n`;
-      intentContext += `CONTEXT: This is a playdate coordination proposal. Key things the message must communicate: (1) which child and with whom, (2) where it happens and who is responsible for logistics/supervision, (3) any impact on the partner's schedule or responsibilities during that time. Be specific about what is being asked of the partner — whether that's agreement, scheduling coverage, or just a heads-up.\n`;
+      if (pdKids.length) intentContext += `WHICH KID: ${pdKids.join(', ')}\n`;
+      if (fn)            intentContext += `FRIEND: ${fn}${fc?.parentName ? ` (parent: ${fc.parentName})` : ''}\n`;
+      if (pdLoc)         intentContext += `LOCATION: ${locL[pdLoc] || pdLoc}\n`;
+      if (pdSup)         intentContext += `WHO SUPERVISES: ${supL[pdSup] || pdSup}\n`;
+      if (pdOther)       intentContext += `OTHER KIDS COVERAGE: ${othL[pdOther] || pdOther}\n`;
+      intentContext += `CONTEXT: Playdate coordination. Communicate: (1) which child and with whom, (2) where and who supervises, (3) any impact on partner's schedule. Be specific about what is asked of the partner.\n`;
     }
-    // Collect date options
+
+    /* ── Date options ──────────────────────────────────────── */
     const dateOptions = [];
     [1,2,3,4].forEach(n => {
       const d = el.querySelector(`.date-slot-date[data-slot="${n}"]`)?.value;
       const t = el.querySelector(`.date-slot-time[data-slot="${n}"]`)?.value;
       if (d) dateOptions.push({ id: 'opt_' + n, date: d, timeLabel: t || 'Any time', label: 'Option ' + n });
     });
-    if (constraints) intentContext += `TIMING CONSTRAINTS: ${constraints}\n`;
+    if (constraints)     intentContext += `TIMING CONSTRAINTS: ${constraints}\n`;
     if (dateOptions.length) intentContext += `DATE OPTIONS PROPOSED: ${dateOptions.map(o => o.label + ': ' + o.date + (o.timeLabel ? ' ' + o.timeLabel : '')).join('; ')}\n`;
 
-    const submitBtn  = el.querySelector('#compose-submit');
-    const btnText    = el.querySelector('#compose-btn-text');
-    btnText.textContent  = 'Filtering your message…';
-    submitBtn.disabled   = true;
+    /* ── Call AI filter ────────────────────────────────────── */
+    const submitBtn = el.querySelector('#compose-submit');
+    const btnText   = el.querySelector('#compose-btn-text');
+    if (btnText) btnText.textContent = 'Filtering your message…';
+    if (submitBtn) submitBtn.disabled = true;
 
-    const _view = State.get('currentView') || 'user';
-    const _myRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (_view === 'partner' ? 'partner' : 'user');
-    const userName = (SupabaseDB.configured ? SupabaseDB.getMyName() : null) || (_myRole === 'partner' ? State.get('partner')?.name : State.get('user')?.name) || 'You';
+    const userName = _getMyName();
     const tone     = State.get('mediatorTone') || 'neutral';
 
     let filtered;
@@ -4518,35 +4474,34 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
       filtered = await runToneFilter(raw, userName, tone, intentContext);
     } catch (err) {
       console.error('[Parlay] runToneFilter failed:', err);
-      btnText.textContent = 'Let Parlay Mediate →';
-      submitBtn.disabled  = false;
-      const msg = err.name === 'AbortError'
-        ? 'Request timed out — check your connection and try again'
-        : 'Couldn\u2019t reach the AI right now. Try again in a moment.';
-      U.toast(msg);
+      if (btnText) btnText.textContent = 'Let Parlay Mediate →';
+      if (submitBtn) submitBtn.disabled = false;
+      U.toast(err.name === 'AbortError' ? 'Request timed out — try again' : 'Couldn\u2019t reach the AI right now. Try again in a moment.');
       return;
     }
 
-    // Save parlay as pending_partner — NO fake partner position, NO generateProposal yet
+    /* ── Save to MediatorState + Supabase ──────────────────── */
+    const createdBy = _getMyRole();
     const topic = TOPIC_TYPES.find(t => t.id === topicId);
     const negId = 'neg_' + Date.now();
-    MediatorState.add({
-      id: negId,
-      topicId,
-      title: topic?.label || 'New Parlay',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      rawInput: raw,
-      filteredInput: filtered,
-      intentContext,
-      dateOptions,
-      status: 'pending_partner',
-      createdBy: (SupabaseDB.configured ? SupabaseDB.getMyRole() : null) || (State.get('currentView') === 'partner' ? 'partner' : 'user'),
-      partnerRawReply: null,
-      partnerFilteredReply: null,
-      partnerDateResponse: null,
-      proposal: null,
-      resolution: null
-    });
+
+    try {
+      MediatorState.add({
+        id: negId, topicId,
+        title: topic?.label || 'New Parlay',
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        rawInput: raw, filteredInput: filtered, intentContext, dateOptions,
+        status: 'pending_partner', createdBy,
+        partnerRawReply: null, partnerFilteredReply: null, partnerDateResponse: null,
+        proposal: null, resolution: null,
+      });
+    } catch(e) {
+      console.error('[Parlay] MediatorState.add failed:', e);
+      if (btnText) btnText.textContent = 'Let Parlay Mediate →';
+      if (submitBtn) submitBtn.disabled = false;
+      U.toast('Failed to save — try again');
+      return;
+    }
 
     Router.navigate('parlay-sent', { negId });
   });
