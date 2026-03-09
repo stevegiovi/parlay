@@ -36,8 +36,8 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:16px;-webkit-text-size-adjust:100%}
-body{font-family:var(--font-body);background:#e8e0d8;color:var(--espresso);min-height:100vh;min-height:100dvh;display:flex;justify-content:center;overflow-x:hidden}
-#app{width:100%;max-width:var(--max-w);min-height:100vh;min-height:100dvh;background:var(--cream);position:relative;overflow:hidden;box-shadow:0 0 80px rgba(44,26,14,0.2)}
+body{font-family:var(--font-body);background:var(--parchment);color:var(--espresso);min-height:100vh;min-height:100dvh;display:flex;justify-content:center;overflow-x:hidden}
+#app{width:100%;max-width:var(--max-w);min-height:100vh;min-height:100dvh;background:var(--parchment);position:relative;overflow:hidden;box-shadow:0 0 80px rgba(44,26,14,0.2)}
 
 /* SCREENS */
 .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;opacity:0;pointer-events:none;transition:opacity 0.28s var(--ease),transform 0.28s var(--ease);transform:translateX(24px)}
@@ -835,10 +835,17 @@ const SupabaseDB = (() => {
   function getMyRole()    { return _myRole; }
   function getMyUserId()  { return _myUserId; }
   function getMyEmail()   { return _session?.user?.email || ''; }
-  function getMyName()    {
-    // Returns the signed-in person's own first name, regardless of spouse role
+  function getSession()   { return _session; }
+  function getMyName()      {
+    // Signed-in person's own name, regardless of spouse role
     if (_myRole === 'user')    return State.get('user')?.name    || '';
     if (_myRole === 'partner') return State.get('partner')?.name || '';
+    return '';
+  }
+  function getPartnerName() {
+    // The OTHER person's name, regardless of who is signed in
+    if (_myRole === 'user')    return State.get('partner')?.name || '';
+    if (_myRole === 'partner') return State.get('user')?.name    || '';
     return '';
   }
 
@@ -1316,7 +1323,7 @@ const SupabaseDB = (() => {
     isReady,
     initAuthListener: _initAuthListener,
     signUp, signIn, signOut, signInWithGoogle, getSession,
-    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getMyEmail, getMyName, getPartnerUserId,
+    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getMyEmail, getMyName, getPartnerName, getPartnerUserId, getSession,
     saveProfile, loadProfile,
     saveCommSelf, saveCommReadOfPartner, loadCommPrefs,
     saveFamilyMember, deleteFamilyMember, loadFamily,
@@ -1365,7 +1372,7 @@ const Router = (() => {
     const bannerSwitch = document.getElementById('view-banner-switch');
     if (banner) {
       const view = State.get('currentView') || 'user';
-      const pName = State.get('partner')?.name || 'Partner';
+      const pName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || State.get('user')?.name || 'Partner';
       // Only show the "Viewing as" banner in localStorage mode (no Supabase)
       if (!SupabaseDB.configured && view === 'partner' && !ONBOARDING_SCREENS.includes(name)) {
         bannerText.textContent = `Viewing as ${pName}`;
@@ -1507,7 +1514,7 @@ Router.register('auth-entry', () => `
     <div style="position:absolute;bottom:40px;left:0;right:0;padding:0 28px;display:flex;flex-direction:column;gap:12px;align-items:center;animation:fadeUp .6s .7s var(--ease) both;">
 
       <!-- PATH 1: Spouse 1 — starting fresh -->
-      <button onclick="Router.navigate('auth-signup')" style="max-width:340px;width:100%;padding:18px 20px;background:var(--terra);color:#fff;border:none;border-radius:16px;font-family:var(--font-body);font-size:.95rem;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;">
+      <button onclick="localStorage.setItem('parlay_signup_intent','start'); Router.navigate('auth-signup')" style="max-width:340px;width:100%;padding:18px 20px;background:var(--terra);color:#fff;border:none;border-radius:16px;font-family:var(--font-body);font-size:.95rem;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;">
         <span>Start your Parlay →</span>
         <span style="font-size:.72rem;font-weight:400;opacity:.75;">Create an account and invite your partner</span>
       </button>
@@ -2004,7 +2011,7 @@ Router.register('ob2', () => `
 
     <div class="a1" style="margin-bottom:24px;">
       <div class="ob-title">How do you feel<br><em>most loved?</em></div>
-      <div class="ob-sub" style="margin-top:8px;">Your partner won't see this unless you choose to share. Parlay uses it privately to suggest actions.</div>
+      <div class="ob-sub" style="margin-top:8px;">Completely private — never shared with your partner. Parlay uses this to calibrate the emotional register of everything that comes your way.</div>
     </div>
 
     <div class="ob-body a2">
@@ -2056,7 +2063,9 @@ Router.register('ob2', () => `
 Router.register('ob-self', () => {
   const view      = State.get('currentView') || 'user';
   const myRole    = view === 'partner' ? 'partner' : 'user';
-  const userName  = State.get('user')?.name || 'you';
+  const userName  = (SupabaseDB.configured ? SupabaseDB.getMyName() : null)
+                 || (view === 'partner' ? State.get('partner')?.name : State.get('user')?.name)
+                 || 'you';
   const commPrefs = State.get('commPrefs') || {};
   const myPrefs   = commPrefs[myRole] || {};
   const selected  = new Set(myPrefs.self?.traits || []);
@@ -2074,31 +2083,11 @@ Router.register('ob-self', () => {
       </div>
 
       <div class="a1" style="margin-bottom:20px;">
-        <div class="ob-title">How do <em>you</em> want<br>to be spoken to?</div>
-        <div class="ob-sub" style="margin-top:8px;">This tells Parlay how to calibrate every message sent your way — tone, pacing, format. Your partner won't see this list, but it shapes everything they receive.</div>
+        <div class="ob-title">What works<br><em>for you?</em></div>
+        <div class="ob-sub" style="margin-top:8px;">A private self-assessment — your partner never sees this. Parlay uses it to shape every message that comes your way, filtering out patterns that shut you down and leading with what opens you up.</div>
       </div>
 
-      <!-- Warm/Direct/Neutral quick-pick -->
-      <div style="margin-bottom:20px;" class="a2">
-        <div style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Quick pick — my overall tone preference</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;" id="tone-quick-pick">
-          ${[
-            { id: 'tone-warm',    icon: '🌿', label: 'Warm',    desc: 'Kind + caring'  },
-            { id: 'tone-neutral', icon: '⚖️', label: 'Neutral', desc: 'Balanced'       },
-            { id: 'tone-direct',  icon: '🎯', label: 'Direct',  desc: 'Clear + brief'  },
-          ].map(t => {
-            const sel = selected.has(t.id);
-            return `<button class="ob-tone-btn" data-id="${t.id}"
-              style="padding:14px 8px;border:2px solid ${sel ? 'var(--terra)' : 'var(--border)'};border-radius:14px;background:${sel ? '#FDF0EA' : 'var(--surface)'};cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:var(--font-body);transition:all .15s;">
-              <span style="font-size:1.3rem;">${t.icon}</span>
-              <span style="font-size:.78rem;font-weight:700;color:var(--espresso);">${t.label}</span>
-              <span style="font-size:.62rem;color:var(--muted);">${t.desc}</span>
-            </button>`;
-          }).join('')}
-        </div>
-      </div>
-
-      <div class="ob-body a3" id="ob-self-traits" style="max-height:44vh;overflow-y:auto;padding-right:4px;">
+      <div class="ob-body a2" id="ob-self-traits" style="max-height:52vh;overflow-y:auto;padding-right:4px;">
         ${MY_COMM_PREFS_TRAITS.map(cat => `
           <div style="margin-bottom:18px;">
             <div style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
@@ -2134,33 +2123,15 @@ Router.register('ob-self', () => {
   `;
 }, (el) => {
   const commPrefs = State.get('commPrefs') || {};
-  const myPrefs   = commPrefs.user || {};
+  const view0     = State.get('currentView') || 'user';
+  const myRole0   = view0 === 'partner' ? 'partner' : 'user';
+  const myPrefs   = commPrefs[myRole0]?.self || {};
   const selectedSet = new Set(myPrefs.traits || []);
 
   function updateCount() {
     const c = el.querySelector('#ob-self-count');
     if (c) c.textContent = selectedSet.size;
   }
-
-  // Quick-pick tone buttons
-  el.querySelectorAll('.ob-tone-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.id;
-      const TONE_IDS = ['tone-warm', 'tone-neutral', 'tone-direct'];
-      // Toggle: select this, deselect others
-      TONE_IDS.forEach(tid => {
-        selectedSet.delete(tid);
-        const b = el.querySelector(`.ob-tone-btn[data-id="${tid}"]`);
-        if (b) { b.style.borderColor = 'var(--border)'; b.style.background = 'var(--surface)'; }
-      });
-      if (!selectedSet.has(id)) {
-        selectedSet.add(id);
-        btn.style.borderColor = 'var(--terra)';
-        btn.style.background  = '#FDF0EA';
-      }
-      updateCount();
-    });
-  });
 
   // Trait rows
   el.querySelectorAll('.ob-self-row').forEach(row => {
@@ -2199,7 +2170,10 @@ Router.register('ob-self', () => {
    MODULE: ONBOARDING — Step 4 (Partner Communication Style)
    ================================================ */
 Router.register('ob3', () => {
-  const partnerName = State.get('partner')?.name || 'your partner';
+  const _v0b3 = State.get('currentView') || 'user';
+  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null)
+                   || (_v0b3 === 'partner' ? State.get('user')?.name : State.get('partner')?.name)
+                   || 'your partner';
   const cp      = State.get('commPrefs') || {};
   const legacy  = State.get('partnerProfile') || {};
   const _v      = State.get('currentView') || 'user';
@@ -2220,12 +2194,12 @@ Router.register('ob3', () => {
       </div>
 
       <div class="a1" style="margin-bottom:20px;">
-        <div class="ob-title">How does <em>${partnerName}</em><br>communicate?</div>
-        <div class="ob-sub" style="margin-top:8px;">Pick everything that fits. Parlay bakes this into every mediation — your partner always feels respected, never pressured.</div>
+        <div class="ob-title">How does <em>${partnerName}</em><br>tick?</div>
+        <div class="ob-sub" style="margin-top:8px;">Your honest read of them — not what's ideal, but what's real. Parlay uses this to approach ${partnerName} in ways that actually land, and to avoid patterns that cause them to shut down.</div>
       </div>
 
       <div class="ob-body" id="ob3-traits" style="max-height:52vh;overflow-y:auto;padding-right:4px;">
-        ${MY_COMM_PREFS_TRAITS.map(cat => `
+        ${PARTNER_PROFILE_TRAITS.map(cat => `
           <div style="margin-bottom:18px;">
             <div style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
               <span>${cat.icon}</span>${cat.category}
@@ -2254,7 +2228,7 @@ Router.register('ob3', () => {
       <div class="ob-footer a5" style="margin-top:12px;">
         <button class="btn btn-primary btn-full" id="ob3-next">Continue →</button>
         <button class="btn btn-muted btn-full" onclick="Router.navigate('ob-self')" style="font-size:.82rem;">Back</button>
-        <button class="btn btn-muted btn-full" onclick="Router.navigate('ob-connect')" style="font-size:.78rem;opacity:.6;">Skip for now</button>
+        <button class="btn btn-muted btn-full" onclick="Router.navigate(localStorage.getItem('parlay_signup_intent')==='start' ? 'ob4' : (SupabaseDB.configured && SupabaseDB.coupleRow ? 'ob-intro' : 'ob-connect'))" style="font-size:.78rem;opacity:.6;">Skip for now</button>
       </div>
     </div>
   `;
@@ -2309,9 +2283,14 @@ Router.register('ob3', () => {
         }
       }
     });
-    // If already coupled (Spouse 2 joined via auth-join), skip ob-connect fork
+    // Route based on who this is:
+    // - Already coupled (Spouse 2 who joined via auth-join) → ob-intro
+    // - Came via "Start your Parlay" (Spouse 1, no couple yet) → ob4 directly
+    // - Unknown/other → ob-connect fork
     if (SupabaseDB.configured && SupabaseDB.coupleRow) {
       Router.navigate('ob-intro');
+    } else if (localStorage.getItem('parlay_signup_intent') === 'start') {
+      Router.navigate('ob4');
     } else {
       Router.navigate('ob-connect');
     }
@@ -2406,7 +2385,7 @@ Router.register('ob4', () => {
         <div class="invite-code-box a2" id="ob4-code-box">
           <div style="font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(250,246,241,.45);margin-bottom:4px;">Your invite code</div>
           <div class="invite-code" id="invite-code">${localCode}</div>
-          <div class="invite-note">Share this with ${State.get('partner').name || 'your partner'} or copy below</div>
+          <div class="invite-note">Share this with ${(SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner').name || 'your partner'} or copy below</div>
         </div>
 
         <button class="btn btn-ghost btn-full a3" id="copy-code" style="margin-top:4px;">
@@ -2427,6 +2406,8 @@ Router.register('ob4', () => {
     </div>
   `;
 }, async (el) => {
+  // Intent has been served — clear it so it doesn't affect future sessions
+  localStorage.removeItem('parlay_signup_intent');
   // Ensure a couple row exists in Supabase and get the real invite code
   if (SupabaseDB.configured && !SupabaseDB.coupleRow) {
     const { data, error } = await SupabaseDB.createCouple();
@@ -2583,7 +2564,7 @@ Router.register('ob-intro', () => `
       </div>
       <div style="padding:14px 16px;background:rgba(122,158,138,.07);border:1px solid rgba(122,158,138,.2);border-radius:14px;">
         <div style="font-size:.75rem;color:var(--espresso);line-height:1.65;">
-          <strong>Two views, one app.</strong> You and your partner both use this app on your own devices. Switch between "my view" and "partner view" to see what they see — but your raw positions stay private.
+          <strong>One account each, one shared space.</strong> You and your partner each sign in on your own device. Your raw positions are always private — only the filtered version reaches them.
         </div>
       </div>
     </div>
@@ -2636,7 +2617,7 @@ Router.register('home', () => {
             </div>
           </div>
           <div class="partner-info" style="flex:1;min-width:0;">
-            <div class="partner-names">${user.name || 'You'} &amp; ${partner.name || 'Partner'}</div>
+            <div class="partner-names">${user.name || 'You'} &amp; ${partner.name || (SupabaseDB.configured && SupabaseDB.getPartnerName()) || 'Partner'}</div>
             <div class="partner-status" style="font-size:.68rem;">${partner.connected ? '🟢 Connected' : '⏳ Awaiting partner'}</div>
             ${SupabaseDB.configured ? `<div style="font-size:.62rem;color:rgba(250,246,241,.3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${SupabaseDB.getMyEmail?.() || ''}</div>` : ''}
           </div>
@@ -2771,7 +2752,11 @@ Router.register('home', () => {
         const incomplete = [
           !sc.loveLanguage.done && 'Love Language',
           !sc.myComm.done && 'My Communication Style',
-          !sc.partnerComm.done && `${partner.name || 'Partner'}'s Profile`,
+          !sc.partnerComm.done && (() => {
+            const _tName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null)
+                        || (view === 'partner' ? (user.name || '') : (partner.name || ''));
+            return (_tName ? _tName + "'s" : "Partner's") + ' Communication Style';
+          })(),
           !sc.tone.done && 'Mediator Tone',
           !sc.family.done && 'Family Setup',
         ].filter(Boolean);
@@ -3040,7 +3025,7 @@ const TOPIC_TYPES = [
    ================================================ */
 const PARTNER_PROFILE_TRAITS = [
   {
-    category: 'Autonomy & Control',
+    category: 'Their autonomy',
     icon: '🎯',
     traits: [
       { id: 'needs-control',     label: 'Needs to feel in control of decisions' },
@@ -3050,7 +3035,7 @@ const PARTNER_PROFILE_TRAITS = [
     ]
   },
   {
-    category: 'Pacing & Processing',
+    category: 'Their pacing',
     icon: '⏳',
     traits: [
       { id: 'needs-time',        label: 'Needs time to process before deciding' },
@@ -3060,7 +3045,7 @@ const PARTNER_PROFILE_TRAITS = [
     ]
   },
   {
-    category: 'Emotional Triggers (Avoid)',
+    category: 'What to avoid',
     icon: '⚠️',
     traits: [
       { id: 'no-urgency',        label: 'Feels manipulated by artificial urgency or deadlines' },
@@ -3071,7 +3056,7 @@ const PARTNER_PROFILE_TRAITS = [
     ]
   },
   {
-    category: 'What Resonates',
+    category: 'What lands well',
     icon: '✨',
     traits: [
       { id: 'appreciates-recognition', label: 'Responds well to appreciation and recognition' },
@@ -3082,7 +3067,7 @@ const PARTNER_PROFILE_TRAITS = [
     ]
   },
   {
-    category: 'Communication Style',
+    category: 'Their communication style',
     icon: '💬',
     traits: [
       { id: 'prefers-brief',     label: 'Prefers brief and direct communication' },
@@ -3098,17 +3083,23 @@ const PARTNER_PROFILE_TRAITS = [
 const TRAIT_MAP = {};
 PARTNER_PROFILE_TRAITS.forEach(cat => cat.traits.forEach(t => TRAIT_MAP[t.id] = t.label));
 
-/* How I want to be communicated with — self-authored preferences */
+/* How I want to be communicated with — self-authored preferences
+   Four clinically-grounded categories (EFT / CBT informed):
+   1. Tone & register — how I like to receive information
+   2. What shuts me down — defensive / avoidant triggers to strip from messages
+   3. What opens me up — persuasion styles that work with me, not against me
+   4. My pacing — timing and format so I can actually hear the message */
 const MY_COMM_PREFS_TRAITS = [
   {
-    category: 'Tone that works for me',
+    category: 'How I like to receive things',
     icon: '🎨',
     traits: [
-      { id: 'my-warm',     label: 'Warmth matters — I need to feel cared for in how things are said' },
-      { id: 'my-direct',   label: 'Just be direct — clear and to-the-point works best for me' },
-      { id: 'my-logical',  label: 'Logic first — lead with reasoning, not feelings' },
-      { id: 'my-emotive',  label: 'Emotional framing resonates with me more than pure logic' },
-      { id: 'my-neutral',  label: 'Neutral and matter-of-fact — no extra emotional weight either way' },
+      { id: 'my-warm',     label: 'Warmth first — I need to feel cared for before I can hear the content' },
+      { id: 'my-direct',   label: 'Direct and clear — no preamble, just get to the point' },
+      { id: 'my-logical',  label: 'Logic first — lead with reasoning before feelings' },
+      { id: 'my-emotive',  label: 'Emotional framing lands better than pure logic for me' },
+      { id: 'my-brief',    label: 'Keep it short — I lose the thread when things run long' },
+      { id: 'my-written',  label: 'Written works better for me than talking things through live' },
     ]
   },
   {
@@ -3117,8 +3108,8 @@ const MY_COMM_PREFS_TRAITS = [
     traits: [
       { id: 'my-no-guilt',      label: 'Guilt or blame — even subtle — makes me disengage' },
       { id: 'my-no-ultimatum',  label: 'Ultimatums or threats make me dig in and shut down' },
-      { id: 'my-no-urgency',    label: 'Artificial urgency or pressure feels manipulative to me' },
-      { id: 'my-no-criticism',  label: 'Criticism — even mild — triggers my defensiveness' },
+      { id: 'my-no-urgency',    label: 'Artificial urgency feels manipulative — I need to move at my own pace' },
+      { id: 'my-no-criticism',  label: 'Criticism — even mild — triggers my defences' },
       { id: 'my-no-ambush',     label: 'Being put on the spot — I need a heads-up before hard topics' },
     ]
   },
@@ -3126,10 +3117,10 @@ const MY_COMM_PREFS_TRAITS = [
     category: 'What opens me up',
     icon: '✨',
     traits: [
-      { id: 'my-appreciation', label: 'Appreciation — being seen and acknowledged goes a long way' },
-      { id: 'my-context',      label: 'Context first — I need to understand the why before I can hear the ask' },
-      { id: 'my-proposals',    label: 'Invitations over demands — "would you be open to..." works for me' },
-      { id: 'my-cosolution',   label: 'I want to be part of building the solution, not just handed one' },
+      { id: 'my-appreciation', label: 'Being seen — appreciation and acknowledgment go a long way' },
+      { id: 'my-context',      label: 'Context first — I need the why before I can hear the ask' },
+      { id: 'my-proposals',    label: 'Invitations over demands — "would you be open to…" works for me' },
+      { id: 'my-cosolution',   label: 'I want to co-build the solution, not just be handed one' },
       { id: 'my-autonomy',     label: 'Autonomy — the decision needs to feel like it\'s mine to make' },
     ]
   },
@@ -3137,20 +3128,10 @@ const MY_COMM_PREFS_TRAITS = [
     category: 'My pacing',
     icon: '⏱',
     traits: [
-      { id: 'my-needs-time',  label: 'I need time to think before I can give a real answer' },
-      { id: 'my-no-spot',     label: 'Don\'t put me on the spot — async and written works better for me' },
-      { id: 'my-overwhelm',   label: 'Too much at once overwhelms me — keep it focused and singular' },
-      { id: 'my-present',     label: 'I\'m comfortable talking things through in real time' },
-    ]
-  },
-  {
-    category: 'My format',
-    icon: '📝',
-    traits: [
-      { id: 'my-brief',   label: 'Keep it short — I lose interest when things get too long' },
-      { id: 'my-detail',  label: 'Full context please — I want to know everything before deciding' },
-      { id: 'my-bluf',    label: 'Bottom line first — give me the ask, then the reasoning' },
-      { id: 'my-written', label: 'Written communication works better for me than talking through it' },
+      { id: 'my-needs-time',  label: 'I need time to sit with it — don\'t expect an answer in the moment' },
+      { id: 'my-overwhelm',   label: 'One thing at a time — too much at once and I shut down' },
+      { id: 'my-detail',      label: 'Full context please — I want to know everything before deciding' },
+      { id: 'my-present',     label: 'I\'m comfortable working through things in real time' },
     ]
   },
 ];
@@ -3227,14 +3208,14 @@ function getRecipientPrefsPrompt(recipientRole, recipientName) {
     });
   }
 
-  // Sender's observed read of recipient (supporting context — fills gaps not covered above)
+  // Sender's observed read of recipient — uses PARTNER_PROFILE_TRAITS (behavioral observation)
   if (senderTraits.length > 0) {
     const byCategory = {};
-    MY_COMM_PREFS_TRAITS.forEach(cat => {
+    PARTNER_PROFILE_TRAITS.forEach(cat => {
       const sel = cat.traits.filter(t => senderTraits.includes(t.id));
       if (sel.length > 0) byCategory[cat.category] = sel.map(t => t.label);
     });
-    block += `Partner's observed read of ${recipientName} (supporting context — use where self-report has gaps, defer to self-report where they conflict):\n`;
+    block += `Partner's behavioral read of ${recipientName} (supporting context — use where self-report has gaps; defer to self-report on conflicts):\n`;
     Object.entries(byCategory).forEach(([cat, items]) => {
       block += `  • ${cat}: ${items.join('; ')}\n`;
     });
@@ -3247,20 +3228,24 @@ function getRecipientPrefsPrompt(recipientRole, recipientName) {
 
 // Legacy alias
 function getPartnerProfilePrompt(partnerName) {
-  return getRecipientPrefsPrompt('partner', partnerName || State.get('partner')?.name || 'Partner');
+  return getRecipientPrefsPrompt('partner', partnerName || (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || 'Partner');
 }
 
 async function callAI(systemPrompt, userMessage) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }]
-    })
-  });
+  // Route through Supabase Edge Function so the Anthropic key stays server-side
+  const session = await SupabaseDB.getSession?.();
+  const authHeader = session?.access_token
+    ? { 'Authorization': `Bearer ${session.access_token}` }
+    : {};
+
+  const res = await fetch(
+    'https://oevfeeymescxynikkqkx.supabase.co/functions/v1/ai-proxy',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader },
+      body: JSON.stringify({ systemPrompt, userMessage }),
+    }
+  );
   const data = await res.json();
   return data.content?.[0]?.text || '';
 }
@@ -4147,8 +4132,12 @@ function renderIntentQuestions(topicId, family, partner) {
 
 Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
   const topic = TOPIC_TYPES.find(t => t.id === topicId) || TOPIC_TYPES[5];
+  const view  = State.get('currentView') || 'user';
   const user = State.get('user');
   const partner = State.get('partner');
+  // role-correct names: always "me" and "the recipient"
+  const _myNameMC   = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (view === 'partner' ? partner.name : user.name) || 'You';
+  const _themNameMC = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name    : partner.name) || 'your partner';
   const family = State.get('family') || { kids: [], providers: [], playdateContacts: [] };
   const needsIntent = INTENT_TOPICS.includes(topicId);
 
@@ -4167,12 +4156,12 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
       <div style="font-size:.82rem;color:var(--muted);line-height:1.6;">
         ${needsIntent
           ? 'First clarify the basics — then tell Parlay exactly what you want. It filters everything before your partner sees it.'
-          : `Say exactly what you want or feel. Don't filter yourself — Parlay will do that before ${partner.name || 'your partner'} sees it.`}
+          : `Say exactly what you want or feel. Don't filter yourself — Parlay will do that before ${_themNameMC} sees it.`}
       </div>
     </div>
 
     <div class="a3" style="display:flex;flex-direction:column;gap:16px;">
-      ${needsIntent ? renderIntentQuestions(topicId, family, partner) : ''}
+      ${needsIntent ? renderIntentQuestions(topicId, family, { ...partner, name: _themNameMC }) : ''}
 
       <!-- Tone warning — Gottman-aware -->
       <div id="tone-warning" style="display:none;padding:12px 14px;background:#FFF5E0;border:1px solid #E8B88A;border-radius:var(--r-md);font-size:.78rem;color:#8A6A2A;line-height:1.5;">
@@ -4228,7 +4217,7 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
 
       <div style="background:var(--parchment);border-radius:var(--r-md);padding:12px 14px;">
         <div style="font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 Private until filtered</div>
-        <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">${partner.name || 'Your partner'} only sees the calm rewritten version — not your raw words above.</div>
+        <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">${_themNameMC || 'Your partner'} only sees the calm rewritten version — not your raw words above.</div>
       </div>
     </div>
 
@@ -4571,7 +4560,7 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
     btn.textContent = 'Filtering your message…';
     el.querySelector('#compose-submit').disabled = true;
 
-    const userName = State.get('user').name || 'You';
+    const userName = _myNameMC || State.get('user').name || 'You';
     const tone = State.get('mediatorTone') || 'neutral';
     const filtered = await runToneFilter(raw, userName, tone, intentContext);
 
@@ -5088,8 +5077,10 @@ Router.register('setup', () => {
   const view     = State.get('currentView') || 'user';
   const user     = State.get('user');
   const partner  = State.get('partner');
-  const myName   = view === 'partner' ? (partner.name || 'Partner') : (user.name || 'You');
-  const themName = view === 'partner' ? (user.name || 'Partner')    : (partner.name || 'Partner');
+  const _myN    = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (view === 'partner' ? partner.name : user.name) || 'You';
+  const _themN  = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name    : partner.name) || '';
+  const myName   = _myN;
+  const themName = _themN;
   const c        = _setupCompletion();
   const TONES    = { soft: '🌿 Soft', neutral: '⚖️ Neutral', direct: '🎯 Direct' };
   const ll       = State.get('loveLanguage') || {};
@@ -5279,7 +5270,7 @@ Router.register('setup', () => {
     });
 
     if (copyMsgBtn) copyMsgBtn.addEventListener('click', () => {
-      const pName = State.get('partner')?.name || 'your partner';
+      const pName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || 'your partner';
       const msg = `Hey! I set up Parlay for us — it's an app that helps us communicate better.\n\nTo connect your account:\n1. Go to ${appUrl}\n2. Tap "Join with an invite code"\n3. Create your account\n4. Enter code: ${code}\n\nOr just tap this link — it pre-fills the code for you:\n${link}`;
       navigator.clipboard?.writeText(msg).catch(() => {});
       copyMsgBtn.textContent = '✓ Message copied!';
@@ -5359,7 +5350,7 @@ Router.register('setup-my-comm', () => {
   const myRole  = view === 'partner' ? 'partner' : 'user';
   const user    = State.get('user');
   const partner = State.get('partner');
-  const myName  = view === 'partner' ? (partner.name || 'Partner') : (user.name || 'You');
+  const myName  = (SupabaseDB.configured ? SupabaseDB.getMyName() : null) || (view === 'partner' ? partner.name : user.name) || 'You';
   const cp      = State.get('commPrefs') || {};
   const myPrefs = cp[myRole]?.self || {};
   const selected= new Set(myPrefs.traits || []);
@@ -5370,33 +5361,12 @@ Router.register('setup-my-comm', () => {
       <div style="position:absolute;top:-30px;right:-30px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(250,246,241,.15),transparent 70%);pointer-events:none;"></div>
       <button onclick="Router.navigate('setup')" style="background:rgba(255,255,255,.15);border:none;color:rgba(255,255,255,.8);font-size:.8rem;padding:10px 16px;border-radius:10px;cursor:pointer;margin-bottom:18px;display:inline-block;font-family:var(--font-body);">‹ Setup</button>
       <div style="font-family:var(--font-display);font-size:1.8rem;font-weight:300;color:#fff;margin-bottom:6px;" class="a1">
-        How <em style="font-style:italic;color:rgba(255,255,255,.85)">${myName}</em><br>wants to receive messages
+        What works for <em style="font-style:italic;color:rgba(255,255,255,.85)">${myName}</em>
       </div>
-      <div style="font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.6;" class="a1">Your self-report — only you fill this in. Your partner fills out their own.</div>
+      <div style="font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.6;" class="a1">Your private self-assessment. Parlay shapes every message sent your way based on this.</div>
     </div>
     <div style="padding:20px 20px 0;">
-      <div style="margin-bottom:20px;" class="a2">
-        <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Start here — overall tone preference</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;" id="my-tone-pick">
-          ${[
-            { id:'tone-warm',    icon:'🌿', label:'Warm',    desc:'Kind + caring'  },
-            { id:'tone-neutral', icon:'⚖️', label:'Neutral', desc:'Balanced'       },
-            { id:'tone-direct',  icon:'🎯', label:'Direct',  desc:'Clear + brief'  },
-          ].map(t => {
-            const isSel = selected.has(t.id);
-            return `<button class="my-tone-btn" data-id="${t.id}" aria-pressed="${isSel}"
-              style="padding:14px 8px;border:2px solid ${isSel ? 'var(--sage)' : 'var(--border)'};border-radius:14px;background:${isSel ? 'rgba(122,158,138,.1)' : 'var(--surface)'};cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:var(--font-body);transition:all .15s;">
-              <span style="font-size:1.3rem;">${t.icon}</span>
-              <span style="font-size:.78rem;font-weight:700;color:var(--espresso);">${t.label}</span>
-              <span style="font-size:.62rem;color:var(--muted);">${t.desc}</span>
-            </button>`;
-          }).join('')}
-        </div>
-      </div>
-      <div style="font-size:.72rem;color:var(--muted);margin-bottom:14px;line-height:1.5;" class="a2">
-        Optionally refine with specifics below — or just pick a tone above and save.
-      </div>
-      <div class="a3" id="my-trait-list">
+      <div class="a2" id="my-trait-list">
         ${MY_COMM_PREFS_TRAITS.map(cat => `
           <div style="margin-bottom:20px;">
             <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
@@ -5428,21 +5398,7 @@ Router.register('setup-my-comm', () => {
   const cp     = State.get('commPrefs') || {};
   // IMPORTANT: read from .self — not flat root
   const sel    = new Set((cp[myRole]?.self?.traits) || []);
-  const TIDS   = ['tone-warm','tone-neutral','tone-direct'];
   function refresh() { const c = el.querySelector('#mc-count'); if(c) c.textContent = sel.size; }
-
-  el.querySelectorAll('.my-tone-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      TIDS.forEach(tid => {
-        sel.delete(tid);
-        const b = el.querySelector(`.my-tone-btn[data-id="${tid}"]`);
-        if (b) { b.style.borderColor='var(--border)'; b.style.background='var(--surface)'; b.setAttribute('aria-pressed','false'); }
-      });
-      sel.add(btn.dataset.id);
-      btn.style.borderColor='var(--sage)'; btn.style.background='rgba(122,158,138,.1)'; btn.setAttribute('aria-pressed','true');
-      refresh();
-    });
-  });
 
   el.querySelectorAll('.mc-trait-row').forEach(row => {
     row.addEventListener('click', () => {
@@ -5507,12 +5463,12 @@ Router.register('setup-partner-comm', () => {
       <div style="font-family:var(--font-display);font-size:1.8rem;font-weight:300;color:#fff;margin-bottom:6px;" class="a1">
         Your read on <em style="font-style:italic;color:rgba(255,255,255,.85)">${themName}</em>
       </div>
-      <div style="font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.6;" class="a1">Your observations of them — ${themName} fills out their own self-report too. Both inform Parlay.</div>
+      <div style="font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.6;" class="a1">Your behavioral observations of ${themName} — what you know about how they actually respond, not just how they'd ideally like to be treated. Parlay cross-references this with their own self-report.</div>
     </div>
     <div style="padding:20px 20px 0;">
       <!-- TRAITS FIRST — the substantive data -->
       <div class="a2" id="pc-trait-list">
-        ${MY_COMM_PREFS_TRAITS.map(cat => `
+        ${PARTNER_PROFILE_TRAITS.map(cat => `
           <div style="margin-bottom:20px;">
             <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
               <span>${cat.icon}</span>${cat.category}
@@ -5821,8 +5777,8 @@ Router.register('tasks', () => {
   const view        = State.get('currentView') || 'user';
   const user        = State.get('user');
   const partner     = State.get('partner');
-  const userName    = user.name    || 'You';
-  const partnerName = partner.name || 'Partner';
+  const userName    = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (view === 'partner' ? partner.name : user.name)    || 'You';
+  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name    : partner.name) || '';
 
   const { inbox, sent, myAction, done } = TaskState.forView(view);
   const otherView   = view === 'partner' ? 'user' : 'partner';
@@ -5924,8 +5880,8 @@ Router.register('task-new', () => {
   const view        = State.get('currentView') || 'user';
   const user        = State.get('user');
   const partner     = State.get('partner');
-  const meLabel     = view === 'partner' ? (partner.name || 'Partner') : (user.name    || 'You');
-  const themLabel   = view === 'partner' ? (user.name    || 'Partner') : (partner.name || 'Partner');
+  const meLabel     = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (view === 'partner' ? partner.name : user.name)    || 'You';
+  const themLabel   = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name    : partner.name) || '';
 
   return `
   <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 20px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));overflow-y:auto;">
@@ -6018,7 +5974,7 @@ Router.register('task-new', () => {
   const view        = State.get('currentView') || 'user';
   const partner     = State.get('partner');
   const user        = State.get('user');
-  const themLabel   = view === 'partner' ? (user.name || 'Partner') : (partner.name || 'Partner');
+  const themLabel   = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name : partner.name) || '';
 
   el.querySelectorAll('.assign-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -6063,7 +6019,7 @@ Router.register('task-new', () => {
     const rawDue = el.querySelector('#task-due').value;
     const rawCtx = el.querySelector('#task-context')?.value.trim() || '';
     const tone   = State.get('mediatorTone') || 'neutral';
-    const authorName = view === 'partner' ? (partner.name || 'Partner') : (user.name || 'You');
+    const authorName = (SupabaseDB.configured ? SupabaseDB.getMyName() : null) || (view === 'partner' ? partner.name : user.name) || 'You';
 
     // Resolve assignedTo to absolute role
     let assignedTo;
@@ -6123,8 +6079,8 @@ Router.register('task-detail', (params) => {
   const view        = State.get('currentView') || 'user';
   const user        = State.get('user');
   const partner     = State.get('partner');
-  const userName    = user.name    || 'You';
-  const partnerName = partner.name || 'Partner';
+  const userName    = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (view === 'partner' ? partner.name : user.name)    || 'You';
+  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name    : partner.name) || '';
   const cat  = TASK_CATEGORIES.find(c => c.id === task.categoryId) || TASK_CATEGORIES[6];
   const pri  = TASK_PRIORITIES.find(p => p.id === task.priority)   || TASK_PRIORITIES[2];
   const me   = view === 'partner' ? 'partner' : 'user';
@@ -6263,8 +6219,8 @@ Router.register('task-reply', (params) => {
   const view        = State.get('currentView') || 'user';
   const user        = State.get('user');
   const partner     = State.get('partner');
-  const userName    = user.name    || 'You';
-  const partnerName = partner.name || 'Partner';
+  const userName    = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (view === 'partner' ? partner.name : user.name)    || 'You';
+  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name    : partner.name) || '';
   const cat         = TASK_CATEGORIES.find(c => c.id === task.categoryId) || TASK_CATEGORIES[6];
   const creatorName = task.createdBy === 'user' ? userName : partnerName;
   const dateStr     = task.dueDate ? new Date(task.dueDate + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) : '';
@@ -6365,8 +6321,8 @@ Router.register('task-reply', (params) => {
     const user      = State.get('user');
     const partner   = State.get('partner');
     const tone      = State.get('mediatorTone') || 'neutral';
-    const myName    = view === 'partner' ? (partner.name || 'Partner') : (user.name || 'You');
-    const otherName = view === 'partner' ? (user.name || 'Partner')    : (partner.name || 'Partner');
+    const myName    = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || (view === 'partner' ? partner.name : user.name) || 'You';
+    const otherName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || (view === 'partner' ? user.name    : partner.name) || '';
 
     const btn = el.querySelector('#reply-submit-btn');
     btn.textContent = 'Filtering response…'; btn.disabled = true;
@@ -6458,7 +6414,7 @@ const Tasks = {
     const user    = State.get('user');
     const partner = State.get('partner');
     const tone    = State.get('mediatorTone') || 'neutral';
-    const myName  = view === 'partner' ? (partner.name || 'Partner') : (user.name || 'You');
+    const myName  = (SupabaseDB.configured ? SupabaseDB.getMyName() : null) || (view === 'partner' ? partner.name : user.name) || 'You';
     const btn     = document.getElementById('pushback-submit-btn');
     if (btn) { btn.textContent = 'Filtering…'; btn.disabled = true; }
 
