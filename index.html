@@ -4636,15 +4636,6 @@ Router.register('parlay-sent', ({ negId, aiWorked = true } = {}) => {
   </div>`;
 });
 
-function _canonicalSpouseNames() {
-  const u = State.get('user') || {};
-  const p = State.get('partner') || {};
-  return {
-    userName: u.name || 'Spouse 1',
-    partnerName: p.name || 'Spouse 2',
-  };
-}
-
 function _resolveDisplayNames() {
   const view = State.get('currentView') || 'user';
   const fallbackMy = view === 'partner' ? State.get('partner')?.name : State.get('user')?.name;
@@ -4671,7 +4662,6 @@ Router.register('parlay-detail', ({ negId } = {}) => {
   // ── ROLE DETECTION — UUID-based, not role-string-based ─────
   const myUid = SupabaseDB.configured ? SupabaseDB.getMyUserId() : null;
   const { myName, partnerName } = _resolveDisplayNames();
-  const { userName: spouse1Name, partnerName: spouse2Name } = _canonicalSpouseNames();
 
   // Compare UUIDs directly — this is the authoritative check
   const iAmCreator = myUid
@@ -4946,8 +4936,7 @@ Router.register('parlay-reply', ({ negId } = {}) => {
 
   const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[7];
   const { myName, partnerName } = _resolveDisplayNames();
-  const { userName: spouse1Name, partnerName: spouse2Name } = _canonicalSpouseNames();
-  const creatorName = neg.createdBy === 'partner' ? spouse2Name : spouse1Name;
+  const creatorName = iAmCreator ? myName : partnerName;
 
   const hasDateOptions = neg.dateOptions && neg.dateOptions.length > 0;
 
