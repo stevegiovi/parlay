@@ -787,22 +787,33 @@ const SupabaseDB = (() => {
 
   async function joinCouple(code) {
     if (!configured || !_myUserId) return { error: 'Not authenticated' };
-    // Find the couple by invite code
-    const { data: couple, error: findErr } = await sb.from('couples')
-      .select('*').eq('invite_code', code.toUpperCase()).single();
-    if (findErr || !couple) return { error: 'Invite code not found' };
-    if (couple.spouse_2_id) return { error: 'This code has already been used' };
-    if (couple.spouse_1_id === _myUserId) return { error: 'That\'s your own code!' };
-    // Link as spouse_2
-    const { data, error } = await sb.from('couples')
-      .update({ spouse_2_id: _myUserId })
-      .eq('id', couple.id).select().single();
-    if (error) return { error: error.message };
-    _coupleRow = data;
+    // Use a SECURITY DEFINER RPC — direct table access fails here because
+    // RLS blocks Spouse 2 from reading/updating a couple row they're not in yet.
+    const { data: rpcData, error: rpcError } = await sb.rpc('join_couple_by_invite', {
+      p_code: code.toUpperCase().trim()
+    });
+    if (rpcError) return { error: rpcError.message };
+    if (rpcData?.error) return { error: rpcData.error };
+    const couple = rpcData?.data;
+    if (!couple) return { error: 'Unexpected response from server' };
+    _coupleRow = couple;
     _myRole    = 'partner';
     State.set('currentView', 'partner');
+    State.set('mediatorTone', couple.mediator_tone || 'neutral');
     State.set('partner', { ...State.get('partner'), connected: true });
-    return { data };
+    return { data: couple };
+  }
+
+  async function validateInviteCode(code) {
+    // Uses the "invite code lookup" SELECT policy (no DEFINER needed for read-only)
+    if (!configured) return { valid: false, error: 'Not configured' };
+    const { data, error } = await sb.from('couples')
+      .select('id, invite_code, spouse_2_id')
+      .eq('invite_code', code.toUpperCase().trim())
+      .single();
+    if (error || !data) return { valid: false, error: 'Invite code not found' };
+    if (data.spouse_2_id) return { valid: false, error: 'This code has already been used' };
+    return { valid: true };
   }
 
   async function loadCouple() {
@@ -1232,7 +1243,7 @@ const SupabaseDB = (() => {
     isReady,
     initAuthListener: _initAuthListener,
     signUp, signIn, signOut, signInWithGoogle, getSession,
-    createCouple, joinCouple, loadCouple, getCoupleId, getMyRole, getMyUserId, getPartnerUserId,
+    createCouple, joinCouple, validateInviteCode, loadCouple, getCoupleId, getMyRole, getMyUserId, getPartnerUserId,
     saveProfile, loadProfile,
     saveCommSelf, saveCommReadOfPartner, loadCommPrefs,
     saveFamilyMember, deleteFamilyMember, loadFamily,
@@ -1597,6 +1608,36 @@ Router.register('auth-join', () => `
     e.target.value = e.target.value.toUpperCase();
   });
 
+  // Live code validation — debounced, runs after user stops typing
+  const codeInputEl  = el.querySelector('#join-code');
+  const codeValidEl  = el.querySelector('#join-code-valid') || (() => {
+    const d = document.createElement('div');
+    d.id = 'join-code-valid';
+    d.style.cssText = 'font-size:.72rem;min-height:18px;margin-top:4px;padding:0 2px;transition:color .2s;';
+    codeInputEl.parentNode.insertBefore(d, codeInputEl.nextSibling);
+    return d;
+  })();
+  let _validateTimer = null;
+  codeInputEl.addEventListener('input', () => {
+    const v = codeInputEl.value.trim();
+    clearTimeout(_validateTimer);
+    if (v.length < 6) { codeValidEl.textContent = ''; return; }
+    codeValidEl.style.color = 'var(--muted)';
+    codeValidEl.textContent = 'Checking…';
+    _validateTimer = setTimeout(async () => {
+      const result = await SupabaseDB.validateInviteCode(v);
+      if (result.valid) {
+        codeValidEl.style.color = 'var(--sage)';
+        codeValidEl.textContent = '✓ Code valid';
+        codeInputEl.style.borderColor = 'rgba(122,158,138,.8)';
+      } else {
+        codeValidEl.style.color = 'var(--terra)';
+        codeValidEl.textContent = '✗ ' + result.error;
+        codeInputEl.style.borderColor = 'rgba(196,113,74,.6)';
+      }
+    }, 500);
+  });
+
   // Auto-fill from magic link ?invite= param
   const prefill = localStorage.getItem('parlay_prefill_invite');
   if (prefill) {
@@ -1605,6 +1646,8 @@ Router.register('auth-join', () => `
       codeInput.value = prefill;
       codeInput.style.borderColor = 'rgba(122,158,138,.8)';
       codeInput.style.background = 'rgba(122,158,138,.12)';
+      // Trigger validation for the prefilled code
+      codeInput.dispatchEvent(new Event('input'));
     }
     localStorage.removeItem('parlay_prefill_invite');
   } else {
@@ -2334,6 +2377,26 @@ Router.register('ob-join', () => `
     </div>
   </div>
 `, async (el) => {
+  // Live validation on ob-join code field
+  const ojCode = el.querySelector('#join-code');
+  let _ojTimer = null;
+  ojCode.addEventListener('input', () => {
+    const v = ojCode.value.trim();
+    const errEl = el.querySelector('#join-error');
+    clearTimeout(_ojTimer);
+    if (v.length < 6) { errEl.style.display = 'none'; return; }
+    _ojTimer = setTimeout(async () => {
+      const result = await SupabaseDB.validateInviteCode(v);
+      if (result.valid) {
+        errEl.style.display = 'none';
+        ojCode.style.borderColor = 'rgba(122,158,138,.8)';
+      } else {
+        errEl.textContent = result.error; errEl.style.display = 'block';
+        ojCode.style.borderColor = 'rgba(196,113,74,.6)';
+      }
+    }, 500);
+  });
+
   el.querySelector('#join-btn').addEventListener('click', async () => {
     const code   = el.querySelector('#join-code').value.trim().toUpperCase();
     const errEl  = el.querySelector('#join-error');
