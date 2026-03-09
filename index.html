@@ -1189,12 +1189,27 @@ const SupabaseDB = (() => {
           subscribeToCouple();
           State.set('onboarded', true);
           Router.navigate('home');
-        } else if (profile?.love_language) {
-          // Has done at least ob2 — send to couple-connect fork
-          Router.navigate('ob-connect');
         } else {
-          // Brand new (Google first-timer or email-confirmed) — full onboarding
-          Router.navigate('ob2');
+          // Check if there's a pending invite code (Spouse 2 used Google on auth-join)
+          const pendingCode = localStorage.getItem('parlay_pending_invite');
+          if (pendingCode) {
+            localStorage.removeItem('parlay_pending_invite');
+            const joinResult = await joinCouple(pendingCode);
+            if (!joinResult.error) {
+              const partnerId = getPartnerUserId();
+              if (partnerId) {
+                const partnerProfile = await loadProfile(partnerId);
+                if (partnerProfile?.name) State.set('partner', { ...State.get('partner'), name: partnerProfile.name, connected: true });
+              }
+              await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
+              subscribeToCouple();
+              State.set('onboarded', true);
+              Router.navigate('ob2'); // Spouse 2's personal onboarding
+              return;
+            }
+          }
+          // No couple, no pending code — normal new user onboarding
+          Router.navigate(profile?.love_language ? 'ob-connect' : 'ob2');
         }
       }
 
@@ -1259,7 +1274,7 @@ const Router = (() => {
     current = name;
 
     // View banner (localStorage dev mode only — hidden when Supabase is active)
-    const ONBOARDING_SCREENS = ['splash','ob1','ob2','ob-self','ob3','ob4','ob-join','ob-connect','ob-intro','auth-entry','auth-signup','auth-signin','auth-confirm-email'];
+    const ONBOARDING_SCREENS = ['splash','ob1','ob2','ob-self','ob3','ob4','ob-join','ob-connect','ob-intro','auth-entry','auth-signup','auth-signin','auth-join','auth-confirm-email'];
     const NAV_MAIN_SCREENS = ['home','languages','plan','tasks','equity','setup'];
     const banner = document.getElementById('view-banner');
     const bannerText = document.getElementById('view-banner-text');
@@ -1386,10 +1401,17 @@ const U = {
    AUTH SCREENS — Entry, Sign Up, Sign In
    ================================================ */
 
+// Helper: shared Google SVG icon
+const GOOGLE_SVG = `<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>`;
+
+/* ================================================
+   AUTH — Entry (splash with 3 clear paths)
+   ================================================ */
 Router.register('auth-entry', () => `
   <div style="position:relative;width:100%;height:100dvh;background:var(--espresso);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden;">
     <div style="position:absolute;top:10%;left:50%;transform:translateX(-50%);width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(196,113,74,0.2),transparent 70%);animation:float 7s ease-in-out infinite;pointer-events:none"></div>
-    <div style="position:relative;z-index:1;animation:fadeIn .9s ease both;margin-bottom:60px;">
+
+    <div style="position:relative;z-index:1;animation:fadeIn .9s ease both;">
       <div style="font-family:var(--font-display);font-size:5rem;font-weight:300;color:var(--cream);letter-spacing:-.02em;line-height:1;">
         Par<em style="font-style:italic;color:var(--amber)">lay</em>
       </div>
@@ -1397,73 +1419,85 @@ Router.register('auth-entry', () => `
         for couples who talk it through
       </div>
     </div>
-    <div style="position:absolute;bottom:48px;left:0;right:0;padding:0 32px;display:flex;flex-direction:column;gap:10px;align-items:center;animation:fadeUp .6s .7s var(--ease) both;">
-      <button onclick="SupabaseDB.signInWithGoogle()" style="max-width:320px;width:100%;padding:15px 20px;background:#fff;color:#1f1f1f;border:none;border-radius:14px;font-family:var(--font-body);font-size:.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
-        Continue with Google
+
+    <div style="position:absolute;bottom:40px;left:0;right:0;padding:0 28px;display:flex;flex-direction:column;gap:12px;align-items:center;animation:fadeUp .6s .7s var(--ease) both;">
+
+      <!-- PATH 1: Spouse 1 — starting fresh -->
+      <button onclick="Router.navigate('auth-signup')" style="max-width:340px;width:100%;padding:18px 20px;background:var(--terra);color:#fff;border:none;border-radius:16px;font-family:var(--font-body);font-size:.95rem;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;">
+        <span>Start your Parlay →</span>
+        <span style="font-size:.72rem;font-weight:400;opacity:.75;">Create an account and invite your partner</span>
       </button>
-      <div style="display:flex;align-items:center;gap:10px;max-width:320px;width:100%;margin:2px 0;">
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
-        <span style="font-size:.68rem;color:rgba(250,246,241,.3);letter-spacing:.08em;">OR</span>
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
+
+      <!-- PATH 2: Spouse 2 — joining with a code -->
+      <button onclick="Router.navigate('auth-join')" style="max-width:340px;width:100%;padding:18px 20px;background:rgba(122,158,138,.18);color:var(--cream);border:1.5px solid rgba(122,158,138,.4);border-radius:16px;font-family:var(--font-body);font-size:.95rem;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;">
+        <span>🔗 Join with an invite code</span>
+        <span style="font-size:.72rem;font-weight:400;opacity:.65;">Your partner already set up a Parlay space</span>
+      </button>
+
+      <!-- Divider -->
+      <div style="display:flex;align-items:center;gap:10px;max-width:340px;width:100%;">
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.1);"></div>
+        <span style="font-size:.65rem;color:rgba(250,246,241,.25);letter-spacing:.1em;">ALREADY HAVE AN ACCOUNT</span>
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.1);"></div>
       </div>
-      <button class="btn btn-accent btn-full" onclick="Router.navigate('auth-signup')" style="max-width:320px;">
-        Sign up with email
+
+      <!-- PATH 3: Returning user -->
+      <button onclick="Router.navigate('auth-signin')" style="max-width:340px;width:100%;padding:14px 20px;background:rgba(255,255,255,.07);color:rgba(250,246,241,.6);border:1px solid rgba(255,255,255,.1);border-radius:14px;font-family:var(--font-body);font-size:.88rem;font-weight:600;cursor:pointer;">
+        Sign in
       </button>
-      <button class="btn btn-muted btn-full" onclick="Router.navigate('auth-signin')" style="max-width:320px;color:rgba(250,246,241,.65);background:rgba(255,255,255,.08);">
-        Sign in with email
-      </button>
-      ${!SupabaseDB.configured ? `
-      <div style="margin-top:12px;max-width:320px;padding:12px 16px;background:rgba(255,255,255,.06);border-radius:12px;border:1px solid rgba(255,255,255,.1);">
-        <div style="font-size:.72rem;color:rgba(250,246,241,.4);line-height:1.55;">
-          ⚙️ <strong style="color:rgba(250,246,241,.6);">Dev mode</strong> — Supabase not configured.<br>
-          <span style="cursor:pointer;text-decoration:underline;color:rgba(250,246,241,.5);" onclick="Router.navigate('splash')">Continue with local storage →</span>
-        </div>
-      </div>` : ''}
     </div>
   </div>
 `);
 
+/* ================================================
+   AUTH — Sign Up  (Spouse 1: create account, get invite code after)
+   ================================================ */
 Router.register('auth-signup', () => `
-  <div style="min-height:100dvh;display:flex;flex-direction:column;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));">
-    <button onclick="Router.navigate('auth-entry')" style="align-self:flex-start;background:rgba(255,255,255,.1);border:none;color:rgba(250,246,241,.65);font-size:.8rem;padding:8px 14px;border-radius:10px;cursor:pointer;margin-bottom:28px;font-family:var(--font-body);">‹ Back</button>
-    <div style="font-family:var(--font-display);font-size:2.2rem;font-weight:300;color:var(--cream);margin-bottom:6px;" class="a1">
+  <div style="min-height:100dvh;display:flex;flex-direction:column;background:var(--espresso);padding:0 28px;padding-top:max(56px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
+    <button onclick="Router.navigate('auth-entry')" style="align-self:flex-start;background:rgba(255,255,255,.1);border:none;color:rgba(250,246,241,.65);font-size:.8rem;padding:8px 14px;border-radius:10px;cursor:pointer;margin-bottom:24px;font-family:var(--font-body);">‹ Back</button>
+
+    <div style="font-family:var(--font-display);font-size:2rem;font-weight:300;color:var(--cream);margin-bottom:4px;" class="a1">
       Create your <em style="color:var(--amber)">account</em>
     </div>
-    <div style="font-size:.78rem;color:rgba(250,246,241,.45);margin-bottom:32px;line-height:1.5;" class="a1">Your partner will create their own — you'll link up with an invite code.</div>
-    <div style="display:flex;flex-direction:column;gap:14px;flex:1;" class="a2">
-      <div>
-        <label style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:6px;">Your first name</label>
-        <input id="signup-name" class="input" type="text" placeholder="e.g. Jamie" autocomplete="given-name"
-          style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);font-size:.95rem;">
-      </div>
-      <div>
-        <label style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:6px;">Email</label>
-        <input id="signup-email" class="input" type="email" placeholder="you@example.com" autocomplete="email"
-          style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);font-size:.95rem;">
-      </div>
-      <div>
-        <label style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:6px;">Password</label>
-        <input id="signup-password" class="input" type="password" placeholder="At least 8 characters" autocomplete="new-password"
-          style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);font-size:.95rem;">
-      </div>
-      <div id="signup-error" style="display:none;font-size:.78rem;color:#F87171;background:rgba(248,113,113,.1);border-radius:10px;padding:10px 14px;line-height:1.5;"></div>
+    <div style="font-size:.76rem;color:rgba(250,246,241,.4);margin-bottom:24px;line-height:1.5;" class="a1">
+      Step 1 of 2 — you'll get an invite code to share with your partner after setup.
     </div>
-    <div class="a3" style="margin-top:24px;">
-      <button onclick="SupabaseDB.signInWithGoogle()" style="width:100%;padding:15px 20px;background:#fff;color:#1f1f1f;border:none;border-radius:14px;font-family:var(--font-body);font-size:.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;">
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
-        Continue with Google
-      </button>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
-        <span style="font-size:.68rem;color:rgba(250,246,241,.3);letter-spacing:.08em;">OR</span>
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
+
+    <!-- Google first -->
+    <button onclick="SupabaseDB.signInWithGoogle()" style="width:100%;padding:14px 20px;background:#fff;color:#1f1f1f;border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;" class="a2">
+      ${GOOGLE_SVG} Continue with Google
+    </button>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;" class="a2">
+      <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
+      <span style="font-size:.65rem;color:rgba(250,246,241,.3);letter-spacing:.08em;">OR SIGN UP WITH EMAIL</span>
+      <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;" class="a2">
+      <div>
+        <label style="font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:5px;">Your first name</label>
+        <input id="signup-name" class="input" type="text" placeholder="e.g. Jamie" autocomplete="given-name" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);">
       </div>
-      <button id="signup-btn" style="width:100%;padding:16px;background:var(--terra);color:#fff;border:none;border-radius:14px;font-family:var(--font-body);font-size:.95rem;font-weight:600;cursor:pointer;">
-        Sign up with email →
+      <div>
+        <label style="font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:5px;">Email</label>
+        <input id="signup-email" class="input" type="email" placeholder="you@example.com" autocomplete="email" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);">
+      </div>
+      <div>
+        <label style="font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:5px;">Password</label>
+        <input id="signup-password" class="input" type="password" placeholder="At least 8 characters" autocomplete="new-password" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);">
+      </div>
+      <div id="signup-error" style="display:none;font-size:.76rem;color:#F87171;background:rgba(248,113,113,.1);border-radius:10px;padding:10px 14px;line-height:1.5;"></div>
+    </div>
+
+    <div style="margin-top:20px;" class="a3">
+      <button id="signup-btn" style="width:100%;padding:16px;background:var(--terra);color:#fff;border:none;border-radius:14px;font-family:var(--font-body);font-size:.92rem;font-weight:700;cursor:pointer;">
+        Create account →
       </button>
-      <div style="text-align:center;margin-top:14px;font-size:.75rem;color:rgba(250,246,241,.3);">
+      <div style="text-align:center;margin-top:14px;font-size:.74rem;color:rgba(250,246,241,.3);">
         Already have an account? <span onclick="Router.navigate('auth-signin')" style="color:var(--amber);cursor:pointer;text-decoration:underline;">Sign in</span>
+        &nbsp;·&nbsp;
+        <span onclick="Router.navigate('auth-join')" style="color:rgba(122,158,138,.8);cursor:pointer;text-decoration:underline;">Have an invite code?</span>
       </div>
     </div>
   </div>
@@ -1484,58 +1518,214 @@ Router.register('auth-signup', () => `
     const result = await SupabaseDB.signUp(email, password, name);
     if (result.error) {
       errEl.textContent = result.error; errEl.style.display = 'block';
-      btn.textContent = 'Sign up with email →'; btn.disabled = false;
+      btn.textContent = 'Create account →'; btn.disabled = false;
       return;
     }
     if (result.confirmEmail) {
-      // Email confirmation required — show waiting screen
-      // The onAuthStateChange listener will handle the redirect when they click the link
       SupabaseDB.initAuthListener();
       Router.navigate('auth-confirm-email');
       return;
     }
-    // Auto-confirmed — session is live, proceed to onboarding
     SupabaseDB.initAuthListener();
     Router.navigate('ob2');
   });
   el.querySelector('#signup-name').focus();
 });
 
+/* ================================================
+   AUTH — Join with Invite Code  (Spouse 2)
+   Invite code is captured here, BEFORE account creation.
+   ================================================ */
+Router.register('auth-join', () => `
+  <div style="min-height:100dvh;display:flex;flex-direction:column;background:var(--espresso);padding:0 28px;padding-top:max(56px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
+    <button onclick="Router.navigate('auth-entry')" style="align-self:flex-start;background:rgba(255,255,255,.1);border:none;color:rgba(250,246,241,.65);font-size:.8rem;padding:8px 14px;border-radius:10px;cursor:pointer;margin-bottom:24px;font-family:var(--font-body);">‹ Back</button>
+
+    <div style="font-family:var(--font-display);font-size:2rem;font-weight:300;color:var(--cream);margin-bottom:4px;" class="a1">
+      Join your <em style="color:var(--amber)">partner</em>
+    </div>
+    <div style="font-size:.76rem;color:rgba(250,246,241,.4);margin-bottom:24px;line-height:1.5;" class="a1">
+      Enter the invite code your partner shared, then create your account.
+    </div>
+
+    <!-- Invite code — prominent, first -->
+    <div style="background:rgba(122,158,138,.1);border:1.5px solid rgba(122,158,138,.3);border-radius:16px;padding:18px;margin-bottom:20px;" class="a2">
+      <label style="font-size:.62rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(122,158,138,.8);display:block;margin-bottom:8px;">Partner's invite code</label>
+      <input id="join-code" class="input" type="text" placeholder="e.g. AB12CD"
+        style="background:rgba(255,255,255,.08);border-color:rgba(122,158,138,.4);color:var(--cream);text-transform:uppercase;letter-spacing:.2em;font-size:1.5rem;font-family:var(--font-display);text-align:center;"
+        maxlength="6" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+
+    <!-- Google join -->
+    <button id="join-google-btn" style="width:100%;padding:14px 20px;background:#fff;color:#1f1f1f;border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;" class="a2">
+      ${GOOGLE_SVG} Continue with Google
+    </button>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;" class="a2">
+      <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
+      <span style="font-size:.65rem;color:rgba(250,246,241,.3);letter-spacing:.08em;">OR CREATE WITH EMAIL</span>
+      <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;" class="a2">
+      <div>
+        <label style="font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:5px;">Your first name</label>
+        <input id="join-name" class="input" type="text" placeholder="e.g. Alex" autocomplete="given-name" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);">
+      </div>
+      <div>
+        <label style="font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:5px;">Email</label>
+        <input id="join-email" class="input" type="email" placeholder="you@example.com" autocomplete="email" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);">
+      </div>
+      <div>
+        <label style="font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:5px;">Password</label>
+        <input id="join-password" class="input" type="password" placeholder="At least 8 characters" autocomplete="new-password" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);">
+      </div>
+      <div id="join-error" style="display:none;font-size:.76rem;color:#F87171;background:rgba(248,113,113,.1);border-radius:10px;padding:10px 14px;line-height:1.5;"></div>
+    </div>
+
+    <div style="margin-top:20px;" class="a3">
+      <button id="join-btn" style="width:100%;padding:16px;background:rgba(122,158,138,.85);color:#fff;border:none;border-radius:14px;font-family:var(--font-body);font-size:.92rem;font-weight:700;cursor:pointer;">
+        Join & create account →
+      </button>
+      <div style="text-align:center;margin-top:14px;font-size:.74rem;color:rgba(250,246,241,.3);">
+        Already have an account? <span onclick="Router.navigate('auth-signin')" style="color:var(--amber);cursor:pointer;text-decoration:underline;">Sign in instead</span>
+      </div>
+    </div>
+  </div>
+`, (el) => {
+  // Auto-uppercase the code field
+  el.querySelector('#join-code').addEventListener('input', e => {
+    e.target.value = e.target.value.toUpperCase();
+  });
+
+  // Auto-fill from magic link ?invite= param
+  const prefill = localStorage.getItem('parlay_prefill_invite');
+  if (prefill) {
+    const codeInput = el.querySelector('#join-code');
+    if (codeInput) {
+      codeInput.value = prefill;
+      codeInput.style.borderColor = 'rgba(122,158,138,.8)';
+      codeInput.style.background = 'rgba(122,158,138,.12)';
+    }
+    localStorage.removeItem('parlay_prefill_invite');
+  } else {
+    el.querySelector('#join-code').focus();
+  }
+
+  // Google path: store code in localStorage before OAuth redirect
+  el.querySelector('#join-google-btn').addEventListener('click', () => {
+    const code = el.querySelector('#join-code').value.trim().toUpperCase();
+    const errEl = el.querySelector('#join-error');
+    if (code.length < 6) {
+      errEl.textContent = 'Enter your partner\'s 6-character invite code first';
+      errEl.style.display = 'block';
+      el.querySelector('#join-code').focus();
+      return;
+    }
+    // Stash code so onAuthStateChange can pick it up after Google redirect
+    localStorage.setItem('parlay_pending_invite', code);
+    SupabaseDB.signInWithGoogle();
+  });
+
+  // Email path: sign up then immediately join
+  el.querySelector('#join-btn').addEventListener('click', async () => {
+    const code     = el.querySelector('#join-code').value.trim().toUpperCase();
+    const name     = el.querySelector('#join-name').value.trim();
+    const email    = el.querySelector('#join-email').value.trim();
+    const password = el.querySelector('#join-password').value;
+    const errEl    = el.querySelector('#join-error');
+    errEl.style.display = 'none';
+
+    if (code.length < 6) { errEl.textContent = 'Enter your partner\'s invite code'; errEl.style.display = 'block'; el.querySelector('#join-code').focus(); return; }
+    if (!name)            { errEl.textContent = 'Enter your name'; errEl.style.display = 'block'; return; }
+    if (!email)           { errEl.textContent = 'Enter your email'; errEl.style.display = 'block'; return; }
+    if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters'; errEl.style.display = 'block'; return; }
+
+    const btn = el.querySelector('#join-btn');
+    btn.textContent = 'Creating account…'; btn.disabled = true;
+
+    // 1. Create account
+    const signupResult = await SupabaseDB.signUp(email, password, name);
+    if (signupResult.error) {
+      errEl.textContent = signupResult.error; errEl.style.display = 'block';
+      btn.textContent = 'Join & create account →'; btn.disabled = false;
+      return;
+    }
+    if (signupResult.confirmEmail) {
+      // Store code so it can be consumed after email confirmation
+      localStorage.setItem('parlay_pending_invite', code);
+      SupabaseDB.initAuthListener();
+      Router.navigate('auth-confirm-email');
+      return;
+    }
+
+    // 2. Account is live — join the couple immediately
+    btn.textContent = 'Joining…';
+    const joinResult = await SupabaseDB.joinCouple(code);
+    if (joinResult.error) {
+      errEl.textContent = joinResult.error; errEl.style.display = 'block';
+      btn.textContent = 'Join & create account →'; btn.disabled = false;
+      return;
+    }
+
+    // 3. Load partner name + shared data
+    const partnerId = SupabaseDB.getPartnerUserId();
+    if (partnerId) {
+      const profile = await SupabaseDB.loadProfile(partnerId);
+      if (profile?.name) State.set('partner', { ...State.get('partner'), name: profile.name, connected: true });
+    }
+    await Promise.all([SupabaseDB.loadCommPrefs(), SupabaseDB.loadFamily(), SupabaseDB.loadNegotiations(), SupabaseDB.loadTasks()]);
+    SupabaseDB.subscribeToCouple();
+    SupabaseDB.initAuthListener();
+
+    // 4. Go to Spouse 2's personal onboarding (skip ob-connect — they've already joined)
+    Router.navigate('ob2');
+  });
+
+  el.querySelector('#join-code').focus();
+});
+
+/* ================================================
+   AUTH — Sign In  (returning user)
+   ================================================ */
 Router.register('auth-signin', () => `
-  <div style="min-height:100dvh;display:flex;flex-direction:column;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));">
-    <button onclick="Router.navigate('auth-entry')" style="align-self:flex-start;background:rgba(255,255,255,.1);border:none;color:rgba(250,246,241,.65);font-size:.8rem;padding:8px 14px;border-radius:10px;cursor:pointer;margin-bottom:28px;font-family:var(--font-body);">‹ Back</button>
-    <div style="font-family:var(--font-display);font-size:2.2rem;font-weight:300;color:var(--cream);margin-bottom:6px;" class="a1">
+  <div style="min-height:100dvh;display:flex;flex-direction:column;background:var(--espresso);padding:0 28px;padding-top:max(56px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
+    <button onclick="Router.navigate('auth-entry')" style="align-self:flex-start;background:rgba(255,255,255,.1);border:none;color:rgba(250,246,241,.65);font-size:.8rem;padding:8px 14px;border-radius:10px;cursor:pointer;margin-bottom:24px;font-family:var(--font-body);">‹ Back</button>
+
+    <div style="font-family:var(--font-display);font-size:2rem;font-weight:300;color:var(--cream);margin-bottom:4px;" class="a1">
       Welcome <em style="color:var(--amber)">back</em>
     </div>
-    <div style="font-size:.78rem;color:rgba(250,246,241,.45);margin-bottom:32px;" class="a1">Sign in to your Parlay account.</div>
-    <div style="display:flex;flex-direction:column;gap:14px;flex:1;" class="a2">
-      <div>
-        <label style="font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:6px;">Email</label>
-        <input id="signin-email" class="input" type="email" placeholder="you@example.com" autocomplete="email"
-          style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);font-size:.95rem;">
-      </div>
-      <div>
-        <label style="font-size:.65nm;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:6px;">Password</label>
-        <input id="signin-password" class="input" type="password" placeholder="Your password" autocomplete="current-password"
-          style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);font-size:.95rem;">
-      </div>
-      <div id="signin-error" style="display:none;font-size:.78rem;color:#F87171;background:rgba(248,113,113,.1);border-radius:10px;padding:10px 14px;line-height:1.5;"></div>
+    <div style="font-size:.76rem;color:rgba(250,246,241,.4);margin-bottom:24px;" class="a1">Sign in to your Parlay account.</div>
+
+    <button onclick="SupabaseDB.signInWithGoogle()" style="width:100%;padding:14px 20px;background:#fff;color:#1f1f1f;border:none;border-radius:14px;font-family:var(--font-body);font-size:.9rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px;" class="a2">
+      ${GOOGLE_SVG} Continue with Google
+    </button>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;" class="a2">
+      <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
+      <span style="font-size:.65rem;color:rgba(250,246,241,.3);letter-spacing:.08em;">OR</span>
+      <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
     </div>
-    <div class="a3" style="margin-top:24px;">
-      <button onclick="SupabaseDB.signInWithGoogle()" style="width:100%;padding:15px 20px;background:#fff;color:#1f1f1f;border:none;border-radius:14px;font-family:var(--font-body);font-size:.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;">
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
-        Continue with Google
-      </button>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
-        <span style="font-size:.68rem;color:rgba(250,246,241,.3);letter-spacing:.08em;">OR</span>
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.12);"></div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;flex:1;" class="a2">
+      <div>
+        <label style="font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:5px;">Email</label>
+        <input id="signin-email" class="input" type="email" placeholder="you@example.com" autocomplete="email" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);">
       </div>
-      <button id="signin-btn" style="width:100%;padding:16px;background:var(--terra);color:#fff;border:none;border-radius:14px;font-family:var(--font-body);font-size:.95rem;font-weight:600;cursor:pointer;">
-        Sign in with email →
+      <div>
+        <label style="font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(250,246,241,.4);display:block;margin-bottom:5px;">Password</label>
+        <input id="signin-password" class="input" type="password" placeholder="Your password" autocomplete="current-password" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:var(--cream);">
+      </div>
+      <div id="signin-error" style="display:none;font-size:.76rem;color:#F87171;background:rgba(248,113,113,.1);border-radius:10px;padding:10px 14px;line-height:1.5;"></div>
+    </div>
+
+    <div style="margin-top:20px;" class="a3">
+      <button id="signin-btn" style="width:100%;padding:16px;background:var(--terra);color:#fff;border:none;border-radius:14px;font-family:var(--font-body);font-size:.92rem;font-weight:700;cursor:pointer;">
+        Sign in →
       </button>
-      <div style="text-align:center;margin-top:14px;font-size:.75rem;color:rgba(250,246,241,.3);">
+      <div style="text-align:center;margin-top:14px;font-size:.74rem;color:rgba(250,246,241,.3);">
         New here? <span onclick="Router.navigate('auth-signup')" style="color:var(--amber);cursor:pointer;text-decoration:underline;">Create an account</span>
+        &nbsp;·&nbsp;
+        <span onclick="Router.navigate('auth-join')" style="color:rgba(122,158,138,.8);cursor:pointer;text-decoration:underline;">Have an invite code?</span>
       </div>
     </div>
   </div>
@@ -1556,9 +1746,8 @@ Router.register('auth-signin', () => `
       btn.textContent = 'Sign in →'; btn.disabled = false;
       return;
     }
-    // Bootstrap loads all data then routes
     const result = await SupabaseDB.bootstrap();
-    Router.navigate(result.coupled ? 'home' : 'ob4');
+    Router.navigate(result.coupled ? 'home' : 'ob-connect');
   };
   el.querySelector('#signin-btn').addEventListener('click', doSignIn);
   el.querySelector('#signin-password').addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
@@ -4746,11 +4935,13 @@ Router.register('setup', () => {
   const doneCount= [c.loveLanguage.done, c.myComm.done, c.partnerComm.done, c.tone.done, c.family.done].filter(Boolean).length;
   const allDone  = doneCount === 5;
 
-  // Check whether the OTHER spouse has filled in their own self-report
-  const cp             = State.get('commPrefs') || {};
-  const themRole       = view === 'partner' ? 'user' : 'partner';
-  const themSelfDone   = (cp[themRole]?.self?.traits || []).length > 0;
-  const switchViewLabel= view === 'partner' ? (user.name || 'your partner') + '\'s view' : (partner.name || 'your partner') + '\'s view';
+  const isSpouse1 = SupabaseDB.configured
+    ? (SupabaseDB.coupleRow?.spouse_1_id === SupabaseDB.getMyUserId())
+    : (view === 'user');
+
+  const cp           = State.get('commPrefs') || {};
+  const themRole     = view === 'partner' ? 'user' : 'partner';
+  const themSelfDone = (cp[themRole]?.self?.traits || []).length > 0;
 
   const _next = _nextIncomplete(null);
 
@@ -4774,6 +4965,64 @@ Router.register('setup', () => {
 
     <div style="padding:20px 20px 0;display:flex;flex-direction:column;gap:10px;" class="a3">
 
+      <!-- ── Partner Connection Status ── -->
+      ${(() => {
+        if (!SupabaseDB.configured) return '';
+        const coupleRow = SupabaseDB.coupleRow;
+        if (!coupleRow) return '';
+        const isConnected = !!coupleRow.spouse_2_id;
+        const code = coupleRow.invite_code || '';
+        const appUrl = 'https://stevegiovi.github.io/parlay/';
+        const magicLink = appUrl + '?invite=' + code;
+        if (isConnected) {
+          const connectedLabel = isSpouse1 ? `${themName} is connected` : `Connected with ${themName}`;
+          const connectedSub   = isSpouse1
+            ? 'Both accounts are linked. Parlay is fully active.'
+            : `Your account is linked to ${themName}. Parlay is fully active.`;
+          return `
+          <div style="background:rgba(122,158,138,.1);border:1.5px solid rgba(122,158,138,.35);border-radius:16px;padding:16px 18px;margin-bottom:4px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-size:1.4rem;">🟢</div>
+              <div>
+                <div style="font-size:.82rem;font-weight:700;color:var(--espresso);">${connectedLabel}</div>
+                <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">${connectedSub}</div>
+              </div>
+            </div>
+          </div>`;
+        }
+        if (!isSpouse1) return '';
+        return `
+        <div style="background:#FDF5F0;border:1.5px solid rgba(196,113,74,.35);border-radius:16px;padding:18px;margin-bottom:4px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+            <div style="font-size:1.4rem;">⏳</div>
+            <div>
+              <div style="font-size:.82rem;font-weight:700;color:var(--espresso);">Waiting for ${themName} to join</div>
+              <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">Share your invite code or magic link below.</div>
+            </div>
+          </div>
+
+          <div style="background:var(--espresso);border-radius:12px;padding:14px 16px;text-align:center;margin-bottom:12px;">
+            <div style="font-size:.6rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(250,246,241,.35);margin-bottom:6px;">Invite code</div>
+            <div id="setup-invite-code" style="font-family:var(--font-display);font-size:2.2rem;font-weight:400;color:var(--amber);letter-spacing:.25em;">${code}</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button id="setup-copy-code" style="width:100%;padding:11px;background:var(--espresso);color:var(--cream);border:none;border-radius:10px;font-family:var(--font-body);font-size:.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+              📋 Copy code only
+            </button>
+            <button id="setup-copy-message" style="width:100%;padding:11px;background:var(--terra);color:#fff;border:none;border-radius:10px;font-family:var(--font-body);font-size:.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+              💬 Copy message with instructions
+            </button>
+            <button id="setup-copy-link" style="width:100%;padding:11px;background:rgba(122,158,138,.85);color:#fff;border:none;border-radius:10px;font-family:var(--font-body);font-size:.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;" data-link="${magicLink}">
+              🔗 Copy magic link (opens app &amp; pre-fills code)
+            </button>
+          </div>
+          <div style="font-size:.68rem;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;">
+            The magic link takes ${themName} straight to the join screen with the code already filled in.
+          </div>
+        </div>`;
+      })()}
+
       <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;">About ${myName}</div>
 
       ${_setupRow('🙋', 'How ' + myName + ' wants to receive messages',
@@ -4791,21 +5040,19 @@ Router.register('setup', () => {
       ${_setupRow('🧠', 'How ' + themName + ' receives messages',
         c.partnerComm.done
           ? c.partnerComm.count + ' trait' + (c.partnerComm.count !== 1 ? 's' : '') + ' noted' + (c.partnerComm.hasEndearment ? ' · endearment set' : '')
-          : 'Your observations about ' + themName + ' — they fill out their own self-report too',
+          : 'Your observations about ' + themName + ' — they fill out their own self-report independently',
         c.partnerComm.done, c.partnerComm.count + ' noted', 'setup-partner-comm')}
 
-      <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;">Parlay Behaviour</div>
+      <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;">Shared Settings</div>
 
       ${_setupRow('⚖️', 'Mediator Tone',
-        c.tone.done ? 'Currently: ' + (TONES[State.get('mediatorTone')] || 'Neutral') : 'How Parlay frames all communication — Soft, Neutral, or Direct',
+        c.tone.done ? 'Shared · Currently: ' + (TONES[State.get('mediatorTone')] || 'Neutral') : 'Shared · How Parlay frames all communication for both of you',
         c.tone.done, TONES[State.get('mediatorTone')] || '', 'setup-tone')}
-
-      <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;">Family</div>
 
       ${_setupRow('👨‍👩‍👧', 'Family Setup',
         c.family.done
-          ? c.family.count + ' kid' + (c.family.count !== 1 ? 's' : '') + (c.family.hasProviders ? ' · providers' : '') + (c.family.hasPlaydates ? ' · contacts' : '')
-          : 'Kids, activity providers, playdate contacts',
+          ? 'Shared · ' + c.family.count + ' kid' + (c.family.count !== 1 ? 's' : '') + (c.family.hasProviders ? ' · providers' : '') + (c.family.hasPlaydates ? ' · contacts' : '')
+          : 'Shared · Kids, activity providers, playdate contacts',
         c.family.done, c.family.count + ' kid' + (c.family.count !== 1 ? 's' : ''), 'family-setup')}
 
     </div>
@@ -4818,13 +5065,9 @@ Router.register('setup', () => {
 
     ${!themSelfDone ? `
     <div style="margin:10px 20px 0;padding:14px 16px;background:#FDF5F0;border:1.5px solid rgba(196,113,74,.3);border-radius:14px;" class="a4">
-      <div style="font-size:.75rem;color:var(--espresso);line-height:1.65;margin-bottom:10px;">
-        <strong>${themName} hasn't filled in their own profile yet.</strong> Their self-report makes Parlay's filtering significantly more accurate.
+      <div style="font-size:.75rem;color:var(--espresso);line-height:1.65;">
+        <strong>${themName} hasn't filled in their own profile yet.</strong> Their self-report makes Parlay's filtering significantly more accurate — they'll need to do it from their own device.
       </div>
-      <button onclick="State.set('currentView','${themRole}'); Router.navigate('setup')"
-        style="width:100%;padding:10px;background:var(--terra);color:#fff;border:none;border-radius:10px;font-family:var(--font-body);font-size:.78rem;font-weight:600;cursor:pointer;">
-        Switch to ${themName}'s view and complete →
-      </button>
     </div>` : ''}
 
     ${_next && doneCount > 0 ? `
@@ -4836,7 +5079,38 @@ Router.register('setup', () => {
     </div>` : ''}
 
   </div>`;
-}, () => {});
+}, () => {
+  const coupleRow = SupabaseDB.configured ? SupabaseDB.coupleRow : null;
+  if (coupleRow && !coupleRow.spouse_2_id) {
+    const code   = coupleRow.invite_code || '';
+    const appUrl = 'https://stevegiovi.github.io/parlay/';
+    const link   = appUrl + '?invite=' + code;
+
+    const copyCodeBtn = document.getElementById('setup-copy-code');
+    const copyMsgBtn  = document.getElementById('setup-copy-message');
+    const copyLinkBtn = document.getElementById('setup-copy-link');
+
+    if (copyCodeBtn) copyCodeBtn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(code).catch(() => {});
+      copyCodeBtn.textContent = '✓ Copied!';
+      setTimeout(() => { copyCodeBtn.innerHTML = '📋 Copy code only'; }, 2000);
+    });
+
+    if (copyMsgBtn) copyMsgBtn.addEventListener('click', () => {
+      const pName = State.get('partner')?.name || 'your partner';
+      const msg = `Hey! I set up Parlay for us — it's an app that helps us communicate better.\n\nTo connect your account:\n1. Go to ${appUrl}\n2. Tap "Join with an invite code"\n3. Create your account\n4. Enter code: ${code}\n\nOr just tap this link — it pre-fills the code for you:\n${link}`;
+      navigator.clipboard?.writeText(msg).catch(() => {});
+      copyMsgBtn.textContent = '✓ Message copied!';
+      setTimeout(() => { copyMsgBtn.innerHTML = '💬 Copy message with instructions'; }, 2500);
+    });
+
+    if (copyLinkBtn) copyLinkBtn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(link).catch(() => {});
+      copyLinkBtn.textContent = '✓ Link copied!';
+      setTimeout(() => { copyLinkBtn.innerHTML = '🔗 Copy magic link (opens app & pre-fills code)'; }, 2000);
+    });
+  }
+});
 
 
 
@@ -6056,8 +6330,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   State.load();
   Router.init();
 
-  // Register the auth state listener once (handles Google OAuth redirects, email confirms, token refresh)
+  // Register the auth state listener once
   SupabaseDB.initAuthListener();
+
+  // Handle magic link: ?invite=XXXXXX  — stash code and route to auth-join
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteParam = urlParams.get('invite');
+  if (inviteParam && inviteParam.length === 6) {
+    localStorage.setItem('parlay_prefill_invite', inviteParam.toUpperCase());
+  }
 
   // Update streak on open
   try {
@@ -6078,7 +6359,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     const result = await SupabaseDB.bootstrap();
 
     if (result.mode === 'unauthenticated') {
-      Router.navigate('auth-entry');
+      // If they arrived via magic link, go straight to join screen
+      const prefill = localStorage.getItem('parlay_prefill_invite');
+      Router.navigate(prefill ? 'auth-join' : 'auth-entry');
       return;
     }
 
