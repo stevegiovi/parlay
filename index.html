@@ -352,7 +352,7 @@ a { color: inherit; text-decoration: none; }
 // ──────────────────────────────────────────────
 // CONFIG
 // ──────────────────────────────────────────────
-const VERSION = '2.0.1';
+const VERSION = '2.0.2';
 
 const CONFIG = {
   SUPABASE_URL:  'https://oevfeeymescxynikkqkx.supabase.co',
@@ -482,15 +482,16 @@ const Auth = (() => {
 
   async function joinCouple(code) {
     if (!_uid) return { error: 'Not authenticated' };
-    const { data, error } = await sb.from('couples')
-      .select('*').eq('invite_code', code.toUpperCase()).is('spouse_2_id', null)
-      .maybeSingle();
-    if (error || !data) return { error: 'Invalid or expired invite code' };
-    if (data.spouse_1_id === _uid) return { error: "That's your own code" };
-    const { error: err2 } = await sb.from('couples')
-      .update({ spouse_2_id: _uid }).eq('id', data.id);
-    if (err2) return { error: err2.message };
-    data.spouse_2_id = _uid;
+    // Use RPC function that runs with SECURITY DEFINER to bypass RLS
+    // (Spouse 2 isn't in the couples row yet, so normal RLS blocks them)
+    const { data, error } = await sb.rpc('join_couple_by_code', {
+      p_code: code.toUpperCase(),
+      p_user_id: _uid,
+    });
+    if (error) return { error: error.message || 'Failed to join' };
+    if (!data || data.error) return { error: data?.error || 'Invalid or expired invite code' };
+
+    // data is the updated couple row
     _couple = data;
     _amSpouse1 = false;
     return { data };
