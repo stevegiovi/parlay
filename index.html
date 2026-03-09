@@ -704,7 +704,8 @@ const SupabaseDB = (() => {
   const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
   // ── Identity ──────────────────────────────────────────────
-  let _session    = null;   // supabase Session
+  let _session           = null;   // supabase Session
+  let _signingInViaForm  = false;   // true during email/password sign-in to suppress onAuthStateChange
   let _coupleRow  = null;   // couples row
   let _myUserId   = null;
   let _myRole     = 'user'; // 'user' | 'partner'  (spouse_1 = user, spouse_2 = partner)
@@ -734,7 +735,9 @@ const SupabaseDB = (() => {
 
   async function signIn(email, password) {
     if (!configured) return { error: 'Supabase not configured' };
+    _signingInViaForm = true;
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    _signingInViaForm = false;
     if (error) return { error: error.message };
     _session  = data.session;
     _myUserId = data.user?.id || null;
@@ -1043,11 +1046,13 @@ const SupabaseDB = (() => {
       return { mode: 'local' };
     }
 
-    const session = await getSession();
+    let session;
+    try { session = await getSession(); } catch(e) { console.warn('[bootstrap] getSession error:', e); }
     if (!session) return { mode: 'unauthenticated' };
 
     // Load my own profile
-    const profile = await loadProfile(_myUserId);
+    let profile;
+    try { profile = await loadProfile(_myUserId); } catch(e) { console.warn('[bootstrap] loadProfile error:', e); }
     if (profile) {
       // State.user = Spouse 1's data, State.partner = Spouse 2's data — always.
       // Load my profile into the correct slot based on my actual role.
@@ -1065,13 +1070,15 @@ const SupabaseDB = (() => {
     }
 
     // Load or create couple
-    const couple = await loadCouple();
+    let couple;
+    try { couple = await loadCouple(); } catch(e) { console.warn('[bootstrap] loadCouple error:', e); }
 
     if (couple) {
       // Load partner's profile into the OTHER role slot
       const partnerId = getPartnerUserId();
       if (partnerId) {
-        const partnerProfile = await loadProfile(partnerId);
+        let partnerProfile;
+        try { partnerProfile = await loadProfile(partnerId); } catch(e) { console.warn('[bootstrap] partner profile error:', e); }
         if (partnerProfile) {
           if (_myRole === 'user') {
             // I am Spouse 1 — partner goes in State.partner
@@ -1093,8 +1100,10 @@ const SupabaseDB = (() => {
           }
         }
       }
-      await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
-      subscribeToCouple();
+      try {
+        await Promise.all([loadCommPrefs(), loadFamily(), loadNegotiations(), loadTasks()]);
+        subscribeToCouple();
+      } catch(e) { console.warn('[bootstrap] data load error:', e); }
     }
 
     if (profile?.name) State.set('onboarded', true);
@@ -1230,7 +1239,11 @@ const SupabaseDB = (() => {
     _authListenerRegistered = true;
 
     sb.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session && !_session) {
+      // SIGNED_IN fires for: Google OAuth redirect, email confirmation click, AND email/password sign-in.
+      // We only want to run the full onboarding-nav logic for Google/confirmation flows.
+      // Email/password sign-in is handled directly in the auth-signin handler via bootstrap().
+      // Guard: skip if this is a programmatic email/password sign-in (_signingInViaForm flag).
+      if (event === 'SIGNED_IN' && session && !_signingInViaForm) {
         // Fresh auth event — Google OAuth redirect or email confirmation link clicked
         _session  = session;
         _myUserId = session.user.id;
@@ -1874,9 +1887,17 @@ Router.register('auth-signin', () => `
       btn.textContent = 'Sign in →'; btn.disabled = false;
       return;
     }
-    const result = await SupabaseDB.bootstrap();
+    let result;
+    try {
+      result = await SupabaseDB.bootstrap();
+    } catch (err) {
+      console.error('[Parlay] bootstrap failed after sign-in:', err);
+      btn.textContent = 'Sign in →'; btn.disabled = false;
+      errEl.textContent = 'Signed in but could not load your account — check your connection and try again.';
+      errEl.style.display = 'block';
+      return;
+    }
     if (result.coupled) {
-      // Go home if onboarding was completed, otherwise finish the last step
       Router.navigate(result.onboardingComplete ? 'home' : 'ob-intro');
     } else {
       Router.navigate(result.onboardingComplete ? 'ob-connect' : 'ob2');
@@ -3075,21 +3096,38 @@ function getPartnerProfilePrompt(partnerName) {
 
 async function callAI(systemPrompt, userMessage) {
   // Route through Supabase Edge Function so the Anthropic key stays server-side
-  const session = await SupabaseDB.getSession?.();
-  const authHeader = session?.access_token
-    ? { 'Authorization': `Bearer ${session.access_token}` }
-    : {};
+  const session = SupabaseDB.getSession?.();
+  const token   = session?.access_token || null;
+  const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-  const res = await fetch(
-    'https://oevfeeymescxynikkqkx.supabase.co/functions/v1/ai-proxy',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader },
-      body: JSON.stringify({ systemPrompt, userMessage }),
-    }
-  );
+  // AbortController timeout — edge functions can be slow to cold-start
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 30000); // 30s max
+
+  let res;
+  try {
+    res = await fetch(
+      'https://oevfeeymescxynikkqkx.supabase.co/functions/v1/ai-proxy',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeader },
+        body: JSON.stringify({ systemPrompt, userMessage }),
+        signal: controller.signal,
+      }
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`AI proxy error ${res.status}: ${errBody.slice(0, 120)}`);
+  }
+
   const data = await res.json();
-  return data.content?.[0]?.text || '';
+  const text = data.content?.[0]?.text || '';
+  if (!text) throw new Error('AI returned empty response');
+  return text;
 }
 
 const TONE_PROFILES = {
@@ -3266,7 +3304,8 @@ Identify the underlying interests, name the dreams within the conflict, and gene
 }
 
 async function detectTension(text) {
-  const result = await callAI(
+  let result;
+  try { result = await callAI(
     `You are a couples communication analyst trained in the Gottman Four Horsemen framework. Analyze the text for destructive communication patterns.
 
 The Four Horsemen and their indicators:
@@ -3286,6 +3325,7 @@ Return ONLY a JSON object with exactly this shape:
 Flag true if any Horseman is present. Level "high" if contempt is detected (it's the strongest predictor of relationship damage). Return ONLY JSON.`,
     text
   );
+  } catch { return { level: 'low', flag: false, horseman: 'none', note: '' }; }
   try { return JSON.parse(result); }
   catch { return { level: 'low', flag: false, horseman: 'none', note: '' }; }
 }
@@ -4398,13 +4438,27 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
     if (constraints) intentContext += `TIMING CONSTRAINTS: ${constraints}\n`;
     if (dateOptions.length) intentContext += `DATE OPTIONS PROPOSED: ${dateOptions.map(o => o.label + ': ' + o.date + (o.timeLabel ? ' ' + o.timeLabel : '')).join('; ')}\n`;
 
-    const btn = el.querySelector('#compose-btn-text');
-    btn.textContent = 'Filtering your message…';
-    el.querySelector('#compose-submit').disabled = true;
+    const submitBtn  = el.querySelector('#compose-submit');
+    const btnText    = el.querySelector('#compose-btn-text');
+    btnText.textContent  = 'Filtering your message…';
+    submitBtn.disabled   = true;
 
     const userName = _myNameMC || State.get('user').name || 'You';
-    const tone = State.get('mediatorTone') || 'neutral';
-    const filtered = await runToneFilter(raw, userName, tone, intentContext);
+    const tone     = State.get('mediatorTone') || 'neutral';
+
+    let filtered;
+    try {
+      filtered = await runToneFilter(raw, userName, tone, intentContext);
+    } catch (err) {
+      console.error('[Parlay] runToneFilter failed:', err);
+      btnText.textContent = 'Let Parlay Mediate →';
+      submitBtn.disabled  = false;
+      const msg = err.name === 'AbortError'
+        ? 'Request timed out — check your connection and try again'
+        : 'Couldn\u2019t reach the AI right now. Try again in a moment.';
+      U.toast(msg);
+      return;
+    }
 
     // Save parlay as pending_partner — NO fake partner position, NO generateProposal yet
     const topic = TOPIC_TYPES.find(t => t.id === topicId);
@@ -5999,7 +6053,16 @@ Router.register('task-reply', (params) => {
           : selectedDecision === 'decline'
           ? `TASK: "${task.title}" | DECISION: DECLINED. Preserve the decline clearly. Remove blame, contempt, or harsh language.`
           : `TASK: "${task.title}" | DECISION: COUNTER-SUGGESTION. Make the suggestion clear and constructive.`;
-        filteredReply = await runToneFilter(rawReply, myName, tone, decisionCtx);
+        const _replyBtn = el.querySelector('#task-reply-submit') || el.querySelector('button[id*="reply"]');
+        if (_replyBtn) { _replyBtn.textContent = 'Filtering…'; _replyBtn.disabled = true; }
+        try {
+          filteredReply = await runToneFilter(rawReply, myName, tone, decisionCtx);
+        } catch(err) {
+          console.error('[Parlay] task reply filter failed:', err);
+          if (_replyBtn) { _replyBtn.textContent = 'Send Reply →'; _replyBtn.disabled = false; }
+          U.toast('Couldn\'t reach the AI right now. Try again.');
+          return;
+        }
       } else {
         filteredReply = { accept: `Works for me — I'll take care of it.`, decline: `I'm not able to take this on right now.`, counter: `I'd like to suggest a different approach.` }[selectedDecision];
       }
@@ -6158,10 +6221,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     const app = document.getElementById('app');
     if (app) app.innerHTML = `<div style="height:100dvh;display:flex;align-items:center;justify-content:center;background:var(--espresso);"><div style="font-family:var(--font-display);font-size:2.5rem;font-weight:300;color:var(--cream);">Par<em style="color:var(--amber)">lay</em></div></div>`;
 
-    const result = await SupabaseDB.bootstrap();
+    let result;
+    try {
+      result = await SupabaseDB.bootstrap();
+    } catch(err) {
+      console.error('[Parlay] App init bootstrap failed:', err);
+      Router.navigate('auth-entry');
+      return;
+    }
 
     if (result.mode === 'unauthenticated') {
-      // If they arrived via magic link, go straight to join screen
       const prefill = localStorage.getItem('parlay_prefill_invite');
       Router.navigate(prefill ? 'auth-join' : 'auth-entry');
       return;
@@ -6169,11 +6238,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     if (result.mode === 'supabase') {
       if (!result.coupled) {
-        // Signed in but no couple yet — check if onboarding was completed
         if (result.onboardingComplete) {
-          Router.navigate('ob-connect'); // finished personal setup, needs couple step
+          Router.navigate('ob-connect');
         } else {
-          Router.navigate('ob2'); // hasn't done anything yet
+          Router.navigate('ob2');
         }
       } else {
         Router.navigate('home');
