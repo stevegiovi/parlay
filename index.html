@@ -696,7 +696,13 @@ const SupabaseDB = (() => {
   const SUPABASE_URL      = 'https://oevfeeymescxynikkqkx.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ldmZlZXltZXNjeHluaWtrcWt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMjU3MTgsImV4cCI6MjA4ODYwMTcxOH0.NgyUxl7UPZh8A4JVBUTNTyXQyR3p5eoqeByK-dvQAHo';
 
-  const configured = SUPABASE_URL !== 'YOUR_SUPABASE_URL';
+  const configured = !!(
+    window.supabase &&
+    SUPABASE_URL &&
+    SUPABASE_ANON_KEY &&
+    SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
+    SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY'
+  );
   const sb = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
   // ── Identity ──────────────────────────────────────────────
@@ -1060,23 +1066,25 @@ const SupabaseDB = (() => {
 
   // ── Bootstrap ─────────────────────────────────────────────
   let _bootstrapping = false;
+  let _bootstrapPromise = null;
   async function bootstrap() {
     if (!configured) {
       State.load();
       return { mode: 'local' };
     }
     // Prevent concurrent bootstrap calls (auth listener + manual call race)
-    if (_bootstrapping) {
-      console.warn('[bootstrap] already running — skipping duplicate call');
-      return { mode: 'pending' };
+    if (_bootstrapping && _bootstrapPromise) {
+      console.warn('[bootstrap] already running — awaiting existing call');
+      return _bootstrapPromise;
     }
     _bootstrapping = true;
 
+    _bootstrapPromise = (async () => {
     try {
       // 1. Get session
       let session;
       try { session = await getSession(); } catch(e) { console.error('[bootstrap] getSession error:', e); }
-      if (!session) { _bootstrapping = false; return { mode: 'unauthenticated' }; }
+      if (!session) return { mode: 'unauthenticated' };
 
       // 2. Persist email (fire-and-forget)
       if (_session?.user?.email) {
@@ -1130,7 +1138,6 @@ const SupabaseDB = (() => {
       if (profile?.name) State.set('onboarded', true);
       console.log('[bootstrap] Done. Me:', getMyName(), '| Partner:', getPartnerName());
 
-      _bootstrapping = false;
       return {
         mode: 'supabase',
         coupled: !!couple,
@@ -1141,7 +1148,6 @@ const SupabaseDB = (() => {
     } catch(e) {
       // Outer safety net — nothing above should reach here, but just in case
       console.error('[bootstrap] UNHANDLED error:', e);
-      _bootstrapping = false;
       // Return a usable result even on failure — don't throw up to caller
       return {
         mode: 'supabase',
@@ -1149,6 +1155,14 @@ const SupabaseDB = (() => {
         partnerConnected: !!(_coupleRow?.spouse_2_id),
         onboardingComplete: false,
       };
+    }
+    })();
+
+    try {
+      return await _bootstrapPromise;
+    } finally {
+      _bootstrapping = false;
+      _bootstrapPromise = null;
     }
   }
 
@@ -3269,7 +3283,9 @@ async function runToneFilter(rawText, userName, tone = 'neutral', intentContext 
   // Resolve recipient name via auth helpers — not raw State reads
   const _myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || State.get('user')?.name || '';
   const _partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || '';
-  const recipientName = senderRole === 'user' ? _partnerName : _myName;
+  // Recipient is always "the other spouse" relative to the sender.
+  // Using _myName when senderRole === 'partner' causes prompts to name the recipient as the sender.
+  const recipientName = _partnerName;
 
   const senderBlock    = getSenderPrefsPrompt(senderRole);
   const recipientBlock = getRecipientPrefsPrompt(recipientRole, recipientName);
@@ -3419,6 +3435,16 @@ Flag true if any Horseman is present. Level "high" if contempt is detected (it's
 
 // Safely parse a proposal response from the AI.
 // The model sometimes wraps JSON in ```json ... ``` fences despite instructions — strip them first.
+function _proposalPreviewText(proposal) {
+  if (!proposal) return '';
+  if (typeof proposal === 'string') return proposal;
+  if (typeof proposal === 'object') {
+    if (typeof proposal.proposal === 'string') return proposal.proposal;
+    try { return JSON.stringify(proposal); } catch { return ''; }
+  }
+  return String(proposal || '');
+}
+
 function parseProposal(raw) {
   try {
     const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
@@ -3518,7 +3544,7 @@ Router.register('plan', () => {
                   </div>
                   <div style="font-size:.62rem;font-weight:600;color:${sc};background:${sc}18;padding:3px 9px;border-radius:var(--r-pill);">${sl}</div>
                 </div>
-                ${neg.proposal ? `<div style="margin-top:10px;padding:9px 11px;background:var(--parchment);border-radius:var(--r-sm);font-size:.76rem;color:var(--muted);line-height:1.5;border-left:3px solid ${sc};">${neg.proposal.slice(0,100)}${neg.proposal.length > 100 ? '…' : ''}</div>` : ''}
+                ${(() => { const _pt = _proposalPreviewText(neg.proposal); return _pt ? `<div style="margin-top:10px;padding:9px 11px;background:var(--parchment);border-radius:var(--r-sm);font-size:.76rem;color:var(--muted);line-height:1.5;border-left:3px solid ${sc};">${_pt.slice(0,100)}${_pt.length > 100 ? '…' : ''}</div>` : ''; })()}
               </div>
             `;
           }).join('')}
@@ -3683,11 +3709,11 @@ Router.register('mediator', () => {
                     <div style="font-size:1rem;color:var(--border);">›</div>
                   </div>
                 </div>
-                ${neg.proposal ? `
+                ${(() => { const _pt = _proposalPreviewText(neg.proposal); return _pt ? `
                   <div style="margin-top:12px;padding:10px 12px;background:var(--parchment);border-radius:var(--r-sm);font-size:.78rem;color:var(--muted);line-height:1.5;border-left:3px solid ${sc};">
-                    ${neg.proposal.slice(0, 100)}${neg.proposal.length > 100 ? '…' : ''}
+                    ${_pt.slice(0, 100)}${_pt.length > 100 ? '…' : ''}
                   </div>
-                ` : ''}
+                ` : ''; })()}
               </div>
             `;
           }).join('')}
@@ -4584,6 +4610,16 @@ Router.register('parlay-sent', ({ negId, aiWorked = true } = {}) => {
   </div>`;
 });
 
+function _resolveDisplayNames() {
+  const view = State.get('currentView') || 'user';
+  const fallbackMy = view === 'partner' ? State.get('partner')?.name : State.get('user')?.name;
+  const fallbackPartner = view === 'partner' ? State.get('user')?.name : State.get('partner')?.name;
+  const canTrustSupabaseIdentity = !!(SupabaseDB.configured && SupabaseDB.getMyUserId && SupabaseDB.getMyUserId());
+  const myName = (canTrustSupabaseIdentity ? SupabaseDB.getMyName() : null) || fallbackMy || 'You';
+  const partnerName = (canTrustSupabaseIdentity ? SupabaseDB.getPartnerName() : null) || fallbackPartner || 'Partner';
+  return { myName, partnerName };
+}
+
 /* ================================================
    MODULE: PARLAY DETAIL
    Both spouses — shows the conversation thread, filtered message,
@@ -4599,8 +4635,7 @@ Router.register('parlay-detail', ({ negId } = {}) => {
 
   // ── ROLE DETECTION — UUID-based, not role-string-based ─────
   const myUid = SupabaseDB.configured ? SupabaseDB.getMyUserId() : null;
-  const myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || State.get('user')?.name || 'You';
-  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || 'Partner';
+  const { myName, partnerName } = _resolveDisplayNames();
 
   // Compare UUIDs directly — this is the authoritative check
   const iAmCreator = myUid
@@ -4638,7 +4673,7 @@ Router.register('parlay-detail', ({ negId } = {}) => {
               <div style="font-size:.88rem;font-weight:600;color:var(--espresso);">${label}</div>
               ${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}
             </div>
-            ${isSelected ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Selected</span>` : ''}
+            <span class="date-selected-badge" style="font-size:.72rem;font-weight:700;color:var(--sage);display:${isSelected ? 'inline' : 'none'};">✓ Selected</span>
           </div>`;
         }).join('')}
       </div>
@@ -4778,20 +4813,19 @@ Router.register('parlay-detail', ({ negId } = {}) => {
     el.querySelectorAll('.date-option-card').forEach(card => {
       card.addEventListener('click', () => {
         const optId = card.dataset.optId;
+        const currentlySelected = neg.partnerDateResponse === optId;
+        const nextSelection = currentlySelected ? null : optId;
+
         el.querySelectorAll('.date-option-card').forEach(c => {
-          const sel = c.dataset.optId === optId;
+          const sel = c.dataset.optId === nextSelection;
           c.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
           c.style.background  = sel ? '#EDF4F0' : 'var(--surface)';
-          const badge = c.querySelector('span[style*="color:var(--sage)"]');
-          if (sel && !badge) {
-            const b = document.createElement('span');
-            b.style.cssText = 'font-size:.72rem;font-weight:700;color:var(--sage);';
-            b.textContent = '✓ Selected';
-            c.appendChild(b);
-          } else if (!sel && badge) badge.remove();
+          const badge = c.querySelector('.date-selected-badge');
+          if (badge) badge.style.display = sel ? 'inline' : 'none';
         });
-        // Store selection on neg for use when reply is submitted
-        MediatorState.update(neg.id, { partnerDateResponse: optId });
+
+        neg.partnerDateResponse = nextSelection;
+        MediatorState.update(neg.id, { partnerDateResponse: nextSelection });
       });
     });
   }
@@ -4875,8 +4909,7 @@ Router.register('parlay-reply', ({ negId } = {}) => {
   }
 
   const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[7];
-  const myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || State.get('user')?.name || 'You';
-  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || 'Partner';
+  const { myName, partnerName } = _resolveDisplayNames();
   const creatorName = iAmCreator ? myName : partnerName;
 
   const hasDateOptions = neg.dateOptions && neg.dateOptions.length > 0;
