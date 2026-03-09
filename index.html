@@ -3308,13 +3308,14 @@ OUTPUT RULES:
   );
 }
 
-async function generateProposal(topic, userPosition, partnerPosition, userName, partnerName, tone = 'neutral', intentContext = '') {
+async function generateProposal(topic, userPosition, partnerPosition, userName, partnerName, tone = 'neutral', intentContext = '', creatorRole = 'user') {
   const profile = TONE_PROFILES[tone] || TONE_PROFILES.neutral;
+  const recipientRole = creatorRole === 'user' ? 'partner' : 'user';
 
-  // Both parties' prefs inform the proposal — sender (user) voice + recipient (partner) calibration
-  const userSenderBlock    = getSenderPrefsPrompt('user');
-  const partnerSenderBlock = getSenderPrefsPrompt('partner');
-  const recipientBlock     = getRecipientPrefsPrompt('partner', partnerName);
+  // Both parties' prefs inform the proposal — each person's self-report is included
+  const creatorSenderBlock    = getSenderPrefsPrompt(creatorRole);
+  const recipientSenderBlock  = getSenderPrefsPrompt(recipientRole);
+  const recipientBlock        = getRecipientPrefsPrompt(recipientRole, partnerName);
 
   const intentBlock = intentContext
     ? `\nCRITICAL INTENT CONTEXT (must be respected exactly — do not assume or change who is going):\n${intentContext}\n`
@@ -3339,8 +3340,8 @@ Never assign blame. Never position one partner as more reasonable than the other
 ${intentBlock}
 IMPORTANT: If intent context is provided above, you MUST honour it exactly. If it says "just the user going alone", your proposal must reflect solo travel — never suggest the spouse join unless the intent context explicitly includes them.
 ${UNIVERSAL_LANGUAGE_SAFETY}
-${userSenderBlock}
-${partnerSenderBlock}
+${creatorSenderBlock}
+${recipientSenderBlock}
 ${recipientBlock}
 TONE STYLE: ${profile.label}
 ${profile.proposalInstructions}
@@ -3409,14 +3410,6 @@ function parseProposal(raw) {
     };
   }
 }
-const PARTNER_POSITIONS = {
-  date:   "I'd love a date night but I'm really tired this week — maybe keep it low-key and close to home?",
-  boys:   "Fine with it but I'd appreciate knowing the plan in advance so I can arrange things on my end.",
-  girls:  "I've been really needing this — just want to make sure we figure out the kids' coverage first.",
-  inlaw:  "I think we should visit but I want to make sure we're not overdoing it — maybe just one weekend.",
-  family: "Happy to host but I want to keep it small, I've been overwhelmed lately.",
-  other:  "I'm open to discussing it — just want us both to feel heard before we decide anything.",
-};
 
 /* ================================================
    MODULE: PLAN (replaces mediator hub as entry point)
@@ -4515,7 +4508,9 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
     btnText.textContent  = 'Filtering your message…';
     submitBtn.disabled   = true;
 
-    const userName = _myNameMC || State.get('user').name || 'You';
+    const _view = State.get('currentView') || 'user';
+    const _myRole = (SupabaseDB.configured && SupabaseDB.getMyRole) ? SupabaseDB.getMyRole() : (_view === 'partner' ? 'partner' : 'user');
+    const userName = (SupabaseDB.configured ? SupabaseDB.getMyName() : null) || (_myRole === 'partner' ? State.get('partner')?.name : State.get('user')?.name) || 'You';
     const tone     = State.get('mediatorTone') || 'neutral';
 
     let filtered;
@@ -4775,7 +4770,7 @@ Router.register('parlay-detail', ({ negId } = {}) => {
           neg.title,
           neg.filteredInput || neg.rawInput,
           neg.partnerFilteredReply || neg.partnerRawReply,
-          creatorName, recipName, tone, neg.intentContext || ''
+          creatorName, recipName, tone, neg.intentContext || '', neg.createdBy
         );
         const parsed = parseProposal(raw);
         MediatorState.update(neg.id, { proposal: JSON.stringify(parsed), status: 'active' });
