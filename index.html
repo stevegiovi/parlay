@@ -4610,6 +4610,16 @@ Router.register('parlay-sent', ({ negId, aiWorked = true } = {}) => {
   </div>`;
 });
 
+function _resolveDisplayNames() {
+  const view = State.get('currentView') || 'user';
+  const fallbackMy = view === 'partner' ? State.get('partner')?.name : State.get('user')?.name;
+  const fallbackPartner = view === 'partner' ? State.get('user')?.name : State.get('partner')?.name;
+  const canTrustSupabaseIdentity = !!(SupabaseDB.configured && SupabaseDB.getMyUserId && SupabaseDB.getMyUserId());
+  const myName = (canTrustSupabaseIdentity ? SupabaseDB.getMyName() : null) || fallbackMy || 'You';
+  const partnerName = (canTrustSupabaseIdentity ? SupabaseDB.getPartnerName() : null) || fallbackPartner || 'Partner';
+  return { myName, partnerName };
+}
+
 /* ================================================
    MODULE: PARLAY DETAIL
    Both spouses — shows the conversation thread, filtered message,
@@ -4625,8 +4635,7 @@ Router.register('parlay-detail', ({ negId } = {}) => {
 
   // ── ROLE DETECTION — UUID-based, not role-string-based ─────
   const myUid = SupabaseDB.configured ? SupabaseDB.getMyUserId() : null;
-  const myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || State.get('user')?.name || 'You';
-  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || 'Partner';
+  const { myName, partnerName } = _resolveDisplayNames();
 
   // Compare UUIDs directly — this is the authoritative check
   const iAmCreator = myUid
@@ -4664,7 +4673,7 @@ Router.register('parlay-detail', ({ negId } = {}) => {
               <div style="font-size:.88rem;font-weight:600;color:var(--espresso);">${label}</div>
               ${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}
             </div>
-            ${isSelected ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Selected</span>` : ''}
+            <span class="date-selected-badge" style="font-size:.72rem;font-weight:700;color:var(--sage);display:${isSelected ? 'inline' : 'none'};">✓ Selected</span>
           </div>`;
         }).join('')}
       </div>
@@ -4804,20 +4813,19 @@ Router.register('parlay-detail', ({ negId } = {}) => {
     el.querySelectorAll('.date-option-card').forEach(card => {
       card.addEventListener('click', () => {
         const optId = card.dataset.optId;
+        const currentlySelected = neg.partnerDateResponse === optId;
+        const nextSelection = currentlySelected ? null : optId;
+
         el.querySelectorAll('.date-option-card').forEach(c => {
-          const sel = c.dataset.optId === optId;
+          const sel = c.dataset.optId === nextSelection;
           c.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
           c.style.background  = sel ? '#EDF4F0' : 'var(--surface)';
-          const badge = c.querySelector('span[style*="color:var(--sage)"]');
-          if (sel && !badge) {
-            const b = document.createElement('span');
-            b.style.cssText = 'font-size:.72rem;font-weight:700;color:var(--sage);';
-            b.textContent = '✓ Selected';
-            c.appendChild(b);
-          } else if (!sel && badge) badge.remove();
+          const badge = c.querySelector('.date-selected-badge');
+          if (badge) badge.style.display = sel ? 'inline' : 'none';
         });
-        // Store selection on neg for use when reply is submitted
-        MediatorState.update(neg.id, { partnerDateResponse: optId });
+
+        neg.partnerDateResponse = nextSelection;
+        MediatorState.update(neg.id, { partnerDateResponse: nextSelection });
       });
     });
   }
@@ -4901,8 +4909,7 @@ Router.register('parlay-reply', ({ negId } = {}) => {
   }
 
   const topic = TOPIC_TYPES.find(t => t.id === neg.topicId) || TOPIC_TYPES[7];
-  const myName      = (SupabaseDB.configured ? SupabaseDB.getMyName()      : null) || State.get('user')?.name || 'You';
-  const partnerName = (SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || State.get('partner')?.name || 'Partner';
+  const { myName, partnerName } = _resolveDisplayNames();
   const creatorName = iAmCreator ? myName : partnerName;
 
   const hasDateOptions = neg.dateOptions && neg.dateOptions.length > 0;
