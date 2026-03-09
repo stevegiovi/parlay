@@ -3167,52 +3167,74 @@ function getPartnerProfilePrompt(partnerName) {
 }
 
 async function callAI(systemPrompt, userMessage) {
-  // Route through Supabase Edge Function so the Anthropic key stays server-side
-  const session = SupabaseDB.getCurrentSession?.();
-  const token   = session?.access_token || null;
+  // ── Resolve auth ────────────────────────────────────────────
+  let session = SupabaseDB.getCurrentSession?.();
+  // If session is null (e.g. page was open a while), try refreshing it
+  if (!session) {
+    try { session = await SupabaseDB.getSession?.(); } catch(e) { console.warn('[callAI] session refresh failed:', e); }
+  }
+  const token = session?.access_token || null;
 
-  // Supabase Edge Functions require BOTH the apikey header (anon key) and Authorization (user JWT)
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  // The anon key is needed for Supabase's API gateway to route the request
-  headers['apikey'] = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ldmZlZXltZXNjeHluaWtrcWt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMjU3MTgsImV4cCI6MjA4ODYwMTcxOH0.NgyUxl7UPZh8A4JVBUTNTyXQyR3p5eoqeByK-dvQAHo';
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ldmZlZXltZXNjeHluaWtrcWt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMjU3MTgsImV4cCI6MjA4ODYwMTcxOH0.NgyUxl7UPZh8A4JVBUTNTyXQyR3p5eoqeByK-dvQAHo';
+  const EDGE_URL = 'https://oevfeeymescxynikkqkx.supabase.co/functions/v1/ai-proxy';
 
-  // AbortController timeout — edge functions can be slow to cold-start
+  const headers = {
+    'Content-Type': 'application/json',
+    'apikey': ANON_KEY,
+    'Authorization': `Bearer ${token || ANON_KEY}`,
+  };
+
+  const body = JSON.stringify({ systemPrompt, userMessage });
+
+  console.log('[callAI] Sending request:', { url: EDGE_URL, hasToken: !!token, bodyLength: body.length });
+
+  // 45s timeout — edge functions cold-start can take 10-15s
   const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), 30000); // 30s max
+  const timeoutId  = setTimeout(() => controller.abort(), 45000);
 
   let res;
   try {
-    res = await fetch(
-      'https://oevfeeymescxynikkqkx.supabase.co/functions/v1/ai-proxy',
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ systemPrompt, userMessage }),
-        signal: controller.signal,
-      }
-    );
+    res = await fetch(EDGE_URL, { method: 'POST', headers, body, signal: controller.signal });
   } catch(fetchErr) {
     clearTimeout(timeoutId);
-    console.error('[callAI] fetch error:', fetchErr);
-    throw fetchErr;
+    console.error('[callAI] Network error:', fetchErr.name, fetchErr.message);
+    throw new Error(`Network error: ${fetchErr.message}`);
   } finally {
     clearTimeout(timeoutId);
   }
 
+  console.log('[callAI] Response status:', res.status);
+
   if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    const errMsg = `AI proxy error ${res.status}: ${errBody.slice(0, 200)}`;
-    console.error('[callAI]', errMsg);
-    throw new Error(errMsg);
+    const errBody = await res.text().catch(() => '(could not read body)');
+    console.error('[callAI] HTTP error:', res.status, errBody);
+    throw new Error(`Edge function returned ${res.status}: ${errBody.slice(0, 150)}`);
   }
 
-  const data = await res.json();
-  const text = data.content?.[0]?.text || '';
-  if (!text) {
-    console.error('[callAI] empty response:', JSON.stringify(data).slice(0, 300));
-    throw new Error('AI returned empty response');
+  // Parse response — handle both direct Anthropic format and wrapped formats
+  const raw = await res.text();
+  console.log('[callAI] Raw response (first 200 chars):', raw.slice(0, 200));
+
+  let data;
+  try { data = JSON.parse(raw); } catch(e) {
+    // If the edge function returned plain text, use it directly
+    if (raw.trim().length > 0) return raw.trim();
+    throw new Error('AI returned unparseable response');
   }
+
+  // Try multiple response shapes (different edge function implementations)
+  const text = data.content?.[0]?.text   // Anthropic API format
+    || data.text                          // Simple { text: "..." } wrapper
+    || data.result                        // { result: "..." } wrapper
+    || data.message                       // { message: "..." } wrapper
+    || (typeof data === 'string' ? data : '');  // Direct string
+
+  if (!text) {
+    console.error('[callAI] Could not extract text from response:', JSON.stringify(data).slice(0, 300));
+    throw new Error('AI response had no text content. Check edge function. Response: ' + JSON.stringify(data).slice(0, 100));
+  }
+
+  console.log('[callAI] Success. Text length:', text.length);
   return text;
 }
 
@@ -4485,7 +4507,11 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
     if (constraints)     intentContext += `TIMING CONSTRAINTS: ${constraints}\n`;
     if (dateOptions.length) intentContext += `DATE OPTIONS PROPOSED: ${dateOptions.map(o => o.label + ': ' + o.date + (o.timeLabel ? ' ' + o.timeLabel : '')).join('; ')}\n`;
 
-    /* ── Call AI filter ────────────────────────────────────── */
+    /* ═══════════════════════════════════════════════════════════
+       CALL AI FILTER (best-effort — flow completes even if AI is down)
+       If the edge function fails for ANY reason, the parlay is still
+       saved and sent to the partner's inbox using the raw text.
+       ═══════════════════════════════════════════════════════════ */
     const submitBtn = el.querySelector('#compose-submit');
     const btnText   = el.querySelector('#compose-btn-text');
     if (btnText) btnText.textContent = 'Filtering your message…';
@@ -4494,22 +4520,24 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
     const userName = _getMyName();
     const tone     = State.get('mediatorTone') || 'neutral';
 
-    let filtered;
+    let filtered = raw;  // default to raw text
+    let aiWorked = false;
     try {
+      console.log('[Parlay] Calling runToneFilter…');
       filtered = await runToneFilter(raw, userName, tone, intentContext);
+      aiWorked = true;
+      console.log('[Parlay] AI filter succeeded. Filtered length:', filtered.length);
     } catch (err) {
-      console.error('[Parlay] runToneFilter failed:', err);
-      if (btnText) btnText.textContent = 'Let Parlay Mediate →';
-      if (submitBtn) submitBtn.disabled = false;
-      const errMsg = err.name === 'AbortError' ? 'Request timed out' : (err.message || 'Unknown AI error').slice(0, 100);
-      U.toast(errMsg);
-      return;
+      console.error('[Parlay] ⚠️ AI FILTER FAILED — saving with raw text:', err.message || err);
+      filtered = raw;  // fallback: use raw text so the flow still works
     }
 
-    /* ── Save to MediatorState + Supabase ──────────────────── */
+    /* ── Save to MediatorState + Supabase (ALWAYS runs) ──── */
     const createdBy = _getMyRole();
     const topic = TOPIC_TYPES.find(t => t.id === topicId);
     const negId = 'neg_' + Date.now();
+
+    console.log('[Parlay] Saving parlay:', { negId, topicId, createdBy, aiWorked, filteredLen: filtered.length });
 
     try {
       MediatorState.add({
@@ -4522,14 +4550,22 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
         proposal: null, resolution: null,
       });
     } catch(e) {
-      console.error('[Parlay] MediatorState.add failed:', e);
+      console.error('[Parlay] MediatorState.add FAILED:', e);
       if (btnText) btnText.textContent = 'Let Parlay Mediate →';
       if (submitBtn) submitBtn.disabled = false;
-      U.toast('Failed to save — try again');
+      U.toast('Failed to save — ' + (e.message || 'unknown error').slice(0, 80));
       return;
     }
 
+    // Navigate to confirmation — parlay is saved regardless of AI status
     Router.navigate('parlay-sent', { negId });
+
+    // Show toast AFTER navigation so user sees it on the sent screen
+    if (aiWorked) {
+      U.toast('Parlay sent ✓');
+    } else {
+      setTimeout(() => U.toast('⚠️ AI filter unavailable — sent without filtering. Open browser console for details.', 5000), 300);
+    }
   });
 });
 
@@ -4881,14 +4917,14 @@ Router.register('parlay-reply', ({ negId } = {}) => {
     const btnText = el.querySelector('#reply-btn-text');
     btn.disabled = true; btnText.textContent = 'Filtering your message…';
 
-    let filtered;
+    let filtered = raw;
+    let aiWorked = false;
     try {
       filtered = await runToneFilter(raw, myName, tone, neg.intentContext || '');
+      aiWorked = true;
     } catch (err) {
-      console.error('[Parlay] reply filter failed:', err);
-      btn.disabled = false; btnText.textContent = 'Send my position →';
-      U.toast(err.name === 'AbortError' ? 'Request timed out' : (err.message || 'AI error').slice(0, 100));
-      return;
+      console.error('[Parlay] Reply AI filter failed — sending raw:', err.message || err);
+      filtered = raw;
     }
 
     MediatorState.update(neg.id, {
@@ -4898,7 +4934,11 @@ Router.register('parlay-reply', ({ negId } = {}) => {
     });
 
     Router.navigate('parlay-detail', { negId: neg.id });
-    U.toast('Position sent \u2714');
+    if (aiWorked) {
+      U.toast('Position sent ✓');
+    } else {
+      setTimeout(() => U.toast('⚠️ Sent without AI filter — check console for details', 4000), 300);
+    }
   });
 });
 
@@ -6452,10 +6492,8 @@ Router.register('task-reply', (params) => {
         try {
           filteredReply = await runToneFilter(rawReply, myName, tone, decisionCtx);
         } catch(err) {
-          console.error('[Parlay] task reply filter failed:', err);
-          btn.textContent = 'Send Response'; btn.disabled = false;
-          U.toast('AI error: ' + (err.message || 'unknown').slice(0, 100));
-          return;
+          console.error('[Parlay] task reply filter failed — using raw:', err.message || err);
+          filteredReply = rawReply; // fallback to raw text
         }
       } else {
         filteredReply = { accept: `Works for me — I'll take care of it.`, decline: `I'm not able to take this on right now.`, counter: `I'd like to suggest a different approach.` }[selectedDecision];
@@ -6541,7 +6579,8 @@ const Tasks = {
 
     try {
       const ctx = `TASK FOLLOW-UP: "${task.title}" | The task creator is pushing back on the ${task.status}. Preserve the core position while removing any contempt or blame.`;
-      const filtered = await runToneFilter(text, myName, tone, ctx);
+      let filtered = text;
+      try { filtered = await runToneFilter(text, myName, tone, ctx); } catch(aiErr) { console.error('[Parlay] pushback filter failed:', aiErr.message); }
       TaskState.update(id, {
         creatorRawReply:      text,
         creatorFilteredReply: filtered,
