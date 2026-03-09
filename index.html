@@ -1080,12 +1080,22 @@ const SupabaseDB = (() => {
       try { couple = await loadCouple(); } catch(e) { console.error('[bootstrap] loadCouple error:', e); }
 
       if (couple) {
-        // 5. Load partner's profile into the other role slot
+        // Mark connected based on couple row — don't depend on profile read succeeding
+        const hasPartner = !!getPartnerUserId();
+        if (hasPartner) {
+          if (_myRole === 'user') {
+            State.set('partner', { ...(State.get('partner') || {}), connected: true });
+          } else {
+            State.set('partner', { ...(State.get('partner') || {}), connected: true });
+          }
+        }
+
+        // 5. Try to load partner's profile for their name (may fail due to RLS — that's ok)
         try {
           const partnerId = getPartnerUserId();
           if (partnerId) {
             let partnerProfile;
-            try { partnerProfile = await loadProfile(partnerId); } catch(e) { console.error('[bootstrap] partner profile error:', e); }
+            try { partnerProfile = await loadProfile(partnerId); } catch(e) { console.warn('[bootstrap] partner profile read failed (may be RLS):', e.message); }
             if (partnerProfile) {
               if (_myRole === 'user') {
                 State.set('partner', {
@@ -1100,8 +1110,9 @@ const SupabaseDB = (() => {
                   name:  partnerProfile.name  || State.get('user')?.name  || '',
                   email: partnerProfile.email || '',
                 });
-                State.set('partner', { ...(State.get('partner') || {}), connected: true });
               }
+            } else {
+              console.warn('[bootstrap] partner profile returned null — RLS may block cross-user profile reads. Partner is connected but name is unavailable.');
             }
           }
         } catch(e) { console.error('[bootstrap] partner state error:', e); }
@@ -2582,8 +2593,8 @@ Router.register('home', () => {
             </div>
           </div>
           <div class="partner-info" style="flex:1;min-width:0;">
-            <div class="partner-names">${user.name || 'You'} &amp; ${partner.name || (SupabaseDB.configured && SupabaseDB.getPartnerName()) || 'Partner'}</div>
-            <div class="partner-status" style="font-size:.68rem;">${partner.connected ? '🟢 Connected' : '⏳ Awaiting partner'}</div>
+            <div class="partner-names">${user.name || 'You'} &amp; ${(SupabaseDB.configured ? SupabaseDB.getPartnerName() : null) || partner.name || 'Partner'}</div>
+            <div class="partner-status" style="font-size:.68rem;">${(SupabaseDB.configured && SupabaseDB.coupleRow?.spouse_2_id) ? '🟢 Connected' : partner.connected ? '🟢 Connected' : '⏳ Awaiting partner'}</div>
             ${SupabaseDB.configured ? `<div style="font-size:.62rem;color:rgba(250,246,241,.3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${SupabaseDB.getMyEmail?.() || ''}</div>` : ''}
           </div>
           <div class="partner-streak">
@@ -3159,7 +3170,12 @@ async function callAI(systemPrompt, userMessage) {
   // Route through Supabase Edge Function so the Anthropic key stays server-side
   const session = SupabaseDB.getCurrentSession?.();
   const token   = session?.access_token || null;
-  const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+  // Supabase Edge Functions require BOTH the apikey header (anon key) and Authorization (user JWT)
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  // The anon key is needed for Supabase's API gateway to route the request
+  headers['apikey'] = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ldmZlZXltZXNjeHluaWtrcWt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMjU3MTgsImV4cCI6MjA4ODYwMTcxOH0.NgyUxl7UPZh8A4JVBUTNTyXQyR3p5eoqeByK-dvQAHo';
 
   // AbortController timeout — edge functions can be slow to cold-start
   const controller = new AbortController();
@@ -3171,23 +3187,32 @@ async function callAI(systemPrompt, userMessage) {
       'https://oevfeeymescxynikkqkx.supabase.co/functions/v1/ai-proxy',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
+        headers,
         body: JSON.stringify({ systemPrompt, userMessage }),
         signal: controller.signal,
       }
     );
+  } catch(fetchErr) {
+    clearTimeout(timeoutId);
+    console.error('[callAI] fetch error:', fetchErr);
+    throw fetchErr;
   } finally {
     clearTimeout(timeoutId);
   }
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
-    throw new Error(`AI proxy error ${res.status}: ${errBody.slice(0, 120)}`);
+    const errMsg = `AI proxy error ${res.status}: ${errBody.slice(0, 200)}`;
+    console.error('[callAI]', errMsg);
+    throw new Error(errMsg);
   }
 
   const data = await res.json();
   const text = data.content?.[0]?.text || '';
-  if (!text) throw new Error('AI returned empty response');
+  if (!text) {
+    console.error('[callAI] empty response:', JSON.stringify(data).slice(0, 300));
+    throw new Error('AI returned empty response');
+  }
   return text;
 }
 
@@ -4476,7 +4501,8 @@ Router.register('mediator-compose', ({ topicId = 'other' } = {}) => {
       console.error('[Parlay] runToneFilter failed:', err);
       if (btnText) btnText.textContent = 'Let Parlay Mediate →';
       if (submitBtn) submitBtn.disabled = false;
-      U.toast(err.name === 'AbortError' ? 'Request timed out — try again' : 'Couldn\u2019t reach the AI right now. Try again in a moment.');
+      const errMsg = err.name === 'AbortError' ? 'Request timed out' : (err.message || 'Unknown AI error').slice(0, 100);
+      U.toast(errMsg);
       return;
     }
 
@@ -4734,7 +4760,7 @@ Router.register('parlay-detail', ({ negId } = {}) => {
         console.error('[Parlay] generateProposal failed:', err);
         genBtn.disabled = false;
         btnText.textContent = '⚖️ Generate Parlay Proposal';
-        U.toast('Could not reach AI right now — try again in a moment');
+        U.toast('AI error: ' + (err.message || 'unknown').slice(0, 100));
       }
     });
   }
@@ -4861,7 +4887,7 @@ Router.register('parlay-reply', ({ negId } = {}) => {
     } catch (err) {
       console.error('[Parlay] reply filter failed:', err);
       btn.disabled = false; btnText.textContent = 'Send my position →';
-      U.toast(err.name === 'AbortError' ? 'Request timed out — try again' : 'Couldn\u2019t reach AI right now — try again');
+      U.toast(err.name === 'AbortError' ? 'Request timed out' : (err.message || 'AI error').slice(0, 100));
       return;
     }
 
@@ -6428,7 +6454,7 @@ Router.register('task-reply', (params) => {
         } catch(err) {
           console.error('[Parlay] task reply filter failed:', err);
           btn.textContent = 'Send Response'; btn.disabled = false;
-          U.toast('Couldn\'t reach the AI right now. Try again.');
+          U.toast('AI error: ' + (err.message || 'unknown').slice(0, 100));
           return;
         }
       } else {
