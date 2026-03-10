@@ -1542,19 +1542,6 @@ const Store = (() => {
   Store.loadTasks = async function() { if (DEMO.active) return; return _origLoadT.apply(this, arguments); };
   const _origLoadC = Store.loadCommPrefs;
   Store.loadCommPrefs = async function() { if (DEMO.active) return; return _origLoadC.apply(this, arguments); };
-
-  // AI calls → return canned response in demo
-  const _origAICall = AI.call;
-  AI.call = async function(sys, usr) {
-    if (DEMO.active) {
-      // Simulate brief delay then return a generic demo response
-      await new Promise(r => setTimeout(r, 800));
-      if (sys.includes('filter') || sys.includes('tone')) return usr; // tone filter: pass through
-      if (sys.includes('proposal') || sys.includes('Proposal')) return "**Demo Proposal**\n\nThis is a sample proposal generated in demo mode. In the real app, the AI mediator would analyze both partners' inputs, consider communication styles, and produce a balanced, fair proposal.\n\n- **Key point 1:** Both perspectives are acknowledged\n- **Key point 2:** A practical compromise is suggested\n- **Key point 3:** Next steps are outlined";
-      return "This is a demo response. In the real app, the AI would provide a thoughtful, context-aware response.";
-    }
-    return _origAICall.apply(this, arguments);
-  };
 })();
 
 // ──────────────────────────────────────────────
@@ -1689,6 +1676,20 @@ const AI = (() => {
   }
 
   return { call };
+})();
+
+// ── DEMO: AI proxy (must be after AI is defined) ──
+(function() {
+  const _origAICall = AI.call;
+  AI.call = async function(sys, usr) {
+    if (DEMO.active) {
+      await new Promise(r => setTimeout(r, 800));
+      if (sys.includes('filter') || sys.includes('tone')) return usr;
+      if (sys.includes('proposal') || sys.includes('Proposal')) return "**Demo Proposal**\n\nThis is a sample proposal generated in demo mode. In the real app, the AI mediator would analyze both partners' inputs, consider communication styles, and produce a balanced, fair proposal.\n\n- **Key point 1:** Both perspectives are acknowledged\n- **Key point 2:** A practical compromise is suggested\n- **Key point 3:** Next steps are outlined";
+      return "This is a demo response. In the real app, the AI would provide a thoughtful, context-aware response.";
+    }
+    return _origAICall.apply(this, arguments);
+  };
 })();
 
 
