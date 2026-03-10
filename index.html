@@ -631,10 +631,15 @@ const Auth = (() => {
           if (payload.eventType === 'INSERT' && payload.new?.created_by !== _uid) {
             U.toast('📬 New parlay from ' + theirName());
           }
-          if (payload.eventType === 'UPDATE' && payload.old?.status !== payload.new?.status && payload.new?.created_by !== _uid) {
-            if (payload.new?.status === 'partner_replied') U.toast('💬 ' + theirName() + ' responded');
-            else if (payload.new?.status === 'active') U.toast('⚖️ Proposal is ready');
-            else if (payload.new?.status === 'resolved') U.toast('✓ Parlay resolved');
+          if (payload.eventType === 'UPDATE' && payload.old?.status !== payload.new?.status) {
+            const newStatus = payload.new?.status;
+            const isCreator = payload.new?.created_by === _uid;
+            // partner_replied: notify the creator (the partner just replied)
+            if (newStatus === 'partner_replied' && isCreator) U.toast('💬 ' + theirName() + ' responded');
+            // active (proposal generated): notify the recipient (the creator generated it)
+            else if (newStatus === 'active' && !isCreator) U.toast('⚖️ Proposal is ready');
+            // resolved: notify the other person (whoever didn't trigger it)
+            else if (newStatus === 'resolved') U.toast('✓ Parlay resolved');
           }
         });
       })
@@ -943,6 +948,7 @@ const Store = (() => {
         title:'title', context:'context', rawContext:'raw_context',
         filteredContext:'filtered_context', priority:'priority',
         dueDate:'due_date', status:'status',
+        assignedTo:'assigned_to',
         counterMessage:'counter_message', filteredCounter:'filtered_counter',
         declineReason:'decline_reason', filteredDecline:'filtered_decline',
         counterCount:'counter_count',
@@ -1576,7 +1582,7 @@ Router.register('ob-invite', () => {
     <div style="font-family:var(--font-display);font-size:3rem;color:var(--amber);letter-spacing:.15em;margin-bottom:24px;background:rgba(255,255,255,.05);padding:20px 32px;border-radius:var(--r-lg);border:1px solid rgba(255,255,255,.1);" class="a2" id="invite-code">${code}</div>
     <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);max-width:240px;" id="copy-code">Copy to clipboard</button>
     <div style="flex:1;"></div>
-    <button class="btn btn-accent" style="max-width:300px;margin-bottom:max(40px,env(safe-area-inset-bottom));" class="a3" onclick="Router.go('home')">Continue to Home →</button>
+    <button class="btn btn-accent a3" style="max-width:300px;margin-bottom:max(40px,env(safe-area-inset-bottom));" onclick="Router.go('home')">Continue to Home →</button>
   </div>`;
 }, (el) => {
   el.querySelector('#copy-code').addEventListener('click', () => {
@@ -2010,23 +2016,30 @@ Router.register('compose', ({ topicId } = {}) => {
     // Save
     const id = 'neg_' + Date.now();
     const topic = TOPICS.find(t => t.id === topicId) || TOPICS[7];
-    await Store.addParlay({
-      id, topicId,
-      title: topic.label,
-      date: U.shortDate(new Date()),
-      rawInput: raw,
-      filteredInput: filtered,
-      intentContext,
-      dateOptions,
-      status: 'pending_partner',
-      createdByUid: Auth.myUid(),
-      isMine: true,
-      partnerRawReply: null, partnerFilteredReply: null,
-      partnerDateResponse: null, proposal: null, resolution: null,
-      archived: false,
-    });
-
-    Router.go('parlay-sent', { id, aiWorked });
+    try {
+      await Store.addParlay({
+        id, topicId,
+        title: topic.label,
+        date: U.shortDate(new Date()),
+        rawInput: raw,
+        filteredInput: filtered,
+        intentContext,
+        dateOptions,
+        status: 'pending_partner',
+        createdByUid: Auth.myUid(),
+        isMine: true,
+        partnerRawReply: null, partnerFilteredReply: null,
+        partnerDateResponse: null, proposal: null, resolution: null,
+        archived: false,
+      });
+      Router.go('parlay-sent', { id, aiWorked });
+    } catch(e) {
+      console.error('[compose] save error:', e);
+      _submitting = false;
+      btn.disabled = false;
+      btnText.textContent = 'Let Parlay Mediate →';
+      U.toast('⚠️ Failed to send — try again');
+    }
   });
 });
 
@@ -2070,7 +2083,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
     pending_partner: isMine ? `Waiting for ${recipN}` : 'Your turn to respond',
     partner_replied: isMine ? `${recipN} has replied` : 'Awaiting proposal',
     active: 'Proposal ready',
-    resolved: 'Resolved',
+    resolved: p.resolution === 'needs_discussion' ? 'Needs conversation' : 'Resolved',
   };
 
   const statusColor = { pending_partner:'#E8B88A', partner_replied:'#7A6A9B', active:'#C4714A', resolved:'#7A9E8A' };
@@ -2121,7 +2134,15 @@ Router.register('parlay-detail', ({ id } = {}) => {
       <button class="btn btn-outline" id="discuss-btn">💬 This needs a conversation</button>
     </div>`;
   } else if (p.status === 'resolved') {
-    actionHtml = `<div style="text-align:center;padding:12px;font-size:.85rem;color:var(--sage);font-weight:600;">✓ Resolved</div>`;
+    if (p.resolution === 'needs_discussion') {
+      actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);">
+        <div style="font-size:.85rem;color:var(--muted);font-weight:600;">💬 Marked for conversation</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:6px;">Talk it through together, then come back to resolve.</div>
+        <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="reopen-btn">↻ Reopen Parlay</button>
+      </div>`;
+    } else {
+      actionHtml = `<div style="text-align:center;padding:12px;font-size:.85rem;color:var(--sage);font-weight:600;">✓ Proposal accepted</div>`;
+    }
   }
 
   return `
@@ -2207,6 +2228,15 @@ Router.register('parlay-detail', ({ id } = {}) => {
     Router.go('plan');
   });
 
+  // Reopen (from needs_discussion resolved state)
+  el.querySelector('#reopen-btn')?.addEventListener('click', async () => {
+    // Reopen to partner_replied so the creator can re-generate a proposal
+    await Store.updateParlay(p.id, { status: 'partner_replied', resolution: null });
+    Badges.update();
+    U.toast('Parlay reopened');
+    Router.go('parlay-detail', { id: p.id });
+  });
+
   // Manage
   el.querySelector('#manage-btn')?.addEventListener('click', () => {
     if (confirm('Delete this parlay for both partners?')) {
@@ -2225,10 +2255,16 @@ Router.register('parlay-reply', ({ id } = {}) => {
   const p = Store.findParlay(id);
   if (!p) return `<div style="padding:60px 24px;text-align:center;">Parlay not found.<br><button class="btn btn-outline btn-sm" style="margin-top:16px;" onclick="Router.go('plan')">‹ Back</button></div>`;
 
-  // Guard: only recipient, only pending
+  // Guard: only recipient, only pending_partner
   if (p.isMine || p.status !== 'pending_partner') {
     setTimeout(() => {
-      U.toast(p.isMine ? 'Waiting for your partner to reply' : 'Already responded');
+      let msg;
+      if (p.isMine) {
+        msg = p.status === 'pending_partner' ? 'Waiting for your partner to reply' : 'View the parlay details';
+      } else {
+        msg = 'Already responded';
+      }
+      U.toast(msg);
       Router.go('parlay-detail', { id });
     }, 50);
     return '<div></div>';
@@ -2333,10 +2369,18 @@ Router.register('parlay-reply', ({ id } = {}) => {
     };
     if (_selectedDate) patch.partnerDateResponse = _selectedDate;
 
-    await Store.updateParlay(p.id, patch);
-    Badges.update();
-    U.toast('Position sent ✓');
-    Router.go('parlay-detail', { id: p.id });
+    try {
+      await Store.updateParlay(p.id, patch);
+      Badges.update();
+      U.toast('Position sent ✓');
+      Router.go('parlay-detail', { id: p.id });
+    } catch(e) {
+      console.error('[reply] save error:', e);
+      _submitting = false;
+      btn.disabled = false;
+      btnText.textContent = 'Send my position →';
+      U.toast('⚠️ Failed to send — try again');
+    }
   });
 });
 
@@ -2712,7 +2756,7 @@ Router.register('setup-tone', () => {
     </div>
     <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;" class="a1">Mediator <em style="color:var(--terra)">Tone</em></div>
     <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:28px;" class="a2">How Parlay frames all communication.</div>
-    <div class="radio-group" id="tone-opts" class="a3">
+    <div class="radio-group a3" id="tone-opts">
       ${Object.entries(TONES).map(([id, t]) => `
         <div class="radio-opt${id === current ? ' selected' : ''}" data-id="${id}">
           <div class="dot"></div>
