@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Parlay helps couples plan events, negotiate decisions, and manage tasks — with AI-powered tone filtering to keep things calm.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a1208">
 <title>Parlay — for couples who talk it through</title>
@@ -22,14 +23,12 @@
   --terra: #C4714A;
   --sage: #7A9E8A;
   --amber: #E8B88A;
-  --muted: #9B8880;
+  --muted: #7A6A62;
   --parchment: #F5F0EA;
   --surface: #FEFCFA;
   --border: #E8E2DA;
   --purple: #7A6A9B;
-  --blush: #9B6B8A;
 
-  --r-sm: 10px;
   --r-md: 14px;
   --r-lg: 18px;
   --r-pill: 100px;
@@ -56,6 +55,7 @@ a { color: inherit; text-decoration: none; }
    SCROLLBAR
    ═══════════════════════════════════════════════ */
 ::-webkit-scrollbar { width: 0; height: 0; }
+* { scrollbar-width: none; }
 
 /* ═══════════════════════════════════════════════
    ANIMATIONS
@@ -90,17 +90,17 @@ a { color: inherit; text-decoration: none; }
 }
 .nav-btn {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
-  background: none; border: none; cursor: pointer; padding: 6px 12px;
-  position: relative;
+  background: none; border: none; cursor: pointer; padding: 10px 14px;
+  position: relative; min-width: 48px; min-height: 48px;
 }
 .nav-btn .icon { font-size: 1.3rem; }
-.nav-btn .label { font-size: .62rem; font-weight: 600; color: var(--muted); }
+.nav-btn .label { font-size: .68rem; font-weight: 600; color: var(--muted); }
 .nav-btn.active .label { color: var(--terra); }
 .nav-badge {
   position: absolute; top: 2px; right: 4px;
   min-width: 16px; height: 16px; border-radius: 8px;
   background: var(--terra); color: #fff;
-  font-size: .58rem; font-weight: 700;
+  font-size: .65rem; font-weight: 700;
   display: none; align-items: center; justify-content: center;
   padding: 0 4px;
 }
@@ -117,6 +117,7 @@ a { color: inherit; text-decoration: none; }
   opacity: 0; pointer-events: none;
   transition: all .3s ease; z-index: 9999;
   white-space: nowrap; max-width: calc(100vw - 40px);
+  overflow: hidden; text-overflow: ellipsis;
   text-align: center;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -130,10 +131,23 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--r-md); font-size: .88rem;
   color: var(--espresso); outline: none;
   transition: border-color .2s;
+  font-family: var(--font-body);
 }
-.input:focus { border-color: var(--terra); }
+select.input {
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239B8880' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 32px;
+}
+.input:focus { border-color: var(--terra); outline: none; }
+.input:focus-visible { border-color: var(--terra); box-shadow: 0 0 0 2px rgba(184,107,68,.25); }
+.input::placeholder { color: var(--muted); opacity: .6; }
+.input:disabled { opacity: .5; cursor: not-allowed; }
+.btn:focus-visible, .btn-ghost:focus-visible, .radio-opt:focus-visible, .nav-btn:focus-visible {
+  outline: 2px solid var(--terra); outline-offset: 2px;
+}
 .input-label {
-  display: block; font-size: .62rem; font-weight: 700;
+  display: block; font-size: .68rem; font-weight: 700;
   letter-spacing: .1em; text-transform: uppercase;
   color: var(--muted); margin-bottom: 8px;
 }
@@ -143,22 +157,20 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--font-body); font-size: .9rem; font-weight: 600;
   cursor: pointer; transition: opacity .15s; width: 100%;
 }
+.btn:hover { opacity: .92; }
 .btn:active { opacity: .85; }
 .btn-primary { background: var(--espresso); color: var(--cream); }
 .btn-accent { background: var(--terra); color: #fff; }
 .btn-outline { background: none; color: var(--muted); border: 1.5px solid var(--border); }
-.btn-sm { padding: 8px 14px; font-size: .82rem; width: auto; }
-.btn-ghost { background: none; border: none; color: var(--muted); font-size: .82rem; cursor: pointer; padding: 8px; }
+.btn-sm { padding: 10px 14px; font-size: .82rem; width: auto; min-height: 44px; }
+.btn-ghost { background: none; border: none; color: var(--muted); font-size: .82rem; cursor: pointer; padding: 10px; min-height: 44px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-danger { background: none; color: #EF4444; border: 1.5px solid #EF4444; }
+.btn-danger:active { background: #FEF2F2; }
 
 /* ═══════════════════════════════════════════════
    CARDS
    ═══════════════════════════════════════════════ */
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: 16px; cursor: pointer;
-  transition: border-color .15s;
-}
-.card:active { border-color: var(--terra); }
 
 /* ═══════════════════════════════════════════════
    HOME HEADER
@@ -175,7 +187,7 @@ a { color: inherit; text-decoration: none; }
   font-weight: 400; line-height: 1.15; margin-bottom: 4px;
 }
 .home-greeting em { font-style: italic; color: var(--amber); }
-.home-date { font-size: .72rem; color: rgba(250,246,241,.45); margin-bottom: 20px; }
+.home-date { font-size: .72rem; color: rgba(250,246,241,.65); margin-bottom: 20px; }
 
 /* Partner bar */
 .partner-bar {
@@ -190,14 +202,14 @@ a { color: inherit; text-decoration: none; }
   display: flex; align-items: center; justify-content: center;
   font-size: .72rem; font-weight: 700;
 }
-.partner-avatars { display: flex; gap: -6px; }
+.partner-avatars { display: flex; gap: 0; }
 .partner-avatars .avatar:last-child { margin-left: -8px; }
 
 /* ═══════════════════════════════════════════════
    SECTION LABELS
    ═══════════════════════════════════════════════ */
 .section-label {
-  font-size: .62rem; font-weight: 700; letter-spacing: .12em;
+  font-size: .68rem; font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase; color: var(--muted);
   padding: 0 20px; margin-bottom: 10px;
 }
@@ -243,6 +255,7 @@ a { color: inherit; text-decoration: none; }
   display: flex; align-items: center; gap: 14px;
   transition: border-color .15s;
 }
+.mod-card:hover { border-color: var(--amber); }
 .mod-card:active { border-color: var(--terra); }
 .mod-icon {
   width: 42px; height: 42px; border-radius: 12px;
@@ -260,9 +273,10 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--r-md); cursor: pointer;
   transition: border-color .15s;
 }
+.parlay-card:hover { border-color: var(--amber); }
 .parlay-card:active { border-color: var(--terra); }
 .status-chip {
-  font-size: .62rem; font-weight: 700;
+  font-size: .68rem; font-weight: 700;
   padding: 3px 10px; border-radius: var(--r-pill);
   white-space: nowrap;
 }
@@ -279,6 +293,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--surface); border: 1.5px solid var(--border);
   cursor: pointer; text-align: center; transition: all .15s;
 }
+.topic-card:hover { border-color: var(--amber); }
 .topic-card:active { border-color: var(--terra); background: #FDF5F0; }
 .topic-icon { font-size: 1.6rem; margin-bottom: 6px; }
 .topic-label { font-size: .78rem; font-weight: 600; color: var(--espresso); }
@@ -290,8 +305,9 @@ a { color: inherit; text-decoration: none; }
   display: flex; align-items: flex-start; gap: 12px;
   padding: 14px 16px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-md); cursor: pointer;
+  border-radius: var(--r-md); cursor: pointer; transition: border-color .15s;
 }
+.task-card:hover { border-color: var(--amber); }
 
 /* ═══════════════════════════════════════════════
    RADIO OPTIONS
@@ -302,6 +318,7 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--r-md); cursor: pointer; transition: all .15s;
   display: flex; align-items: center; gap: 12px;
 }
+.radio-opt:hover { border-color: var(--amber); }
 .radio-opt.selected { border-color: var(--terra); background: #FDF5F0; }
 .radio-opt .dot {
   width: 18px; height: 18px; border-radius: 50%;
@@ -312,6 +329,79 @@ a { color: inherit; text-decoration: none; }
 .radio-opt.selected .dot::after {
   content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff;
 }
+
+/* ═══════════════════════════════════════════════
+   FIELDSET CARDS
+   ═══════════════════════════════════════════════ */
+.fieldset-card {
+  position: relative;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 24px 16px 16px;
+  background: var(--surface);
+}
+.fieldset-badge {
+  position: absolute; top: -10px; left: 16px;
+  display: inline-block; padding: 4px 12px;
+  font-size: .65rem; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase;
+  background: var(--terra); color: #fff;
+  border-radius: 20px; line-height: 1.2;
+}
+.slot-num {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--espresso); color: var(--cream);
+  font-size: .72rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.family-prompt {
+  background: var(--parchment); border-radius: var(--r-md);
+  padding: 14px 16px; margin-bottom: 16px;
+  font-size: .8rem; line-height: 1.55; color: var(--muted);
+}
+.family-prompt strong { color: var(--espresso); }
+.family-prompt a {
+  color: var(--terra); font-weight: 600; cursor: pointer;
+  text-decoration: none;
+}
+
+/* ═══════════════════════════════════════════════
+   BOTTOM SHEET / ACTION MENU
+   ═══════════════════════════════════════════════ */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(26,18,8,.45); opacity: 0;
+  transition: opacity .2s ease;
+}
+.sheet-backdrop.show { opacity: 1; }
+.sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+  background: var(--cream); border-radius: 20px 20px 0 0;
+  padding: 8px 20px max(20px, env(safe-area-inset-bottom));
+  transform: translateY(100%); transition: transform .25s ease;
+}
+.sheet-backdrop.show + .sheet, .sheet.show { transform: translateY(0); }
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border); margin: 0 auto 16px;
+}
+.sheet-title {
+  font-family: var(--font-display); font-size: 1.15rem;
+  margin-bottom: 16px; text-align: center;
+}
+.sheet-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* ═══════════════════════════════════════════════
+   LOADING SPINNER
+   ═══════════════════════════════════════════════ */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 18px; height: 18px; border: 2px solid var(--border);
+  border-top-color: var(--terra); border-radius: 50%;
+  animation: spin .6s linear infinite; display: inline-block;
+}
+
 /* ═══════════════════════════════════════════════
    DEV TOOLBAR
    ═══════════════════════════════════════════════ */
@@ -329,28 +419,78 @@ a { color: inherit; text-decoration: none; }
 }
 #dev-bar button:hover { background: rgba(255,255,255,.25); }
 #dev-bar .sep { width: 1px; height: 16px; background: rgba(255,255,255,.15); }
+
+/* ═══════════════════════════════════════════════
+   DEMO BAR
+   ═══════════════════════════════════════════════ */
+#demo-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+  background: linear-gradient(135deg, #2d1f3d, #1a1208);
+  color: var(--cream); font-size: .7rem; font-family: var(--font-body);
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; height: 40px; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+#demo-bar .demo-label {
+  font-weight: 700; font-size: .6rem; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--amber); margin-right: 4px;
+}
+#demo-bar .demo-version {
+  font-size: .55rem; color: rgba(250,246,241,.5); margin-left: auto;
+  text-align: right; line-height: 1.3;
+}
+#demo-bar button {
+  border: none; color: var(--cream); font-size: .65rem;
+  font-family: var(--font-body); font-weight: 600;
+  padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  transition: background .15s, transform .1s;
+}
+#demo-bar button:hover { transform: scale(1.04); }
+#demo-bar button:active { transform: scale(.97); }
+#demo-bar .demo-partner {
+  background: rgba(255,255,255,.1);
+}
+#demo-bar .demo-partner.active {
+  background: var(--terra); color: #fff;
+}
+#demo-bar .demo-refresh {
+  background: rgba(122,158,138,.25); color: var(--sage);
+}
+#demo-bar .demo-sep {
+  width: 1px; height: 20px; background: rgba(255,255,255,.12);
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════ */
+@media (min-width: 600px) {
+  #app { max-width: 480px; margin: 0 auto; }
+  .topic-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1024px) {
+  #app { max-width: 540px; }
+}
 </style>
 </head>
 <body>
-<div id="app"></div>
-<nav id="nav">
+<main id="app"></main>
+<nav id="nav" aria-label="Main navigation">
   <button class="nav-btn" data-screen="home">
     <span id="badge-home" class="nav-badge"></span>
-    <span class="icon">🏠</span><span class="label">Home</span>
+    <span class="icon" aria-hidden="true">🏠</span><span class="label">Home</span>
   </button>
   <button class="nav-btn" data-screen="plan">
     <span id="badge-plan" class="nav-badge"></span>
-    <span class="icon">📅</span><span class="label">Plan</span>
+    <span class="icon" aria-hidden="true">📅</span><span class="label">Plan</span>
   </button>
   <button class="nav-btn" data-screen="tasks">
     <span id="badge-tasks" class="nav-badge"></span>
-    <span class="icon">✅</span><span class="label">Tasks</span>
+    <span class="icon" aria-hidden="true">✅</span><span class="label">Tasks</span>
   </button>
   <button class="nav-btn" data-screen="setup">
-    <span class="icon">⚙️</span><span class="label">Setup</span>
+    <span class="icon" aria-hidden="true">⚙️</span><span class="label">Setup</span>
   </button>
 </nav>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 'use strict';
@@ -370,17 +510,265 @@ a { color: inherit; text-decoration: none; }
 // CONFIG
 // ──────────────────────────────────────────────
 const VERSION = '2.0.5';
+const BUILD_DATE = '2026-03-10T12:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
-// Auto-login: ?as=1 (Partner 1) or ?as=2 (Partner 2)
-// Set your test credentials here:
+// Auto-login: ?dev&as=1 (Partner 1) or ?dev&as=2 (Partner 2)
+// Set credentials via URL params: ?dev&as=1&email=...&pw=...&name=...
+const _devParams = new URLSearchParams(location.search);
 const DEV = {
-  enabled: new URLSearchParams(location.search).has('dev'),
-  autoAs:  new URLSearchParams(location.search).get('as'),
+  enabled: _devParams.has('dev'),
+  autoAs:  _devParams.get('as'),
   accounts: {
-    '1': { email: 'stevegiovi+1234@gmail.com', password: 'parlay123', label: 'Steve (P1)' },
-    '2': { email: 'stevegiovi+4567@gmail.com', password: 'parlay123', label: 'Taryn (P2)' },
+    '1': { email: _devParams.get('email') || '', password: _devParams.get('pw') || '', label: _devParams.get('name') || 'Partner 1' },
+    '2': { email: _devParams.get('email') || '', password: _devParams.get('pw') || '', label: _devParams.get('name') || 'Partner 2' },
+  },
+};
+
+// ── DEMO MODE ──────────────────────────────────
+// No login required — uses mock data for UI testing
+const DEMO = {
+  active: false,
+  currentPartner: 'A',  // 'A' or 'B'
+
+  partners: {
+    A: { uid: 'demo-uid-a', name: 'Alex', email: 'alex@demo.parlay' },
+    B: { uid: 'demo-uid-b', name: 'Jordan', email: 'jordan@demo.parlay' },
+  },
+
+  couple: {
+    id: 'demo-couple-001',
+    spouse_1_id: 'demo-uid-a',
+    spouse_2_id: 'demo-uid-b',
+    invite_code: 'DEMO42',
+    mediator_tone: 'neutral',
+    equity: null,
+  },
+
+  // Pre-built sample parlays and tasks
+  _mockParlays: null,
+  _mockTasks: null,
+
+  /** Build mock data (called once on demo start) */
+  buildMockData() {
+    const now = new Date();
+    const ago = (days) => new Date(now - days * 86400000).toISOString();
+    const shortDate = (d) => {
+      const dt = new Date(d);
+      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    this._mockParlays = [
+      {
+        id: 'demo-p1', topicId: 'date', title: 'Anniversary dinner this Friday',
+        date: shortDate(ago(1)), rawInput: "I'd love to do something special for our anniversary — maybe that Italian place downtown?",
+        filteredInput: "I'd really love to celebrate our anniversary this Friday. Would the Italian restaurant downtown work for you?",
+        intentContext: JSON.stringify({ who: 'just-us', vibe: 'romantic' }),
+        dateOptions: [
+          { date: '2026-03-13', time: '19:00', label: 'Friday 7pm' },
+          { date: '2026-03-14', time: '18:30', label: 'Saturday 6:30pm' },
+        ],
+        status: 'pending_partner',
+        createdByUid: 'demo-uid-a', isMine: true,
+        partnerRawReply: null, partnerFilteredReply: null, partnerDateResponse: null,
+        counterDates: [], confirmedDate: null,
+        proposal: null, resolution: null, archived: false,
+      },
+      {
+        id: 'demo-p2', topicId: 'inlaw', title: "Mom wants to visit next weekend",
+        date: shortDate(ago(3)), rawInput: "My mom asked if she can come stay Saturday to Monday. She wants to see the kids.",
+        filteredInput: "My mom mentioned she'd love to visit next weekend, Saturday through Monday, to spend time with the kids. How does that feel?",
+        intentContext: JSON.stringify({ who: 'in-laws', hosting: 'our-place' }),
+        dateOptions: [
+          { date: '2026-03-21', time: '10:00', label: 'Sat morning' },
+        ],
+        status: 'partner_replied',
+        createdByUid: 'demo-uid-b', isMine: false,
+        partnerRawReply: "That works but can we do just Saturday daytime? I have a work thing Sunday.",
+        partnerFilteredReply: "Saturday daytime would work great for me. I have a commitment on Sunday — could we plan for a Saturday visit instead?",
+        partnerDateResponse: 'counter',
+        counterDates: [{ date: '2026-03-21', time: '10:00', label: 'Sat 10am–6pm' }],
+        confirmedDate: null,
+        proposal: null, resolution: null, archived: false,
+      },
+      {
+        id: 'demo-p3', topicId: 'trip', title: 'Spring break trip planning',
+        date: shortDate(ago(7)), rawInput: "Can we figure out spring break? I was thinking a beach trip.",
+        filteredInput: "I'd love for us to plan something for spring break — maybe a beach getaway? What do you think?",
+        intentContext: JSON.stringify({ who: 'family', vibe: 'relaxing' }),
+        dateOptions: [
+          { date: '2026-04-06', time: '08:00', label: 'Apr 6–10' },
+          { date: '2026-04-13', time: '08:00', label: 'Apr 13–17' },
+        ],
+        status: 'active',
+        createdByUid: 'demo-uid-a', isMine: true,
+        partnerRawReply: "Beach sounds great! I prefer the second week so I can finish my project.",
+        partnerFilteredReply: "A beach trip sounds wonderful! The second week (Apr 13–17) would work better for me so I can wrap up a work project first.",
+        partnerDateResponse: 'selected',
+        counterDates: [],
+        confirmedDate: { date: '2026-04-13', time: '08:00', label: 'Apr 13–17' },
+        proposal: "**Proposal: Spring Break Beach Trip**\n\nBased on both your preferences, here's a fair plan:\n\n- **Dates:** April 13–17 (Mon–Fri)\n- **Destination:** Beach location TBD — suggest researching together this weekend\n- **Budget:** Discuss a shared budget cap before booking\n- **Logistics:** Alex handles flights/transport, Jordan handles accommodation research\n\nThis gives Jordan time to finish their project while still getting a full week of vacation.",
+        resolution: null, archived: false,
+      },
+      {
+        id: 'demo-p4', topicId: 'boys', title: "Poker night with the guys",
+        date: shortDate(ago(14)), rawInput: "The guys want to do poker night this Thursday.",
+        filteredInput: "The guys are getting together for poker this Thursday evening. I'd love to go — does that work with our schedule?",
+        intentContext: JSON.stringify({ who: 'my-friends', vibe: 'casual' }),
+        dateOptions: [{ date: '2026-02-26', time: '19:00', label: 'Thu 7pm' }],
+        status: 'resolved',
+        createdByUid: 'demo-uid-a', isMine: true,
+        partnerRawReply: "Have fun! I'll do bedtime solo.",
+        partnerFilteredReply: "Sounds fun! I'm happy to handle bedtime on my own that night.",
+        partnerDateResponse: 'accepted',
+        counterDates: [],
+        confirmedDate: { date: '2026-02-26', time: '19:00', label: 'Thu 7pm' },
+        proposal: null, resolution: 'date_accepted', archived: false,
+      },
+    ];
+
+    this._mockTasks = [
+      {
+        id: 'demo-t1', title: 'Schedule dentist appointments for kids',
+        context: 'Both kids are overdue for checkups', rawContext: 'Both kids are overdue', filteredContext: 'Both kids are overdue for their dental checkups.',
+        categoryId: 'kids', priority: 'normal', dueDate: '2026-03-15',
+        assignedTo: 'them', createdBy: 'me', status: 'pending_response',
+        pendingResponseFrom: 'them', counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+      },
+      {
+        id: 'demo-t2', title: 'Fix leaky kitchen faucet',
+        context: "It's been dripping for a week", rawContext: "It's been dripping", filteredContext: "The kitchen faucet has been dripping for about a week.",
+        categoryId: 'maintenance', priority: 'normal', dueDate: null,
+        assignedTo: 'me', createdBy: 'them', status: 'accepted',
+        pendingResponseFrom: null, counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+      },
+      {
+        id: 'demo-t3', title: 'Grocery run — weekly essentials',
+        context: 'We need milk, eggs, bread, and fruit', rawContext: null, filteredContext: null,
+        categoryId: 'errands', priority: 'normal', dueDate: '2026-03-11',
+        assignedTo: 'me', createdBy: 'me', status: 'pending_response',
+        pendingResponseFrom: 'them', counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+      },
+      {
+        id: 'demo-t4', title: 'Call insurance about claim',
+        context: 'Reference #INS-4421', rawContext: null, filteredContext: null,
+        categoryId: 'admin', priority: 'high', dueDate: '2026-03-12',
+        assignedTo: 'them', createdBy: 'them', status: 'accepted',
+        pendingResponseFrom: null, counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+      },
+    ];
+  },
+
+  /** Activate demo mode — monkey-patches Auth & Store */
+  activate(partner = 'A') {
+    this.active = true;
+    this.currentPartner = partner;
+    if (!this._mockParlays) this.buildMockData();
+    this._applyPerspective();
+    document.body.style.paddingTop = '40px';
+    this._createBar();
+    Router.go('home');
+  },
+
+  /** Switch perspective (A or B) and re-render */
+  switchTo(partner) {
+    this.currentPartner = partner;
+    this._applyPerspective();
+    this._updateBar();
+    Router.reload();
+  },
+
+  /** Apply the current partner's perspective to mock data */
+  _applyPerspective() {
+    const p = this.currentPartner;
+    const me = this.partners[p];
+    const them = this.partners[p === 'A' ? 'B' : 'A'];
+    const amSpouse1 = (p === 'A');
+
+    // Patch Auth identity methods
+    Auth._demoOverride = {
+      me:   () => ({ uid: me.uid, name: me.name, email: me.email }),
+      them: () => ({ uid: them.uid, name: them.name, email: them.email }),
+      myName:    () => me.name,
+      theirName: () => them.name,
+      myUid:     () => me.uid,
+      theirUid:  () => them.uid,
+      couple:    () => this.couple,
+      isReady:   () => true,
+      hasPartner:() => true,
+      amSpouse1: () => amSpouse1,
+      getToken:  () => 'demo-token',
+    };
+
+    // Re-derive isMine / assignedTo / createdBy from perspective
+    this._mockParlays.forEach(mp => {
+      mp.isMine = (mp.createdByUid === me.uid);
+    });
+    this._mockTasks.forEach(mt => {
+      const orig = mt._orig || (mt._orig = { assignedToUid: mt.assignedTo === 'me' ? 'demo-uid-a' : 'demo-uid-b', createdByUid: mt.createdBy === 'me' ? 'demo-uid-a' : 'demo-uid-b', pendingUid: mt.pendingResponseFrom === 'me' ? 'demo-uid-a' : mt.pendingResponseFrom === 'them' ? 'demo-uid-b' : null });
+      mt.assignedTo = orig.assignedToUid === me.uid ? 'me' : 'them';
+      mt.createdBy = orig.createdByUid === me.uid ? 'me' : 'them';
+      mt.pendingResponseFrom = orig.pendingUid === me.uid ? 'me' : orig.pendingUid === them.uid ? 'them' : null;
+    });
+
+    // Patch Store data methods
+    Store._demoOverride = {
+      parlays:        () => this._mockParlays,
+      activeParlays:  () => this._mockParlays.filter(p => !p.archived && p.status !== 'resolved'),
+      resolvedParlays:() => this._mockParlays.filter(p => !p.archived && p.status === 'resolved'),
+      findParlay: (id) => this._mockParlays.find(p => p.id === id) || null,
+      myPendingParlayCount: () => this._mockParlays.filter(p =>
+        !p.archived && p.status !== 'resolved' && (
+          (p.status === 'pending_partner' && !p.isMine) ||
+          (p.status === 'partner_replied' && p.isMine) ||
+          (p.status === 'counter_proposed' && p.isMine) ||
+          p.status === 'active'
+        )).length,
+      tasks:       () => this._mockTasks,
+      myTasks:     () => this._mockTasks.filter(t => t.assignedTo === 'me' && t.status !== 'done'),
+      sentTasks:   () => this._mockTasks.filter(t => t.createdBy === 'me' && t.assignedTo === 'them'),
+      myActionTasks:() => this._mockTasks.filter(t => t.pendingResponseFrom === 'me' && t.status !== 'done'),
+      doneTasks:   () => this._mockTasks.filter(t => t.status === 'done'),
+      findTask: (id) => this._mockTasks.find(t => t.id === id) || null,
+      commPrefs:   () => ({ me: { traits: ['I appreciate directness', 'I need time to process'] }, them: { traits: ['I like to talk things through', 'Words of affirmation matter to me'] } }),
+      get: (key) => key === 'mediatorTone' ? 'neutral' : null,
+    };
+
+    // Patch Store KV
+    Store.set('mediatorTone', 'neutral');
+  },
+
+  _createBar() {
+    if (document.getElementById('demo-bar')) return;
+    const bar = document.createElement('div');
+    bar.id = 'demo-bar';
+    this._renderBar(bar);
+    document.body.prepend(bar);
+  },
+
+  _renderBar(bar) {
+    const bd = new Date(BUILD_DATE);
+    const ts = bd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      + ' ' + bd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    bar.innerHTML = `
+      <span class="demo-label">Demo</span>
+      <span class="demo-sep"></span>
+      <button class="demo-partner ${this.currentPartner === 'A' ? 'active' : ''}" onclick="DEMO.switchTo('A')">Partner A</button>
+      <button class="demo-partner ${this.currentPartner === 'B' ? 'active' : ''}" onclick="DEMO.switchTo('B')">Partner B</button>
+      <span class="demo-sep"></span>
+      <button class="demo-refresh" onclick="caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).then(()=>{localStorage.clear();sessionStorage.clear();location.reload()})">↻ Refresh</button>
+      <span class="demo-version">v${VERSION}<br>${ts}</span>
+    `;
+  },
+
+  _updateBar() {
+    const bar = document.getElementById('demo-bar');
+    if (bar) this._renderBar(bar);
   },
 };
 
@@ -410,6 +798,44 @@ const U = {
   code: () => Math.random().toString(36).slice(2,8).toUpperCase(),
   esc: s => (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'),
   shortDate: d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  /** Show a bottom sheet with action buttons. Returns a promise that resolves with the chosen action key. */
+  sheet(title, actions) {
+    return new Promise(resolve => {
+      const existing = document.querySelector('.sheet-backdrop');
+      if (existing) { existing.remove(); document.querySelector('.sheet')?.remove(); }
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'sheet-backdrop';
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      sheet.innerHTML = `
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">${title}</div>
+        <div class="sheet-actions">
+          ${actions.map(a => `<button class="btn ${a.cls || 'btn-outline'}" data-action="${a.key}">${a.label}</button>`).join('')}
+          <button class="btn btn-ghost" data-action="_cancel" style="margin-top:4px;">Cancel</button>
+        </div>`;
+
+      function close(action) {
+        backdrop.classList.remove('show');
+        sheet.classList.remove('show');
+        setTimeout(() => { backdrop.remove(); sheet.remove(); }, 250);
+        resolve(action);
+      }
+
+      backdrop.addEventListener('click', () => close(null));
+      sheet.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => close(btn.dataset.action));
+      });
+
+      document.body.appendChild(backdrop);
+      document.body.appendChild(sheet);
+      requestAnimationFrame(() => {
+        backdrop.classList.add('show');
+        sheet.classList.add('show');
+      });
+    });
+  },
   timeOptions: () => [
     '', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
     '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
@@ -438,6 +864,7 @@ const Auth = (() => {
   let _themProfile = null;  // partner's profile
   let _amSpouse1  = true;   // true = I'm spouse_1_id, false = I'm spouse_2_id
   let _realtime   = null;
+  let _reconnectTimer = null;
   let _bootstrapping = false;
 
   // ── Public identity helpers (used by EVERY screen) ────
@@ -459,7 +886,6 @@ const Auth = (() => {
   const isReady    = () => !!_session && !!_couple;
   const hasPartner = () => !!them().uid;
   const amSpouse1  = () => _amSpouse1;
-  const supabase_  = () => sb;
 
   // ── Auth operations ───────────────────────────
   async function signUp(email, password, name) {
@@ -489,15 +915,6 @@ const Auth = (() => {
     _myProfile = null; _themProfile = null; _amSpouse1 = true;
     Store.clear();
     Router.go('auth-entry');
-  }
-
-  async function signInWithGoogle() {
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.href.split('#')[0] }
-    });
-    if (error) return { error: error.message };
-    return {};
   }
 
   // ── Session ───────────────────────────────────
@@ -558,8 +975,6 @@ const Auth = (() => {
       _couple = coupleData || null;
       _amSpouse1 = _couple ? (_couple.spouse_1_id === _uid) : true;
 
-      console.log('[bootstrap] Role:', _amSpouse1 ? 'spouse_1' : 'spouse_2', '| uid:', _uid?.slice(0,8));
-
       // 3. Load my profile
       const { data: myP } = await sb.from('profiles').select('*').eq('id', _uid).maybeSingle();
       _myProfile = myP || null;
@@ -592,7 +1007,6 @@ const Auth = (() => {
         Store.set('equity', _couple.equity || {});
       }
 
-      console.log('[bootstrap] Done. Me:', myName(), '| Partner:', theirName());
       _bootstrapping = false;
 
       return {
@@ -692,17 +1106,15 @@ const Auth = (() => {
             const { data: theirP } = await sb.from('profiles')
               .select('*').eq('id', newPartnerUid).maybeSingle();
             _themProfile = theirP || null;
-            console.log('[realtime] Partner joined:', _themProfile?.name);
           } catch(e) {}
         }
         Router.reload();
       })
       .subscribe((status) => {
-        console.log('[realtime] Status:', status);
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          // Reconnect after 3 seconds
           console.warn('[realtime] Disconnected — reconnecting in 3s');
-          setTimeout(() => {
+          clearTimeout(_reconnectTimer);
+          _reconnectTimer = setTimeout(() => {
             _realtime = null;
             _subscribeRealtime();
           }, 3000);
@@ -746,7 +1158,7 @@ const Auth = (() => {
   return {
     sb: () => sb, me, them, myName, theirName, myUid, theirUid,
     couple, isReady, hasPartner, amSpouse1, getToken,
-    signUp, signIn, signOut, signInWithGoogle, refreshSession, refresh,
+    signUp, signIn, signOut, refreshSession, refresh,
     createCouple, joinCouple, bootstrap,
     updateMyProfile, saveCoupleSettings, saveMyCommPrefs,
   };
@@ -831,12 +1243,6 @@ const Store = (() => {
   }
 
   // ── Task helpers ──────────────────────────────
-  function _roleToUid(role) {
-    // In parlay-v2 we store UIDs directly, but tasks use a simple role pattern
-    if (role === Auth.myUid()) return role; // already a UID
-    return role === 'me' ? Auth.myUid() : Auth.theirUid();
-  }
-
   function _uidToRole(uid) {
     return uid === Auth.myUid() ? 'me' : 'them';
   }
@@ -900,7 +1306,6 @@ const Store = (() => {
   function parlays()        { return _parlays; }
   function activeParlays()  { return _parlays.filter(p => !p.archived && p.status !== 'resolved'); }
   function resolvedParlays(){ return _parlays.filter(p => !p.archived && p.status === 'resolved'); }
-  function archivedParlays(){ return _parlays.filter(p => p.archived); }
   function findParlay(id)   { return _parlays.find(p => p.id === id) || null; }
 
   /** Count of parlays that need MY attention */
@@ -982,7 +1387,14 @@ const Store = (() => {
         declineReason:'decline_reason', filteredDecline:'filtered_decline',
         counterCount:'counter_count',
       };
-      for (const [k,v] of Object.entries(patch)) { if (map[k]) rowPatch[map[k]] = v; }
+      for (const [k,v] of Object.entries(patch)) {
+        if (k === 'assignedTo' || k === 'pendingResponseFrom') continue; // handled below
+        if (map[k]) rowPatch[map[k]] = v;
+      }
+      if (patch.assignedTo !== undefined) {
+        rowPatch.assigned_to = patch.assignedTo === 'me' ? Auth.myUid()
+          : patch.assignedTo === 'them' ? Auth.theirUid() : patch.assignedTo;
+      }
       if (patch.pendingResponseFrom !== undefined) {
         rowPatch.pending_response_from = patch.pendingResponseFrom === 'me' ? Auth.myUid()
           : patch.pendingResponseFrom === 'them' ? Auth.theirUid() : null;
@@ -1029,12 +1441,119 @@ const Store = (() => {
   }
 
   return {
-    loadParlays, parlays, activeParlays, resolvedParlays, archivedParlays,
+    loadParlays, parlays, activeParlays, resolvedParlays,
     findParlay, myPendingParlayCount, addParlay, updateParlay, deleteParlay,
     loadTasks, tasks, myTasks, sentTasks, myActionTasks, doneTasks,
     findTask, addTask, updateTask, deleteTask,
     loadCommPrefs, commPrefs,
     get, set, clear,
+  };
+})();
+
+// ── DEMO PROXY — Intercepts Auth & Store in demo mode ──
+// Wraps key methods so they return mock data when DEMO.active
+(function _installDemoProxy() {
+  // Read-only Auth methods → return mock identity
+  const _authKeys = ['me','them','myName','theirName','myUid','theirUid','couple','isReady','hasPartner','amSpouse1','getToken'];
+  _authKeys.forEach(k => {
+    const orig = Auth[k];
+    Auth[k] = function() { return (DEMO.active && Auth._demoOverride?.[k]) ? Auth._demoOverride[k](...arguments) : orig.apply(this, arguments); };
+  });
+
+  // Auth operations → no-op in demo
+  const _origRefresh = Auth.refresh;
+  Auth.refresh = async function() {
+    if (DEMO.active) { Badges.update(); Router.reload(); return; }
+    return _origRefresh.apply(this, arguments);
+  };
+  const _origSignOut = Auth.signOut;
+  Auth.signOut = async function() {
+    if (DEMO.active) { DEMO.active = false; document.getElementById('demo-bar')?.remove(); document.body.style.paddingTop = ''; Router.go('auth-entry'); return; }
+    return _origSignOut.apply(this, arguments);
+  };
+
+  // Auth write operations → no-op in demo
+  const _origUpdateProfile = Auth.updateMyProfile;
+  Auth.updateMyProfile = async function(updates) {
+    if (DEMO.active) { U.toast('Updated (demo)'); return; }
+    return _origUpdateProfile.apply(this, arguments);
+  };
+  const _origSaveCoupleSettings = Auth.saveCoupleSettings;
+  Auth.saveCoupleSettings = async function(patch) {
+    if (DEMO.active) { if (patch.mediator_tone) DEMO.couple.mediator_tone = patch.mediator_tone; U.toast('Saved (demo)'); return; }
+    return _origSaveCoupleSettings.apply(this, arguments);
+  };
+  const _origSaveCommPrefs = Auth.saveMyCommPrefs;
+  Auth.saveMyCommPrefs = async function(traits) {
+    if (DEMO.active) { U.toast('Saved (demo)'); return; }
+    return _origSaveCommPrefs.apply(this, arguments);
+  };
+
+  // Read-only Store methods → return mock data
+  const _storeKeys = ['parlays','activeParlays','resolvedParlays','findParlay','myPendingParlayCount','tasks','myTasks','sentTasks','myActionTasks','doneTasks','findTask','commPrefs','get'];
+  _storeKeys.forEach(k => {
+    const orig = Store[k];
+    Store[k] = function() { return (DEMO.active && Store._demoOverride?.[k]) ? Store._demoOverride[k](...arguments) : orig.apply(this, arguments); };
+  });
+
+  // Write Store methods → operate on mock data locally (no DB)
+  const _origAddParlay = Store.addParlay;
+  Store.addParlay = async function(parlay) {
+    if (DEMO.active) { DEMO._mockParlays.unshift(parlay); return; }
+    return _origAddParlay.apply(this, arguments);
+  };
+  const _origUpdateParlay = Store.updateParlay;
+  Store.updateParlay = async function(id, patch) {
+    if (DEMO.active) {
+      const i = DEMO._mockParlays.findIndex(p => p.id === id);
+      if (i > -1) DEMO._mockParlays[i] = { ...DEMO._mockParlays[i], ...patch };
+      return;
+    }
+    return _origUpdateParlay.apply(this, arguments);
+  };
+  const _origDeleteParlay = Store.deleteParlay;
+  Store.deleteParlay = async function(id) {
+    if (DEMO.active) { DEMO._mockParlays = DEMO._mockParlays.filter(p => p.id !== id); return; }
+    return _origDeleteParlay.apply(this, arguments);
+  };
+  const _origAddTask = Store.addTask;
+  Store.addTask = async function(task) {
+    if (DEMO.active) { DEMO._mockTasks.unshift(task); return; }
+    return _origAddTask.apply(this, arguments);
+  };
+  const _origUpdateTask = Store.updateTask;
+  Store.updateTask = async function(id, patch) {
+    if (DEMO.active) {
+      const i = DEMO._mockTasks.findIndex(t => t.id === id);
+      if (i > -1) DEMO._mockTasks[i] = { ...DEMO._mockTasks[i], ...patch };
+      return;
+    }
+    return _origUpdateTask.apply(this, arguments);
+  };
+  const _origDeleteTask = Store.deleteTask;
+  Store.deleteTask = async function(id) {
+    if (DEMO.active) { DEMO._mockTasks = DEMO._mockTasks.filter(t => t.id !== id); return; }
+    return _origDeleteTask.apply(this, arguments);
+  };
+  // loadParlays/loadTasks → no-op in demo (data already in memory)
+  const _origLoadP = Store.loadParlays;
+  Store.loadParlays = async function() { if (DEMO.active) return; return _origLoadP.apply(this, arguments); };
+  const _origLoadT = Store.loadTasks;
+  Store.loadTasks = async function() { if (DEMO.active) return; return _origLoadT.apply(this, arguments); };
+  const _origLoadC = Store.loadCommPrefs;
+  Store.loadCommPrefs = async function() { if (DEMO.active) return; return _origLoadC.apply(this, arguments); };
+
+  // AI calls → return canned response in demo
+  const _origAICall = AI.call;
+  AI.call = async function(sys, usr) {
+    if (DEMO.active) {
+      // Simulate brief delay then return a generic demo response
+      await new Promise(r => setTimeout(r, 800));
+      if (sys.includes('filter') || sys.includes('tone')) return usr; // tone filter: pass through
+      if (sys.includes('proposal') || sys.includes('Proposal')) return "**Demo Proposal**\n\nThis is a sample proposal generated in demo mode. In the real app, the AI mediator would analyze both partners' inputs, consider communication styles, and produce a balanced, fair proposal.\n\n- **Key point 1:** Both perspectives are acknowledged\n- **Key point 2:** A practical compromise is suggested\n- **Key point 3:** Next steps are outlined";
+      return "This is a demo response. In the real app, the AI would provide a thoughtful, context-aware response.";
+    }
+    return _origAICall.apply(this, arguments);
   };
 })();
 
@@ -1363,78 +1882,112 @@ async function filterTaskContext(rawContext) {
 function renderIntentQuestions(topicId) {
   const theirN = Auth.theirName();
 
-  if (['boys','girls','trip'].includes(topicId)) {
+  const familyPrompt = `
+    <div class="family-prompt">
+      <div>👨‍👩‍👧‍👦 <strong>Set up your family first</strong> to get smarter options here — kids' names, who's covering, and more.</div>
+      <div style="margin-top:6px;"><a onclick="Router.go('setup')">Set up Family &rarr;</a> <span style="font-size:.72rem;margin-left:6px;">or continue without</span></div>
+    </div>`;
+
+  function wrap(inner) {
     return `
-    <div style="margin-bottom:12px;">
-      <div class="input-label">Who's going?</div>
+    <div class="fieldset-card">
+      <div class="fieldset-badge">Clarify intent first</div>
+      ${familyPrompt}
+      ${inner}
+    </div>`;
+  }
+
+  if (['boys','girls','trip'].includes(topicId)) {
+    return wrap(`
+    <div style="margin-bottom:14px;">
+      <div class="input-label">Who is going on this?</div>
       <div class="radio-group" id="iq-who">
-        <div class="radio-opt" data-val="just-me"><div class="dot"></div><div>Just me — ${U.esc(theirN)} stays home</div></div>
+        <div class="radio-opt" data-val="just-me"><div class="dot"></div><div>Just me</div></div>
         <div class="radio-opt" data-val="me-and-kids"><div class="dot"></div><div>Me and the kids</div></div>
         <div class="radio-opt" data-val="just-us"><div class="dot"></div><div>Both of us (no kids)</div></div>
         <div class="radio-opt" data-val="whole-family"><div class="dot"></div><div>Whole family</div></div>
       </div>
     </div>
-    <div style="margin-bottom:12px;">
-      <div class="input-label">${U.esc(theirN)}'s role while you're out</div>
+    <div>
+      <div class="input-label">Is ${U.esc(theirN)} involved in this plan at all?</div>
       <div class="radio-group" id="iq-role">
-        <div class="radio-opt" data-val="not-involved"><div class="dot"></div><div>Not involved — I'm handling it</div></div>
-        <div class="radio-opt" data-val="aware"><div class="dot"></div><div>Just needs to know the timing</div></div>
+        <div class="radio-opt" data-val="not-involved"><div class="dot"></div><div>No &mdash; they stay home</div></div>
+        <div class="radio-opt" data-val="aware"><div class="dot"></div><div>Just needs to know / approve the timing</div></div>
         <div class="radio-opt" data-val="covering-kids"><div class="dot"></div><div>Covering the kids while I go</div></div>
       </div>
-    </div>`;
+    </div>`);
   }
 
   if (topicId === 'date') {
-    return `
-    <div style="margin-bottom:12px;">
+    return wrap(`
+    <div>
       <div class="input-label">What kind of date?</div>
       <div class="radio-group" id="iq-who">
         <div class="radio-opt" data-val="just-us"><div class="dot"></div><div>Just us two</div></div>
         <div class="radio-opt" data-val="double"><div class="dot"></div><div>Double date with friends</div></div>
         <div class="radio-opt" data-val="family-outing"><div class="dot"></div><div>Family outing (kids included)</div></div>
       </div>
-    </div>`;
+    </div>`);
   }
 
   if (topicId === 'inlaw') {
-    return `
-    <div style="margin-bottom:12px;">
-      <div class="input-label">Whose family?</div>
+    return wrap(`
+    <div style="margin-bottom:14px;">
+      <div class="input-label">Who is going on this visit?</div>
       <div class="radio-group" id="iq-who">
         <div class="radio-opt" data-val="my-family"><div class="dot"></div><div>My side</div></div>
         <div class="radio-opt" data-val="their-family"><div class="dot"></div><div>${U.esc(theirN)}'s side</div></div>
         <div class="radio-opt" data-val="both"><div class="dot"></div><div>Both families</div></div>
       </div>
     </div>
-    <div style="margin-bottom:12px;">
-      <div class="input-label">Visit type</div>
+    <div>
+      <div class="input-label">Is ${U.esc(theirN)} involved in this plan at all?</div>
       <div class="radio-group" id="iq-role">
         <div class="radio-opt" data-val="they-visit-us"><div class="dot"></div><div>They come to us</div></div>
         <div class="radio-opt" data-val="we-visit-them"><div class="dot"></div><div>We go to them</div></div>
-        <div class="radio-opt" data-val="meet-somewhere"><div class="dot"></div><div>Meet somewhere</div></div>
+        <div class="radio-opt" data-val="meet-somewhere"><div class="dot"></div><div>Meet somewhere neutral</div></div>
       </div>
-    </div>`;
+    </div>`);
   }
 
   if (topicId === 'host') {
-    return `
-    <div style="margin-bottom:12px;">
+    return wrap(`
+    <div style="margin-bottom:14px;">
       <div class="input-label">Hosting format</div>
       <div class="radio-group" id="iq-who">
         <div class="radio-opt" data-val="dinner"><div class="dot"></div><div>Dinner party</div></div>
-        <div class="radio-opt" data-val="drinks"><div class="dot"></div><div>Drinks & appetizers</div></div>
+        <div class="radio-opt" data-val="drinks"><div class="dot"></div><div>Drinks &amp; appetizers</div></div>
         <div class="radio-opt" data-val="bbq"><div class="dot"></div><div>BBQ / backyard</div></div>
         <div class="radio-opt" data-val="game"><div class="dot"></div><div>Game night</div></div>
       </div>
     </div>
-    <div style="margin-bottom:12px;">
-      <div class="input-label">${U.esc(theirN)}'s role</div>
+    <div>
+      <div class="input-label">Is ${U.esc(theirN)} involved in the prep?</div>
       <div class="radio-group" id="iq-role">
-        <div class="radio-opt" data-val="share-prep"><div class="dot"></div><div>Share cooking & prep</div></div>
+        <div class="radio-opt" data-val="share-prep"><div class="dot"></div><div>Share cooking &amp; prep equally</div></div>
         <div class="radio-opt" data-val="i-handle"><div class="dot"></div><div>I handle it, just need the OK</div></div>
         <div class="radio-opt" data-val="plan-together"><div class="dot"></div><div>Plan it together</div></div>
       </div>
-    </div>`;
+    </div>`);
+  }
+
+  if (topicId === 'playdate') {
+    return wrap(`
+    <div style="margin-bottom:14px;">
+      <div class="input-label">Who is going?</div>
+      <div class="radio-group" id="iq-who">
+        <div class="radio-opt" data-val="just-me"><div class="dot"></div><div>Just me and the kids</div></div>
+        <div class="radio-opt" data-val="whole-family"><div class="dot"></div><div>Both of us and the kids</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="input-label">Is ${U.esc(theirN)} involved?</div>
+      <div class="radio-group" id="iq-role">
+        <div class="radio-opt" data-val="not-involved"><div class="dot"></div><div>No &mdash; they stay home</div></div>
+        <div class="radio-opt" data-val="aware"><div class="dot"></div><div>Just needs to know the timing</div></div>
+        <div class="radio-opt" data-val="covering-kids"><div class="dot"></div><div>Comes along</div></div>
+      </div>
+    </div>`);
   }
 
   return '';
@@ -1460,33 +2013,37 @@ Router.register('auth-entry', () => `
     <div style="font-family:var(--font-display);font-size:5rem;font-weight:300;color:var(--cream);line-height:1;" class="a1">
       Par<em style="font-style:italic;color:var(--amber)">lay</em>
     </div>
-    <div style="font-size:.72rem;color:rgba(250,246,241,.4);letter-spacing:.2em;text-transform:uppercase;margin:10px 0 48px;" class="a1">
+    <div style="font-size:.72rem;color:rgba(250,246,241,.65);letter-spacing:.2em;text-transform:uppercase;margin:10px 0 48px;" class="a1">
       for couples who talk it through
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:300px;" class="a2">
       <button class="btn btn-accent" onclick="Router.go('auth-signup')">Create Account</button>
       <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);" onclick="Router.go('auth-signin')">Sign In</button>
     </div>
-    <div style="position:absolute;bottom:max(20px,env(safe-area-inset-bottom));font-size:.6rem;color:rgba(250,246,241,.2);">v${VERSION}</div>
+    <div style="margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:8px;" class="a3">
+      <button class="btn" style="background:rgba(122,158,138,.15);color:var(--sage);border:1px solid rgba(122,158,138,.3);width:100%;max-width:300px;" onclick="DEMO.activate('A')">Try Demo</button>
+      <div style="font-size:.62rem;color:rgba(250,246,241,.4);">No account needed — explore with sample data</div>
+    </div>
+    <div style="position:absolute;bottom:max(20px,env(safe-area-inset-bottom));font-size:.6rem;color:rgba(250,246,241,.35);">v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} ${new Date(BUILD_DATE).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div>
   </div>
 `);
 
 Router.register('auth-signup', () => `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;">
-    <button class="btn-ghost" style="color:rgba(250,246,241,.5);align-self:flex-start;margin-bottom:24px;" onclick="Router.go('auth-entry')">‹ Back</button>
+    <button class="btn-ghost" style="color:rgba(250,246,241,.65);align-self:flex-start;margin-bottom:24px;" onclick="Router.go('auth-entry')">‹ Back</button>
     <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Create your <em style="color:var(--amber)">account</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.5);margin-bottom:32px;" class="a1">Each partner needs their own account.</div>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:32px;" class="a1">Each partner needs their own account.</div>
     <div style="display:flex;flex-direction:column;gap:16px;" class="a2">
       <div>
-        <div class="input-label" style="color:rgba(250,246,241,.4);">Your name</div>
+        <div class="input-label" style="color:rgba(250,246,241,.65);">Your name</div>
         <input id="su-name" class="input" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);" placeholder="First name">
       </div>
       <div>
-        <div class="input-label" style="color:rgba(250,246,241,.4);">Email</div>
+        <div class="input-label" style="color:rgba(250,246,241,.65);">Email</div>
         <input id="su-email" class="input" type="email" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);" placeholder="you@example.com">
       </div>
       <div>
-        <div class="input-label" style="color:rgba(250,246,241,.4);">Password</div>
+        <div class="input-label" style="color:rgba(250,246,241,.65);">Password</div>
         <input id="su-pass" class="input" type="password" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);" placeholder="6+ characters">
       </div>
       <div id="su-error" style="display:none;font-size:.8rem;color:#EF4444;"></div>
@@ -1533,16 +2090,16 @@ Router.register('auth-signup', () => `
 
 Router.register('auth-signin', () => `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;">
-    <button class="btn-ghost" style="color:rgba(250,246,241,.5);align-self:flex-start;margin-bottom:24px;" onclick="Router.go('auth-entry')">‹ Back</button>
+    <button class="btn-ghost" style="color:rgba(250,246,241,.65);align-self:flex-start;margin-bottom:24px;" onclick="Router.go('auth-entry')">‹ Back</button>
     <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Welcome <em style="color:var(--amber)">back</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.5);margin-bottom:32px;" class="a1">Sign in to your account.</div>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:32px;" class="a1">Sign in to your account.</div>
     <div style="display:flex;flex-direction:column;gap:16px;" class="a2">
       <div>
-        <div class="input-label" style="color:rgba(250,246,241,.4);">Email</div>
+        <div class="input-label" style="color:rgba(250,246,241,.65);">Email</div>
         <input id="si-email" class="input" type="email" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);" placeholder="you@example.com">
       </div>
       <div>
-        <div class="input-label" style="color:rgba(250,246,241,.4);">Password</div>
+        <div class="input-label" style="color:rgba(250,246,241,.65);">Password</div>
         <input id="si-pass" class="input" type="password" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);">
       </div>
       <div id="si-error" style="display:none;font-size:.8rem;color:#EF4444;"></div>
@@ -1587,7 +2144,7 @@ Router.register('auth-signin', () => `
 Router.register('ob-couple', () => `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;">
     <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Connect with your <em style="color:var(--amber)">partner</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.5);margin-bottom:40px;" class="a1">Are you the first one here, or did your partner send you an invite?</div>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:40px;" class="a1">Are you the first one here, or did your partner send you an invite?</div>
     <div style="display:flex;flex-direction:column;gap:16px;" class="a2">
       <button class="btn btn-accent" id="obc-create">I'm setting this up first</button>
       <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);" id="obc-join">I have an invite code</button>
@@ -1607,7 +2164,7 @@ Router.register('ob-invite', () => {
   return `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;align-items:center;text-align:center;">
     <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Share this <em style="color:var(--amber)">code</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.5);margin-bottom:32px;" class="a1">Your partner enters this code when they sign up.</div>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:32px;" class="a1">Your partner enters this code when they sign up.</div>
     <div style="font-family:var(--font-display);font-size:3rem;color:var(--amber);letter-spacing:.15em;margin-bottom:24px;background:rgba(255,255,255,.05);padding:20px 32px;border-radius:var(--r-lg);border:1px solid rgba(255,255,255,.1);" class="a2" id="invite-code">${code}</div>
     <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);max-width:240px;" id="copy-code">Copy to clipboard</button>
     <div style="flex:1;"></div>
@@ -1622,9 +2179,9 @@ Router.register('ob-invite', () => {
 
 Router.register('ob-join', () => `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;">
-    <button class="btn-ghost" style="color:rgba(250,246,241,.5);align-self:flex-start;margin-bottom:24px;" onclick="Router.go('ob-couple')">‹ Back</button>
+    <button class="btn-ghost" style="color:rgba(250,246,241,.65);align-self:flex-start;margin-bottom:24px;" onclick="Router.go('ob-couple')">‹ Back</button>
     <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Enter invite <em style="color:var(--amber)">code</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.5);margin-bottom:32px;" class="a1">Your partner will have a 6-character code for you.</div>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:32px;" class="a1">Your partner will have a 6-character code for you.</div>
     <div style="display:flex;flex-direction:column;gap:16px;" class="a2">
       <input id="join-code" class="input" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);font-size:1.5rem;text-align:center;letter-spacing:.2em;text-transform:uppercase;" placeholder="ABC123" maxlength="6">
       <div id="join-error" style="display:none;font-size:.8rem;color:#EF4444;"></div>
@@ -1674,7 +2231,7 @@ Router.register('home', () => {
     <div class="home-header">
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div class="home-greeting a1">Good ${U.timeOfDay()},<br><em>${U.esc(myN)}</em></div>
-        <button class="btn-ghost" style="color:rgba(250,246,241,.5);font-size:1.1rem;" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
+        <button class="btn-ghost" style="color:rgba(250,246,241,.65);font-size:1.1rem;" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
       </div>
       <div class="home-date a1">${U.today()}</div>
       <div class="partner-bar a2">
@@ -1684,7 +2241,7 @@ Router.register('home', () => {
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:.82rem;font-weight:600;color:var(--cream);">${U.esc(myN)} & ${U.esc(theirN)}</div>
-          <div style="font-size:.68rem;color:rgba(250,246,241,.45);">${Auth.hasPartner() ? '🟢 Connected' : '⏳ Awaiting partner'}</div>
+          <div style="font-size:.68rem;color:rgba(250,246,241,.65);">${Auth.hasPartner() ? '🟢 Connected' : '⏳ Awaiting partner'}</div>
         </div>
       </div>
     </div>
@@ -1695,7 +2252,7 @@ Router.register('home', () => {
       <div style="font-size:1.6rem;">🔗</div>
       <div style="flex:1;">
         <div style="font-size:.82rem;font-weight:700;color:var(--amber);margin-bottom:3px;">Partner hasn't joined yet</div>
-        <div style="font-size:.72rem;color:rgba(250,246,241,.5);">Share your invite code.</div>
+        <div style="font-size:.72rem;color:rgba(250,246,241,.65);">Share your invite code.</div>
       </div>
       <button class="btn btn-sm btn-accent" onclick="Router.go('ob-invite')">Share</button>
     </div>` : ''}
@@ -1708,7 +2265,7 @@ Router.register('home', () => {
           <div style="width:32px;height:32px;border-radius:50%;background:rgba(196,113,74,.25);display:flex;align-items:center;justify-content:center;">📬</div>
           <div>
             <div style="font-size:.9rem;font-weight:700;color:var(--amber);">${totalPending} item${totalPending !== 1 ? 's' : ''} waiting on you</div>
-            <div style="font-size:.68rem;color:rgba(250,246,241,.45);">Tap to respond</div>
+            <div style="font-size:.68rem;color:rgba(250,246,241,.65);">Tap to respond</div>
           </div>
         </div>
         <div style="background:var(--terra);color:#fff;font-size:.7rem;font-weight:800;min-width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:0 7px;">${totalPending}</div>
@@ -1723,7 +2280,7 @@ Router.register('home', () => {
           <span style="font-size:1.1rem;">${topic.icon}</span>
           <div style="flex:1;min-width:0;">
             <div style="font-size:.82rem;font-weight:600;color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc(p.title)}</div>
-            <div style="font-size:.68rem;color:rgba(250,246,241,.45);">${p.date}</div>
+            <div style="font-size:.68rem;color:rgba(250,246,241,.65);">${p.date}</div>
           </div>
           <div class="status-chip" style="background:rgba(232,184,138,.15);color:var(--amber);">${label}</div>
         </div>`;
@@ -1736,12 +2293,12 @@ Router.register('home', () => {
           <span style="font-size:1.1rem;">${cat.icon}</span>
           <div style="flex:1;min-width:0;">
             <div style="font-size:.82rem;font-weight:600;color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc(t.title)}</div>
-            <div style="font-size:.68rem;color:rgba(250,246,241,.45);">From ${U.esc(from)}</div>
+            <div style="font-size:.68rem;color:rgba(250,246,241,.65);">From ${U.esc(from)}</div>
           </div>
           <div class="status-chip" style="background:rgba(122,101,180,.15);color:rgba(200,180,235,1);">⚡ Your turn</div>
         </div>`;
       }).join('')}
-      ${actionTasks.length > 3 ? `<div style="font-size:.72rem;color:rgba(250,246,241,.4);text-align:center;padding:4px;">+${actionTasks.length - 3} more in Tasks tab</div>` : ''}` : ''}
+      ${actionTasks.length > 3 ? `<div style="font-size:.72rem;color:rgba(250,246,241,.65);text-align:center;padding:4px;">+${actionTasks.length - 3} more in Tasks tab</div>` : ''}` : ''}
     </div>` : ''}
 
     <!-- QUICK ACTIONS -->
@@ -1778,7 +2335,7 @@ Router.register('home', () => {
       <div style="color:var(--muted);font-size:1.2rem;">›</div>
     </div>
 
-    <div style="text-align:center;padding:20px 0 8px;font-size:.58rem;color:var(--border);">Parlay v${VERSION}</div>
+    <div style="text-align:center;padding:20px 0 8px;font-size:.65rem;color:var(--border);">Parlay v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
   </div>`;
 }, () => { Badges.update(); });
 
@@ -1806,9 +2363,9 @@ Router.register('plan', () => {
     <div style="background:var(--espresso);padding:0 24px 24px;padding-top:max(52px,env(safe-area-inset-top));">
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:var(--cream);" class="a1">Plan an <em style="color:var(--amber)">Event</em></div>
-        <button class="btn-ghost" style="color:rgba(250,246,241,.5);font-size:1.1rem;" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
+        <button class="btn-ghost" style="color:rgba(250,246,241,.65);font-size:1.1rem;" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
       </div>
-      <div style="font-size:.72rem;color:rgba(250,246,241,.4);" class="a1">Pick a topic — Parlay handles the negotiation.</div>
+      <div style="font-size:.72rem;color:rgba(250,246,241,.65);" class="a1">Pick a topic — Parlay handles the negotiation.</div>
     </div>
 
     <div style="padding:16px 0;">
@@ -1875,6 +2432,19 @@ Router.register('compose', ({ topicId } = {}) => {
   const theirN = Auth.theirName();
   const needsIntent = INTENT_TOPICS.includes(topicId);
 
+  if (!Auth.hasPartner()) {
+    return `
+    <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;text-align:center;">
+      <div style="font-size:2.8rem;margin-bottom:16px;">👫</div>
+      <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">Partner needed</div>
+      <div style="font-size:.85rem;color:var(--muted);max-width:280px;margin:0 auto 24px;line-height:1.5;">
+        You need a connected partner before you can create a parlay. Share your invite code to get started.
+      </div>
+      <button class="btn btn-primary" style="max-width:240px;" onclick="Router.go('setup')">Go to Setup</button>
+      <button class="btn btn-outline" style="max-width:240px;margin-top:10px;" onclick="Router.go('plan')">‹ Back</button>
+    </div>`;
+  }
+
   return `
   <div data-topic="${topicId}" style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
@@ -1887,8 +2457,8 @@ Router.register('compose', ({ topicId } = {}) => {
       <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;">Your <em style="color:var(--terra)">position</em></div>
       <div style="font-size:.82rem;color:var(--muted);line-height:1.6;">
         ${needsIntent
-          ? 'First clarify the basics — then tell Parlay exactly what you want.'
-          : `Say exactly what you want. Don't filter yourself — Parlay does that before ${U.esc(theirN)} sees it.`}
+          ? 'First clarify the basics &mdash; then tell Parlay exactly what you want. It filters everything before your partner sees it.'
+          : `Say exactly what you want. Don't filter yourself &mdash; Parlay does that before ${U.esc(theirN)} sees it.`}
       </div>
     </div>
 
@@ -1904,40 +2474,57 @@ Router.register('compose', ({ topicId } = {}) => {
 
       <div>
         <div class="input-label">What do you want or need? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">speak freely</span></div>
-        <textarea id="compose-text" class="input" rows="5" placeholder="e.g. I want to take a solo trip to visit my college friends March 20-23. I'll need you to handle the kids." style="resize:none;line-height:1.6;"></textarea>
+        <textarea id="compose-text" class="input" rows="5" placeholder="e.g. I really want to see my parents this month. I miss them and feel like we haven't visited in a while." style="resize:none;line-height:1.6;"></textarea>
       </div>
 
-      <!-- Date options -->
+      <!-- Dates or constraints -->
       <div>
-        <div class="input-label">Date &amp; time options (optional, up to 4)</div>
-        <div style="display:flex;flex-direction:column;gap:8px;" id="date-slots">
-          <div style="display:flex;gap:8px;">
+        <div class="input-label">Dates or constraints? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
+        <input type="text" id="compose-constraints" class="input" placeholder="e.g. Not the weekend of the 22nd, prefer a Saturday&hellip;">
+      </div>
+
+      <!-- Date options card -->
+      <div class="fieldset-card">
+        <div class="fieldset-badge">📅 Propose date options</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div class="input-label" style="margin-bottom:0;">Propose date options</div>
+          <span style="font-size:.68rem;color:var(--muted);background:var(--parchment);padding:2px 8px;border-radius:10px;">up to 4</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">Give your partner real options to choose from &mdash; no guessing games.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;" id="date-slots">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">1</div>
             <input type="date" class="input" style="flex:2;" data-slot="1" data-type="date">
             ${U.timeSelectHtml(1)}
           </div>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">2</div>
             <input type="date" class="input" style="flex:2;" data-slot="2" data-type="date">
             ${U.timeSelectHtml(2)}
           </div>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">3</div>
             <input type="date" class="input" style="flex:2;" data-slot="3" data-type="date">
             ${U.timeSelectHtml(3)}
           </div>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">4</div>
             <input type="date" class="input" style="flex:2;" data-slot="4" data-type="date">
             ${U.timeSelectHtml(4)}
           </div>
         </div>
+        <div style="font-size:.72rem;color:var(--muted);font-style:italic;margin-top:12px;line-height:1.5;">Leave blank to skip date options and just send your position.</div>
       </div>
 
-      <div style="background:var(--parchment);border-radius:var(--r-md);padding:12px 14px;">
-        <div style="font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 Private until filtered</div>
-        <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">${U.esc(theirN)} only sees Parlay's rewrite — never your raw words.</div>
+      <div style="background:var(--parchment);border-radius:var(--r-md);padding:16px 18px;">
+        <div style="font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 Private until filtered</div>
+        <div style="font-size:.78rem;color:var(--muted);line-height:1.55;">${U.esc(theirN)} only sees the calm rewritten version &mdash; not your raw words above.</div>
       </div>
 
-      <button class="btn btn-primary" id="compose-submit">
-        <span id="compose-btn-text">Let Parlay Mediate →</span>
+      <button class="btn btn-accent" id="compose-submit">
+        <span id="compose-btn-text">Let Parlay Mediate &rarr;</span>
       </button>
+      <button class="btn btn-outline" onclick="Router.go('plan')" style="margin-top:-4px;">Cancel</button>
     </div>
   </div>`;
 }, (el, { topicId } = {}) => {
@@ -1953,6 +2540,10 @@ Router.register('compose', ({ topicId } = {}) => {
       opt.classList.add('selected');
     });
   });
+
+  // Set min date on date inputs to today
+  const today = new Date().toISOString().split('T')[0];
+  el.querySelectorAll('input[type="date"]').forEach(d => { d.min = today; });
 
   // Tension detection (debounced, versioned)
   let _toneTimer, _tensionV = 0;
@@ -1993,7 +2584,7 @@ Router.register('compose', ({ topicId } = {}) => {
     const btn = el.querySelector('#compose-submit');
     const btnText = el.querySelector('#compose-btn-text');
     btn.disabled = true;
-    btnText.textContent = 'Filtering your message…';
+    btnText.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Filtering your message…';
 
     // ── Gather intent context from structured questions ────
     let intentContext = '';
@@ -2040,6 +2631,11 @@ Router.register('compose', ({ topicId } = {}) => {
     }
     if (dateOptions.length) {
       intentContext += `DATE OPTIONS: ${dateOptions.map(o => o.date + (o.timeLabel ? ' ' + o.timeLabel : '')).join('; ')}\n`;
+    }
+
+    const constraints = el.querySelector('#compose-constraints')?.value.trim();
+    if (constraints) {
+      intentContext += `DATE CONSTRAINTS: ${constraints}\n`;
     }
 
     // ── AI tone filter (best-effort) ────
@@ -2248,7 +2844,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
       <div class="input-label">${isMine ? 'Your position' : creatorN + "'s position"}</div>
       <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);">
         <div style="font-size:.88rem;line-height:1.65;">${p.filteredInput || p.rawInput || ''}</div>
-        <div style="font-size:.62rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
       </div>
       ${dateHtml}
     </div>
@@ -2259,7 +2855,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
       <div class="input-label">${!isMine ? 'Your response' : recipN + "'s response"}</div>
       <div style="padding:14px 16px;background:var(--surface);border:1px solid rgba(122,106,155,.25);border-radius:var(--r-md);">
         <div style="font-size:.88rem;line-height:1.65;">${p.partnerFilteredReply}</div>
-        <div style="font-size:.62rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
       </div>
     </div>` : ''}
 
@@ -2276,7 +2872,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
   el.querySelector('#gen-proposal-btn')?.addEventListener('click', async () => {
     const btn = el.querySelector('#gen-proposal-btn');
     const txt = el.querySelector('#gen-btn-text');
-    btn.disabled = true; txt.textContent = 'Generating…';
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.3);margin-right:8px;"></span> Generating proposal…';
 
     try {
       const parsed = await generateProposal(p);
@@ -2333,7 +2929,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
     if (!_selectedCounterDate) return;
     const btn = el.querySelector('#accept-counter-btn');
     const txt = el.querySelector('#accept-counter-text');
-    btn.disabled = true; txt.textContent = 'Confirming…';
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Confirming…';
     const selectedOpt = p.counterDates?.find(o => o.id === _selectedCounterDate);
     try {
       await Store.updateParlay(p.id, {
@@ -2361,9 +2957,17 @@ Router.register('parlay-detail', ({ id } = {}) => {
   });
 
   // Manage
-  el.querySelector('#manage-btn')?.addEventListener('click', () => {
-    if (confirm('Delete this parlay for both partners?')) {
-      Store.deleteParlay(p.id);
+  el.querySelector('#manage-btn')?.addEventListener('click', async () => {
+    const action = await U.sheet('Manage Parlay', [
+      { key: 'archive', label: '📦 Archive', cls: 'btn-outline' },
+      { key: 'delete', label: '🗑 Delete for both partners', cls: 'btn-danger' },
+    ]);
+    if (action === 'archive') {
+      await Store.updateParlay(p.id, { archived: true });
+      U.toast('Parlay archived');
+      Router.go('plan');
+    } else if (action === 'delete') {
+      await Store.deleteParlay(p.id);
       U.toast('Parlay deleted');
       Router.go('plan');
     }
@@ -2527,7 +3131,7 @@ Router.register('parlay-reply', ({ id } = {}) => {
       _submitting = true;
       const btn = el.querySelector('#accept-date-btn');
       const txt = el.querySelector('#accept-date-text');
-      btn.disabled = true; txt.textContent = 'Confirming…';
+      btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Confirming…';
 
       const selectedOpt = p.dateOptions.find(o => o.id === _selectedDate);
       try {
@@ -2565,7 +3169,7 @@ Router.register('parlay-reply', ({ id } = {}) => {
       _submitting = true;
       const btn = el.querySelector('#counter-submit');
       const txt = el.querySelector('#counter-btn-text');
-      btn.disabled = true; txt.textContent = 'Sending…';
+      btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Sending…';
 
       const raw = el.querySelector('#reply-text')?.value.trim() || '';
       let filtered = raw;
@@ -2602,7 +3206,7 @@ Router.register('parlay-reply', ({ id } = {}) => {
 
       const btn = el.querySelector('#reply-submit');
       const btnText = el.querySelector('#reply-btn-text');
-      btn.disabled = true; btnText.textContent = 'Filtering…';
+      btn.disabled = true; btnText.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Filtering…';
 
       let filtered = raw;
       try {
@@ -2653,7 +3257,7 @@ Router.register('tasks', () => {
       <div style="flex:1;">
         <div style="font-size:.9rem;font-weight:600;margin-bottom:3px;">${U.esc(t.title)}</div>
         <div style="font-size:.72rem;color:var(--muted);">${t.assignedTo === 'me' ? 'From ' + from : 'To ' + to}</div>
-        ${needsMe ? `<div style="font-size:.62rem;font-weight:700;color:var(--purple);margin-top:4px;">⚡ Your turn</div>` : ''}
+        ${needsMe ? `<div style="font-size:.68rem;font-weight:700;color:var(--purple);margin-top:4px;">⚡ Your turn</div>` : ''}
       </div>
     </div>`;
   };
@@ -2663,7 +3267,7 @@ Router.register('tasks', () => {
     <div style="background:var(--espresso);padding:0 24px 24px;padding-top:max(52px,env(safe-area-inset-top));">
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:var(--cream);" class="a1">Tasks <em style="color:var(--amber)">& Chores</em></div>
-        <button class="btn-ghost" style="color:rgba(250,246,241,.5);font-size:1.1rem;" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
+        <button class="btn-ghost" style="color:rgba(250,246,241,.65);font-size:1.1rem;" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
       </div>
     </div>
 
@@ -2688,7 +3292,13 @@ Router.register('tasks', () => {
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${sent.map(taskCard).join('')}</div>
     </div>` : ''}
 
-    ${my.length === 0 && sent.length === 0 ? `
+    ${done.length > 0 ? `
+    <div style="padding:20px 20px 0;">
+      <div class="section-label" style="padding:0;color:var(--sage);">✓ Completed (${done.length})</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;opacity:.65;">${done.map(taskCard).join('')}</div>
+    </div>` : ''}
+
+    ${my.length === 0 && sent.length === 0 && done.length === 0 ? `
     <div style="padding:52px 24px;text-align:center;" class="a4">
       <div style="font-size:2.8rem;margin-bottom:16px;">📋</div>
       <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">No tasks yet</div>
@@ -2701,7 +3311,20 @@ Router.register('tasks', () => {
 // ──────────────────────────────────────────────
 // NEW TASK
 // ──────────────────────────────────────────────
-Router.register('task-new', () => `
+Router.register('task-new', () => {
+  if (!Auth.hasPartner()) {
+    return `
+    <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;text-align:center;">
+      <div style="font-size:2.8rem;margin-bottom:16px;">👫</div>
+      <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">Partner needed</div>
+      <div style="font-size:.85rem;color:var(--muted);max-width:280px;margin:0 auto 24px;line-height:1.5;">
+        You need a connected partner before you can assign tasks.
+      </div>
+      <button class="btn btn-primary" style="max-width:240px;" onclick="Router.go('setup')">Go to Setup</button>
+      <button class="btn btn-outline" style="max-width:240px;margin-top:10px;" onclick="Router.go('tasks')">‹ Back</button>
+    </div>`;
+  }
+  return `
   <div style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
       <button class="btn btn-outline btn-sm" onclick="Router.go('tasks')">‹ Back</button>
@@ -2725,8 +3348,8 @@ Router.register('task-new', () => `
       </div>
       <button class="btn btn-primary" id="tn-submit">Assign Task</button>
     </div>
-  </div>
-`, (el) => {
+  </div>`;
+}, (el) => {
   let _assignTo = 'them';
   const themBtn = el.querySelector('#tn-them');
   const meBtn = el.querySelector('#tn-me');
@@ -2813,7 +3436,13 @@ Router.register('task-detail', ({ id } = {}) => {
     <div id="td-counter-form" style="display:none;margin-top:12px;">
       <div class="input-label">What would work better?</div>
       <textarea id="td-counter-msg" class="input" rows="3" placeholder="e.g. I can do this Thursday instead" style="resize:none;margin-bottom:12px;"></textarea>
-      <button class="btn btn-accent" id="td-counter-submit">Send suggestion →</button>
+      <button class="btn btn-accent" id="td-counter-submit">Send suggestion &rarr;</button>
+    </div>
+    <!-- Decline form (hidden until Decline clicked) -->
+    <div id="td-decline-form" style="display:none;margin-top:12px;">
+      <div class="input-label">Why are you declining? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
+      <textarea id="td-decline-msg" class="input" rows="2" placeholder="e.g. I don't have bandwidth for this right now" style="resize:none;margin-bottom:12px;"></textarea>
+      <button class="btn btn-danger" id="td-decline-submit">Decline task</button>
     </div>`;
   } else if (t.status === 'accepted' && iAmAssignee) {
     actionHtml = `<div style="margin-top:20px;">
@@ -2921,8 +3550,22 @@ Router.register('task-detail', ({ id } = {}) => {
     Router.go('tasks');
   });
 
-  el.querySelector('#td-decline')?.addEventListener('click', async () => {
-    const reason = prompt('Optional: why are you declining?') || '';
+  el.querySelector('#td-decline')?.addEventListener('click', () => {
+    const form = el.querySelector('#td-decline-form');
+    if (form) form.style.display = 'block';
+    el.querySelector('#td-decline').style.display = 'none';
+    // Hide counter form if open
+    const cf = el.querySelector('#td-counter-form');
+    if (cf) cf.style.display = 'none';
+    const cb = el.querySelector('#td-counter');
+    if (cb) cb.style.display = '';
+  });
+
+  el.querySelector('#td-decline-submit')?.addEventListener('click', async () => {
+    const reason = el.querySelector('#td-decline-msg')?.value.trim() || '';
+    const btn = el.querySelector('#td-decline-submit');
+    btn.disabled = true; btn.textContent = 'Declining…';
+
     let filtered = reason;
     if (reason) {
       try {
@@ -2943,7 +3586,10 @@ Router.register('task-detail', ({ id } = {}) => {
   });
 
   el.querySelector('#td-delete')?.addEventListener('click', async () => {
-    if (confirm('Delete this task?')) {
+    const action = await U.sheet('Delete this task?', [
+      { key: 'delete', label: '🗑 Delete task', cls: 'btn-danger' },
+    ]);
+    if (action === 'delete') {
       await Store.deleteTask(t.id);
       Badges.update(); U.toast('Task deleted');
       Router.go('tasks');
@@ -2958,14 +3604,42 @@ Router.register('task-detail', ({ id } = {}) => {
 Router.register('setup', () => {
   const tone = Store.get('mediatorTone') || 'neutral';
   const toneLabel = TONES[tone]?.label || 'Neutral';
+  const myN = Auth.myName();
+  const theirN = Auth.theirName();
+  const couple = Auth.couple();
+  const hasPartner = !!Auth.theirUid();
+  const inviteCode = couple?.invite_code || '';
 
   return `
   <div style="padding-bottom:calc(var(--nav-h) + 20px);">
-    <div style="background:var(--espresso);padding:0 24px 24px;padding-top:max(52px,env(safe-area-inset-top));">
+    <div style="background:var(--espresso);padding:0 24px 28px;padding-top:max(52px,env(safe-area-inset-top));">
       <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:var(--cream);" class="a1">Setup</div>
     </div>
 
+    <!-- Profile cards -->
     <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;" class="a2">
+      <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--terra);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0;">${U.initials(myN)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.92rem;font-weight:600;">${U.esc(myN)}</div>
+          <div style="font-size:.72rem;color:var(--muted);">You</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);">
+        <div style="width:44px;height:44px;border-radius:50%;background:${hasPartner ? 'var(--sage)' : 'var(--border)'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0;">${hasPartner ? U.initials(theirN) : '?'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.92rem;font-weight:600;">${hasPartner ? U.esc(theirN) : 'Waiting for partner'}</div>
+          <div style="font-size:.72rem;color:var(--muted);">${hasPartner ? 'Your partner' : 'Share your invite code'}</div>
+        </div>
+        ${!hasPartner && inviteCode ? `<div style="font-family:var(--font-display);font-size:1rem;color:var(--terra);letter-spacing:.1em;align-self:center;" id="setup-code">${inviteCode}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div style="padding:0 20px;margin-top:8px;">
+      <div class="input-label" style="margin-bottom:10px;">Settings</div>
+    </div>
+    <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;" class="a3">
       <div class="mod-card" onclick="Router.go('setup-tone')">
         <div class="mod-icon" style="background:rgba(196,113,74,.1);">⚖️</div>
         <div style="flex:1;">
@@ -2974,7 +3648,7 @@ Router.register('setup', () => {
         </div>
         <div style="color:var(--muted);">›</div>
       </div>
-      <div class="mod-card" style="opacity:.6;">
+      <div class="mod-card" style="opacity:.5;cursor:default;">
         <div class="mod-icon" style="background:rgba(122,158,138,.1);">💬</div>
         <div style="flex:1;">
           <div style="font-size:.9rem;font-weight:600;">Communication Style</div>
@@ -2983,11 +3657,22 @@ Router.register('setup', () => {
       </div>
     </div>
 
-    <div style="padding:20px;text-align:center;" class="a3">
-      <button class="btn btn-outline" style="max-width:200px;margin:0 auto;color:#EF4444;border-color:#EF4444;" onclick="Auth.signOut()">Sign Out</button>
-      <div style="margin-top:16px;font-size:.58rem;color:var(--border);">Parlay v${VERSION}</div>
+    <div style="padding:28px 20px;text-align:center;" class="a4">
+      <button class="btn btn-danger" style="max-width:220px;margin:0 auto;" id="signout-btn">Sign Out</button>
+      <div style="margin-top:16px;font-size:.65rem;color:var(--border);">Parlay v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
     </div>
   </div>`;
+}, (el) => {
+  el.querySelector('#signout-btn')?.addEventListener('click', async () => {
+    const action = await U.sheet('Sign out?', [
+      { key: 'signout', label: 'Sign Out', cls: 'btn-danger' },
+    ]);
+    if (action === 'signout') Auth.signOut();
+  });
+  el.querySelector('#setup-code')?.addEventListener('click', () => {
+    navigator.clipboard?.writeText(Auth.couple()?.invite_code || '');
+    U.toast('Invite code copied ✓');
+  });
 });
 
 
@@ -3132,9 +3817,14 @@ Router.register('setup-tone', () => {
     return;
   }
 
+  // ── Demo mode via URL (?demo or ?demo=B) ──────
+  if (_devParams.has('demo')) {
+    DEMO.activate(_devParams.get('demo') === 'B' ? 'B' : 'A');
+    return;
+  }
+
   // ── Normal flow ───────────────────────────────
   const boot = await Auth.bootstrap();
-  console.log('[init] Bootstrap result:', boot);
 
   if (boot.mode === 'unauthenticated') {
     Router.go('auth-entry');
