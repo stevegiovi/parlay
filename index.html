@@ -421,6 +421,45 @@ select.input {
 #dev-bar .sep { width: 1px; height: 16px; background: rgba(255,255,255,.15); }
 
 /* ═══════════════════════════════════════════════
+   DEMO BAR
+   ═══════════════════════════════════════════════ */
+#demo-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+  background: linear-gradient(135deg, #2d1f3d, #1a1208);
+  color: var(--cream); font-size: .7rem; font-family: var(--font-body);
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; height: 40px; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+#demo-bar .demo-label {
+  font-weight: 700; font-size: .6rem; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--amber); margin-right: 4px;
+}
+#demo-bar .demo-version {
+  font-size: .55rem; color: rgba(250,246,241,.5); margin-left: auto;
+  text-align: right; line-height: 1.3;
+}
+#demo-bar button {
+  border: none; color: var(--cream); font-size: .65rem;
+  font-family: var(--font-body); font-weight: 600;
+  padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  transition: background .15s, transform .1s;
+}
+#demo-bar button:hover { transform: scale(1.04); }
+#demo-bar button:active { transform: scale(.97); }
+#demo-bar .demo-partner {
+  background: rgba(255,255,255,.1);
+}
+#demo-bar .demo-partner.active {
+  background: var(--terra); color: #fff;
+}
+#demo-bar .demo-refresh {
+  background: rgba(122,158,138,.25); color: var(--sage);
+}
+#demo-bar .demo-sep {
+  width: 1px; height: 20px; background: rgba(255,255,255,.12);
+}
+
+/* ═══════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════ */
 @media (min-width: 600px) {
@@ -471,6 +510,7 @@ select.input {
 // CONFIG
 // ──────────────────────────────────────────────
 const VERSION = '2.0.5';
+const BUILD_DATE = '2026-03-10T12:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -483,6 +523,252 @@ const DEV = {
   accounts: {
     '1': { email: _devParams.get('email') || '', password: _devParams.get('pw') || '', label: _devParams.get('name') || 'Partner 1' },
     '2': { email: _devParams.get('email') || '', password: _devParams.get('pw') || '', label: _devParams.get('name') || 'Partner 2' },
+  },
+};
+
+// ── DEMO MODE ──────────────────────────────────
+// No login required — uses mock data for UI testing
+const DEMO = {
+  active: false,
+  currentPartner: 'A',  // 'A' or 'B'
+
+  partners: {
+    A: { uid: 'demo-uid-a', name: 'Alex', email: 'alex@demo.parlay' },
+    B: { uid: 'demo-uid-b', name: 'Jordan', email: 'jordan@demo.parlay' },
+  },
+
+  couple: {
+    id: 'demo-couple-001',
+    spouse_1_id: 'demo-uid-a',
+    spouse_2_id: 'demo-uid-b',
+    invite_code: 'DEMO42',
+    mediator_tone: 'neutral',
+    equity: null,
+  },
+
+  // Pre-built sample parlays and tasks
+  _mockParlays: null,
+  _mockTasks: null,
+
+  /** Build mock data (called once on demo start) */
+  buildMockData() {
+    const now = new Date();
+    const ago = (days) => new Date(now - days * 86400000).toISOString();
+    const shortDate = (d) => {
+      const dt = new Date(d);
+      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    this._mockParlays = [
+      {
+        id: 'demo-p1', topicId: 'date', title: 'Anniversary dinner this Friday',
+        date: shortDate(ago(1)), rawInput: "I'd love to do something special for our anniversary — maybe that Italian place downtown?",
+        filteredInput: "I'd really love to celebrate our anniversary this Friday. Would the Italian restaurant downtown work for you?",
+        intentContext: JSON.stringify({ who: 'just-us', vibe: 'romantic' }),
+        dateOptions: [
+          { date: '2026-03-13', time: '19:00', label: 'Friday 7pm' },
+          { date: '2026-03-14', time: '18:30', label: 'Saturday 6:30pm' },
+        ],
+        status: 'pending_partner',
+        createdByUid: 'demo-uid-a', isMine: true,
+        partnerRawReply: null, partnerFilteredReply: null, partnerDateResponse: null,
+        counterDates: [], confirmedDate: null,
+        proposal: null, resolution: null, archived: false,
+      },
+      {
+        id: 'demo-p2', topicId: 'inlaw', title: "Mom wants to visit next weekend",
+        date: shortDate(ago(3)), rawInput: "My mom asked if she can come stay Saturday to Monday. She wants to see the kids.",
+        filteredInput: "My mom mentioned she'd love to visit next weekend, Saturday through Monday, to spend time with the kids. How does that feel?",
+        intentContext: JSON.stringify({ who: 'in-laws', hosting: 'our-place' }),
+        dateOptions: [
+          { date: '2026-03-21', time: '10:00', label: 'Sat morning' },
+        ],
+        status: 'partner_replied',
+        createdByUid: 'demo-uid-b', isMine: false,
+        partnerRawReply: "That works but can we do just Saturday daytime? I have a work thing Sunday.",
+        partnerFilteredReply: "Saturday daytime would work great for me. I have a commitment on Sunday — could we plan for a Saturday visit instead?",
+        partnerDateResponse: 'counter',
+        counterDates: [{ date: '2026-03-21', time: '10:00', label: 'Sat 10am–6pm' }],
+        confirmedDate: null,
+        proposal: null, resolution: null, archived: false,
+      },
+      {
+        id: 'demo-p3', topicId: 'trip', title: 'Spring break trip planning',
+        date: shortDate(ago(7)), rawInput: "Can we figure out spring break? I was thinking a beach trip.",
+        filteredInput: "I'd love for us to plan something for spring break — maybe a beach getaway? What do you think?",
+        intentContext: JSON.stringify({ who: 'family', vibe: 'relaxing' }),
+        dateOptions: [
+          { date: '2026-04-06', time: '08:00', label: 'Apr 6–10' },
+          { date: '2026-04-13', time: '08:00', label: 'Apr 13–17' },
+        ],
+        status: 'active',
+        createdByUid: 'demo-uid-a', isMine: true,
+        partnerRawReply: "Beach sounds great! I prefer the second week so I can finish my project.",
+        partnerFilteredReply: "A beach trip sounds wonderful! The second week (Apr 13–17) would work better for me so I can wrap up a work project first.",
+        partnerDateResponse: 'selected',
+        counterDates: [],
+        confirmedDate: { date: '2026-04-13', time: '08:00', label: 'Apr 13–17' },
+        proposal: "**Proposal: Spring Break Beach Trip**\n\nBased on both your preferences, here's a fair plan:\n\n- **Dates:** April 13–17 (Mon–Fri)\n- **Destination:** Beach location TBD — suggest researching together this weekend\n- **Budget:** Discuss a shared budget cap before booking\n- **Logistics:** Alex handles flights/transport, Jordan handles accommodation research\n\nThis gives Jordan time to finish their project while still getting a full week of vacation.",
+        resolution: null, archived: false,
+      },
+      {
+        id: 'demo-p4', topicId: 'boys', title: "Poker night with the guys",
+        date: shortDate(ago(14)), rawInput: "The guys want to do poker night this Thursday.",
+        filteredInput: "The guys are getting together for poker this Thursday evening. I'd love to go — does that work with our schedule?",
+        intentContext: JSON.stringify({ who: 'my-friends', vibe: 'casual' }),
+        dateOptions: [{ date: '2026-02-26', time: '19:00', label: 'Thu 7pm' }],
+        status: 'resolved',
+        createdByUid: 'demo-uid-a', isMine: true,
+        partnerRawReply: "Have fun! I'll do bedtime solo.",
+        partnerFilteredReply: "Sounds fun! I'm happy to handle bedtime on my own that night.",
+        partnerDateResponse: 'accepted',
+        counterDates: [],
+        confirmedDate: { date: '2026-02-26', time: '19:00', label: 'Thu 7pm' },
+        proposal: null, resolution: 'date_accepted', archived: false,
+      },
+    ];
+
+    this._mockTasks = [
+      {
+        id: 'demo-t1', title: 'Schedule dentist appointments for kids',
+        context: 'Both kids are overdue for checkups', rawContext: 'Both kids are overdue', filteredContext: 'Both kids are overdue for their dental checkups.',
+        categoryId: 'kids', priority: 'normal', dueDate: '2026-03-15',
+        assignedTo: 'them', createdBy: 'me', status: 'pending_response',
+        pendingResponseFrom: 'them', counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+      },
+      {
+        id: 'demo-t2', title: 'Fix leaky kitchen faucet',
+        context: "It's been dripping for a week", rawContext: "It's been dripping", filteredContext: "The kitchen faucet has been dripping for about a week.",
+        categoryId: 'maintenance', priority: 'normal', dueDate: null,
+        assignedTo: 'me', createdBy: 'them', status: 'accepted',
+        pendingResponseFrom: null, counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+      },
+      {
+        id: 'demo-t3', title: 'Grocery run — weekly essentials',
+        context: 'We need milk, eggs, bread, and fruit', rawContext: null, filteredContext: null,
+        categoryId: 'errands', priority: 'normal', dueDate: '2026-03-11',
+        assignedTo: 'me', createdBy: 'me', status: 'pending_response',
+        pendingResponseFrom: 'them', counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+      },
+      {
+        id: 'demo-t4', title: 'Call insurance about claim',
+        context: 'Reference #INS-4421', rawContext: null, filteredContext: null,
+        categoryId: 'admin', priority: 'high', dueDate: '2026-03-12',
+        assignedTo: 'them', createdBy: 'them', status: 'accepted',
+        pendingResponseFrom: null, counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+      },
+    ];
+  },
+
+  /** Activate demo mode — monkey-patches Auth & Store */
+  activate(partner = 'A') {
+    this.active = true;
+    this.currentPartner = partner;
+    if (!this._mockParlays) this.buildMockData();
+    this._applyPerspective();
+    document.body.style.paddingTop = '40px';
+    this._createBar();
+    Router.go('home');
+  },
+
+  /** Switch perspective (A or B) and re-render */
+  switchTo(partner) {
+    this.currentPartner = partner;
+    this._applyPerspective();
+    this._updateBar();
+    Router.reload();
+  },
+
+  /** Apply the current partner's perspective to mock data */
+  _applyPerspective() {
+    const p = this.currentPartner;
+    const me = this.partners[p];
+    const them = this.partners[p === 'A' ? 'B' : 'A'];
+    const amSpouse1 = (p === 'A');
+
+    // Patch Auth identity methods
+    Auth._demoOverride = {
+      me:   () => ({ uid: me.uid, name: me.name, email: me.email }),
+      them: () => ({ uid: them.uid, name: them.name, email: them.email }),
+      myName:    () => me.name,
+      theirName: () => them.name,
+      myUid:     () => me.uid,
+      theirUid:  () => them.uid,
+      couple:    () => this.couple,
+      isReady:   () => true,
+      hasPartner:() => true,
+      amSpouse1: () => amSpouse1,
+      getToken:  () => 'demo-token',
+    };
+
+    // Re-derive isMine / assignedTo / createdBy from perspective
+    this._mockParlays.forEach(mp => {
+      mp.isMine = (mp.createdByUid === me.uid);
+    });
+    this._mockTasks.forEach(mt => {
+      const orig = mt._orig || (mt._orig = { assignedToUid: mt.assignedTo === 'me' ? 'demo-uid-a' : 'demo-uid-b', createdByUid: mt.createdBy === 'me' ? 'demo-uid-a' : 'demo-uid-b', pendingUid: mt.pendingResponseFrom === 'me' ? 'demo-uid-a' : mt.pendingResponseFrom === 'them' ? 'demo-uid-b' : null });
+      mt.assignedTo = orig.assignedToUid === me.uid ? 'me' : 'them';
+      mt.createdBy = orig.createdByUid === me.uid ? 'me' : 'them';
+      mt.pendingResponseFrom = orig.pendingUid === me.uid ? 'me' : orig.pendingUid === them.uid ? 'them' : null;
+    });
+
+    // Patch Store data methods
+    Store._demoOverride = {
+      parlays:        () => this._mockParlays,
+      activeParlays:  () => this._mockParlays.filter(p => !p.archived && p.status !== 'resolved'),
+      resolvedParlays:() => this._mockParlays.filter(p => !p.archived && p.status === 'resolved'),
+      findParlay: (id) => this._mockParlays.find(p => p.id === id) || null,
+      myPendingParlayCount: () => this._mockParlays.filter(p =>
+        !p.archived && p.status !== 'resolved' && (
+          (p.status === 'pending_partner' && !p.isMine) ||
+          (p.status === 'partner_replied' && p.isMine) ||
+          (p.status === 'counter_proposed' && p.isMine) ||
+          p.status === 'active'
+        )).length,
+      tasks:       () => this._mockTasks,
+      myTasks:     () => this._mockTasks.filter(t => t.assignedTo === 'me' && t.status !== 'done'),
+      sentTasks:   () => this._mockTasks.filter(t => t.createdBy === 'me' && t.assignedTo === 'them'),
+      myActionTasks:() => this._mockTasks.filter(t => t.pendingResponseFrom === 'me' && t.status !== 'done'),
+      doneTasks:   () => this._mockTasks.filter(t => t.status === 'done'),
+      findTask: (id) => this._mockTasks.find(t => t.id === id) || null,
+      commPrefs:   () => ({ me: { traits: ['I appreciate directness', 'I need time to process'] }, them: { traits: ['I like to talk things through', 'Words of affirmation matter to me'] } }),
+      get: (key) => key === 'mediatorTone' ? 'neutral' : null,
+    };
+
+    // Patch Store KV
+    Store.set('mediatorTone', 'neutral');
+  },
+
+  _createBar() {
+    if (document.getElementById('demo-bar')) return;
+    const bar = document.createElement('div');
+    bar.id = 'demo-bar';
+    this._renderBar(bar);
+    document.body.prepend(bar);
+  },
+
+  _renderBar(bar) {
+    const bd = new Date(BUILD_DATE);
+    const ts = bd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      + ' ' + bd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    bar.innerHTML = `
+      <span class="demo-label">Demo</span>
+      <span class="demo-sep"></span>
+      <button class="demo-partner ${this.currentPartner === 'A' ? 'active' : ''}" onclick="DEMO.switchTo('A')">Partner A</button>
+      <button class="demo-partner ${this.currentPartner === 'B' ? 'active' : ''}" onclick="DEMO.switchTo('B')">Partner B</button>
+      <span class="demo-sep"></span>
+      <button class="demo-refresh" onclick="caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).then(()=>{localStorage.clear();sessionStorage.clear();location.reload()})">↻ Refresh</button>
+      <span class="demo-version">v${VERSION}<br>${ts}</span>
+    `;
+  },
+
+  _updateBar() {
+    const bar = document.getElementById('demo-bar');
+    if (bar) this._renderBar(bar);
   },
 };
 
@@ -1164,6 +1450,113 @@ const Store = (() => {
   };
 })();
 
+// ── DEMO PROXY — Intercepts Auth & Store in demo mode ──
+// Wraps key methods so they return mock data when DEMO.active
+(function _installDemoProxy() {
+  // Read-only Auth methods → return mock identity
+  const _authKeys = ['me','them','myName','theirName','myUid','theirUid','couple','isReady','hasPartner','amSpouse1','getToken'];
+  _authKeys.forEach(k => {
+    const orig = Auth[k];
+    Auth[k] = function() { return (DEMO.active && Auth._demoOverride?.[k]) ? Auth._demoOverride[k](...arguments) : orig.apply(this, arguments); };
+  });
+
+  // Auth operations → no-op in demo
+  const _origRefresh = Auth.refresh;
+  Auth.refresh = async function() {
+    if (DEMO.active) { Badges.update(); Router.reload(); return; }
+    return _origRefresh.apply(this, arguments);
+  };
+  const _origSignOut = Auth.signOut;
+  Auth.signOut = async function() {
+    if (DEMO.active) { DEMO.active = false; document.getElementById('demo-bar')?.remove(); document.body.style.paddingTop = ''; Router.go('auth-entry'); return; }
+    return _origSignOut.apply(this, arguments);
+  };
+
+  // Auth write operations → no-op in demo
+  const _origUpdateProfile = Auth.updateMyProfile;
+  Auth.updateMyProfile = async function(updates) {
+    if (DEMO.active) { U.toast('Updated (demo)'); return; }
+    return _origUpdateProfile.apply(this, arguments);
+  };
+  const _origSaveCoupleSettings = Auth.saveCoupleSettings;
+  Auth.saveCoupleSettings = async function(patch) {
+    if (DEMO.active) { if (patch.mediator_tone) DEMO.couple.mediator_tone = patch.mediator_tone; U.toast('Saved (demo)'); return; }
+    return _origSaveCoupleSettings.apply(this, arguments);
+  };
+  const _origSaveCommPrefs = Auth.saveMyCommPrefs;
+  Auth.saveMyCommPrefs = async function(traits) {
+    if (DEMO.active) { U.toast('Saved (demo)'); return; }
+    return _origSaveCommPrefs.apply(this, arguments);
+  };
+
+  // Read-only Store methods → return mock data
+  const _storeKeys = ['parlays','activeParlays','resolvedParlays','findParlay','myPendingParlayCount','tasks','myTasks','sentTasks','myActionTasks','doneTasks','findTask','commPrefs','get'];
+  _storeKeys.forEach(k => {
+    const orig = Store[k];
+    Store[k] = function() { return (DEMO.active && Store._demoOverride?.[k]) ? Store._demoOverride[k](...arguments) : orig.apply(this, arguments); };
+  });
+
+  // Write Store methods → operate on mock data locally (no DB)
+  const _origAddParlay = Store.addParlay;
+  Store.addParlay = async function(parlay) {
+    if (DEMO.active) { DEMO._mockParlays.unshift(parlay); return; }
+    return _origAddParlay.apply(this, arguments);
+  };
+  const _origUpdateParlay = Store.updateParlay;
+  Store.updateParlay = async function(id, patch) {
+    if (DEMO.active) {
+      const i = DEMO._mockParlays.findIndex(p => p.id === id);
+      if (i > -1) DEMO._mockParlays[i] = { ...DEMO._mockParlays[i], ...patch };
+      return;
+    }
+    return _origUpdateParlay.apply(this, arguments);
+  };
+  const _origDeleteParlay = Store.deleteParlay;
+  Store.deleteParlay = async function(id) {
+    if (DEMO.active) { DEMO._mockParlays = DEMO._mockParlays.filter(p => p.id !== id); return; }
+    return _origDeleteParlay.apply(this, arguments);
+  };
+  const _origAddTask = Store.addTask;
+  Store.addTask = async function(task) {
+    if (DEMO.active) { DEMO._mockTasks.unshift(task); return; }
+    return _origAddTask.apply(this, arguments);
+  };
+  const _origUpdateTask = Store.updateTask;
+  Store.updateTask = async function(id, patch) {
+    if (DEMO.active) {
+      const i = DEMO._mockTasks.findIndex(t => t.id === id);
+      if (i > -1) DEMO._mockTasks[i] = { ...DEMO._mockTasks[i], ...patch };
+      return;
+    }
+    return _origUpdateTask.apply(this, arguments);
+  };
+  const _origDeleteTask = Store.deleteTask;
+  Store.deleteTask = async function(id) {
+    if (DEMO.active) { DEMO._mockTasks = DEMO._mockTasks.filter(t => t.id !== id); return; }
+    return _origDeleteTask.apply(this, arguments);
+  };
+  // loadParlays/loadTasks → no-op in demo (data already in memory)
+  const _origLoadP = Store.loadParlays;
+  Store.loadParlays = async function() { if (DEMO.active) return; return _origLoadP.apply(this, arguments); };
+  const _origLoadT = Store.loadTasks;
+  Store.loadTasks = async function() { if (DEMO.active) return; return _origLoadT.apply(this, arguments); };
+  const _origLoadC = Store.loadCommPrefs;
+  Store.loadCommPrefs = async function() { if (DEMO.active) return; return _origLoadC.apply(this, arguments); };
+
+  // AI calls → return canned response in demo
+  const _origAICall = AI.call;
+  AI.call = async function(sys, usr) {
+    if (DEMO.active) {
+      // Simulate brief delay then return a generic demo response
+      await new Promise(r => setTimeout(r, 800));
+      if (sys.includes('filter') || sys.includes('tone')) return usr; // tone filter: pass through
+      if (sys.includes('proposal') || sys.includes('Proposal')) return "**Demo Proposal**\n\nThis is a sample proposal generated in demo mode. In the real app, the AI mediator would analyze both partners' inputs, consider communication styles, and produce a balanced, fair proposal.\n\n- **Key point 1:** Both perspectives are acknowledged\n- **Key point 2:** A practical compromise is suggested\n- **Key point 3:** Next steps are outlined";
+      return "This is a demo response. In the real app, the AI would provide a thoughtful, context-aware response.";
+    }
+    return _origAICall.apply(this, arguments);
+  };
+})();
+
 // ──────────────────────────────────────────────
 // BADGES — Centralized count display
 // ──────────────────────────────────────────────
@@ -1627,7 +2020,11 @@ Router.register('auth-entry', () => `
       <button class="btn btn-accent" onclick="Router.go('auth-signup')">Create Account</button>
       <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);" onclick="Router.go('auth-signin')">Sign In</button>
     </div>
-    <div style="position:absolute;bottom:max(20px,env(safe-area-inset-bottom));font-size:.6rem;color:rgba(250,246,241,.2);">v${VERSION}</div>
+    <div style="margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:8px;" class="a3">
+      <button class="btn" style="background:rgba(122,158,138,.15);color:var(--sage);border:1px solid rgba(122,158,138,.3);width:100%;max-width:300px;" onclick="DEMO.activate('A')">Try Demo</button>
+      <div style="font-size:.62rem;color:rgba(250,246,241,.4);">No account needed — explore with sample data</div>
+    </div>
+    <div style="position:absolute;bottom:max(20px,env(safe-area-inset-bottom));font-size:.6rem;color:rgba(250,246,241,.35);">v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} ${new Date(BUILD_DATE).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div>
   </div>
 `);
 
@@ -1938,7 +2335,7 @@ Router.register('home', () => {
       <div style="color:var(--muted);font-size:1.2rem;">›</div>
     </div>
 
-    <div style="text-align:center;padding:20px 0 8px;font-size:.65rem;color:var(--border);">Parlay v${VERSION}</div>
+    <div style="text-align:center;padding:20px 0 8px;font-size:.65rem;color:var(--border);">Parlay v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
   </div>`;
 }, () => { Badges.update(); });
 
@@ -3262,7 +3659,7 @@ Router.register('setup', () => {
 
     <div style="padding:28px 20px;text-align:center;" class="a4">
       <button class="btn btn-danger" style="max-width:220px;margin:0 auto;" id="signout-btn">Sign Out</button>
-      <div style="margin-top:16px;font-size:.65rem;color:var(--border);">Parlay v${VERSION}</div>
+      <div style="margin-top:16px;font-size:.65rem;color:var(--border);">Parlay v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
     </div>
   </div>`;
 }, (el) => {
@@ -3417,6 +3814,12 @@ Router.register('setup-tone', () => {
       Router.go('home');
     }
     updateDevBar();
+    return;
+  }
+
+  // ── Demo mode via URL (?demo or ?demo=B) ──────
+  if (_devParams.has('demo')) {
+    DEMO.activate(_devParams.get('demo') === 'B' ? 'B' : 'A');
     return;
   }
 
