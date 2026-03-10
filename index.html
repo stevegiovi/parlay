@@ -1678,17 +1678,112 @@ const AI = (() => {
   return { call };
 })();
 
+// ── DEMO: Local tone rewriter (no AI needed) ──
+const DemoRewriter = (() => {
+  // Profanity → clean replacement map
+  const PROFANITY = [
+    [/\bfuck(?:en|ing|ed|s)?\b/gi, ''],
+    [/\bshit(?:ty|s)?\b/gi, ''],
+    [/\bbitch(?:ing|y|es)?\b/gi, ''],
+    [/\bdamn(?:ed|it)?\b/gi, ''],
+    [/\bass(?:hole|es)?\b/gi, ''],
+    [/\bcrap(?:py|s)?\b/gi, ''],
+    [/\bhell\b/gi, ''],
+    [/\bwtf\b/gi, ''],
+    [/\bstfu\b/gi, ''],
+  ];
+
+  // Aggressive phrases → softer alternatives
+  const SOFTENERS = [
+    [/\byou need to\b/gi, 'I'd really appreciate if you could'],
+    [/\byou have to\b/gi, 'it would mean a lot if you could'],
+    [/\byou never\b/gi, 'I've been noticing that sometimes'],
+    [/\byou always\b/gi, 'I feel like sometimes'],
+    [/\byou don'?t even\b/gi, 'I wish we could'],
+    [/\byou don'?t care\b/gi, 'I need to feel that this matters to both of us'],
+    [/\bI don'?t care\b/gi, 'I'm flexible on this'],
+    [/\bwhatever\b/gi, 'I'm open to options'],
+    [/\blet me\b/gi, 'I'd like to'],
+    [/\bjust let me\b/gi, 'I'd really like to'],
+    [/\bI want to\b/gi, 'I'd love to'],
+    [/\bI want\b/gi, 'I'd like'],
+    [/\bI need\b/gi, 'It's important to me to'],
+  ];
+
+  /** Extract the quoted raw message from the prompt format:
+   *  'Name wrote: "message text"\n\nApply the framework...' */
+  function extractQuoted(usr) {
+    const m = usr.match(/wrote:\s*"([\s\S]*?)"\s*\n/);
+    return m ? m[1].trim() : usr.trim();
+  }
+
+  /** Clean profanity and soften aggressive phrasing */
+  function rewrite(text) {
+    let out = text;
+    // Remove profanity
+    for (const [rx, rep] of PROFANITY) out = out.replace(rx, rep);
+    // Soften aggressive phrases
+    for (const [rx, rep] of SOFTENERS) out = out.replace(rx, rep);
+    // Collapse multiple spaces / clean up punctuation
+    out = out.replace(/\s{2,}/g, ' ').replace(/\s+([.,!?])/g, '$1').trim();
+    // Ensure ends with punctuation
+    if (out && !/[.!?]$/.test(out)) out += '.';
+    // Capitalize first letter
+    if (out) out = out[0].toUpperCase() + out.slice(1);
+    return out;
+  }
+
+  return { extractQuoted, rewrite };
+})();
+
 // ── DEMO: AI proxy (must be after AI is defined) ──
 (function() {
   const _origAICall = AI.call;
   AI.call = async function(sys, usr) {
-    if (DEMO.active) {
-      await new Promise(r => setTimeout(r, 800));
-      if (sys.includes('filter') || sys.includes('tone')) return usr;
-      if (sys.includes('proposal') || sys.includes('Proposal')) return "**Demo Proposal**\n\nThis is a sample proposal generated in demo mode. In the real app, the AI mediator would analyze both partners' inputs, consider communication styles, and produce a balanced, fair proposal.\n\n- **Key point 1:** Both perspectives are acknowledged\n- **Key point 2:** A practical compromise is suggested\n- **Key point 3:** Next steps are outlined";
-      return "This is a demo response. In the real app, the AI would provide a thoughtful, context-aware response.";
+    if (!DEMO.active) return _origAICall.apply(this, arguments);
+
+    // Simulate realistic AI latency
+    await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
+
+    // ── Tension / Gottman detection ──
+    if (sys.includes('Horsemen') || sys.includes('Gottman')) {
+      // Simple local heuristic: flag if profanity or aggressive "you" statements
+      const hasHeat = /\b(fuck|shit|bitch|damn|ass|hell)\b/i.test(usr)
+        || /\byou (never|always|don'?t)\b/i.test(usr);
+      const horseman = hasHeat
+        ? (/\byou (never|always)\b/i.test(usr) ? 'criticism' : 'contempt')
+        : 'none';
+      return JSON.stringify({
+        flag: hasHeat,
+        horseman,
+        note: hasHeat ? "That's okay — Parlay will cool it down for you." : ''
+      });
     }
-    return _origAICall.apply(this, arguments);
+
+    // ── Proposal generation ──
+    if (sys.includes('Compromise Generator') || sys.includes('Proposal')) {
+      // Extract names and positions from usr
+      const lines = usr.split('\n').filter(l => l.trim());
+      const topicLine = lines.find(l => l.startsWith('Topic:')) || '';
+      const topic = topicLine.replace('Topic:', '').trim();
+      const posA = lines.find(l => l.includes('position:'))?.replace(/.*position:\s*"?/,'').replace(/"$/,'') || '';
+      const posB = lines.filter(l => l.includes('position:')).pop()?.replace(/.*position:\s*"?/,'').replace(/"$/,'') || '';
+      return JSON.stringify({
+        proposal: `Here's a plan that works for both of you on "${topic}": honour both preferences by meeting in the middle. Start with the shared goal, then alternate on the specifics so each person feels heard.`,
+        reasoning: 'Both positions have valid needs — this splits the difference fairly.',
+        userConcession: 'Being flexible on timing and specific details.',
+        partnerConcession: 'Accommodating the core request while adjusting scope.',
+      });
+    }
+
+    // ── Tone filter (main parlay compose, replies, counters) ──
+    if (sys.includes('Communication Translator') || sys.includes('filter') || sys.includes('tone') || sys.includes('Rewrite')) {
+      const raw = DemoRewriter.extractQuoted(usr);
+      return DemoRewriter.rewrite(raw);
+    }
+
+    // ── Fallback for any other AI call ──
+    return DemoRewriter.rewrite(DemoRewriter.extractQuoted(usr));
   };
 })();
 
