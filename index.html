@@ -1695,19 +1695,19 @@ const DemoRewriter = (() => {
 
   // Aggressive phrases → softer alternatives
   const SOFTENERS = [
-    [/\byou need to\b/gi, 'I'd really appreciate if you could'],
-    [/\byou have to\b/gi, 'it would mean a lot if you could'],
-    [/\byou never\b/gi, 'I've been noticing that sometimes'],
-    [/\byou always\b/gi, 'I feel like sometimes'],
-    [/\byou don'?t even\b/gi, 'I wish we could'],
-    [/\byou don'?t care\b/gi, 'I need to feel that this matters to both of us'],
-    [/\bI don'?t care\b/gi, 'I'm flexible on this'],
-    [/\bwhatever\b/gi, 'I'm open to options'],
-    [/\blet me\b/gi, 'I'd like to'],
-    [/\bjust let me\b/gi, 'I'd really like to'],
-    [/\bI want to\b/gi, 'I'd love to'],
-    [/\bI want\b/gi, 'I'd like'],
-    [/\bI need\b/gi, 'It's important to me to'],
+    [/\byou need to\b/gi, `I'd really appreciate if you could`],
+    [/\byou have to\b/gi, `it would mean a lot if you could`],
+    [/\byou never\b/gi, `I've been noticing that sometimes`],
+    [/\byou always\b/gi, `I feel like sometimes`],
+    [/\byou don'?t even\b/gi, `I wish we could`],
+    [/\byou don'?t care\b/gi, `I need to feel that this matters to both of us`],
+    [/\bI don'?t care\b/gi, `I'm flexible on this`],
+    [/\bwhatever\b/gi, `I'm open to options`],
+    [/\blet me\b/gi, `I'd like to`],
+    [/\bjust let me\b/gi, `I'd really like to`],
+    [/\bI want to\b/gi, `I'd love to`],
+    [/\bI want\b/gi, `I'd like`],
+    [/\bI need\b/gi, `It's important to me to`],
   ];
 
   /** Extract the quoted raw message from the prompt format:
