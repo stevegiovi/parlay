@@ -410,6 +410,19 @@ const U = {
   code: () => Math.random().toString(36).slice(2,8).toUpperCase(),
   esc: s => (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'),
   shortDate: d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  timeOptions: () => [
+    '', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+    '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
+    '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM',
+    '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM',
+    '9:00 PM', '9:30 PM', '10:00 PM',
+  ],
+  timeSelectHtml: (slot, selected = '') => {
+    const opts = U.timeOptions().map(t =>
+      `<option value="${t}"${t === selected ? ' selected' : ''}>${t || 'Time'}</option>`
+    ).join('');
+    return `<select class="input" style="flex:1;min-width:0;" data-slot="${slot}" data-type="time">${opts}</select>`;
+  },
 };
 
 // ──────────────────────────────────────────────
@@ -636,10 +649,16 @@ const Auth = (() => {
             const isCreator = payload.new?.created_by === _uid;
             // partner_replied: notify the creator (the partner just replied)
             if (newStatus === 'partner_replied' && isCreator) U.toast('💬 ' + theirName() + ' responded');
+            // counter_proposed: notify the creator (the partner suggested new times)
+            else if (newStatus === 'counter_proposed' && isCreator) U.toast('📅 ' + theirName() + ' suggested different times');
             // active (proposal generated): notify the recipient (the creator generated it)
             else if (newStatus === 'active' && !isCreator) U.toast('⚖️ Proposal is ready');
-            // resolved: notify the other person (whoever didn't trigger it)
-            else if (newStatus === 'resolved') U.toast('✓ Parlay resolved');
+            // resolved: notify both — use specific message for date confirmation
+            else if (newStatus === 'resolved') {
+              const res = payload.new?.resolution;
+              if (res === 'date_accepted') U.toast('🎉 Event confirmed!');
+              else U.toast('✓ Parlay resolved');
+            }
           }
         });
       })
@@ -761,6 +780,12 @@ const Store = (() => {
       partnerRawReply: row.partner_raw_reply,
       partnerFilteredReply: row.partner_filtered_reply,
       partnerDateResponse: row.partner_date_response,
+      counterDates: typeof row.counter_dates === 'string'
+        ? (() => { try { return JSON.parse(row.counter_dates); } catch { return []; } })()
+        : (row.counter_dates || []),
+      confirmedDate: typeof row.confirmed_date === 'string'
+        ? (() => { try { return JSON.parse(row.confirmed_date); } catch { return null; } })()
+        : (row.confirmed_date || null),
       proposal: row.proposal,
       resolution: row.resolution,
       archived: row.archived || false,
@@ -782,6 +807,8 @@ const Store = (() => {
       partner_raw_reply: p.partnerRawReply,
       partner_filtered_reply: p.partnerFilteredReply,
       partner_date_response: p.partnerDateResponse,
+      counter_dates: p.counterDates,
+      confirmed_date: p.confirmedDate,
       proposal: p.proposal,
       resolution: p.resolution,
       archived: p.archived || false,
@@ -794,7 +821,8 @@ const Store = (() => {
       filteredInput:'filtered_input', intentContext:'intent_context',
       dateOptions:'date_options', status:'status',
       partnerRawReply:'partner_raw_reply', partnerFilteredReply:'partner_filtered_reply',
-      partnerDateResponse:'partner_date_response',
+      partnerDateResponse:'partner_date_response', counterDates:'counter_dates',
+      confirmedDate:'confirmed_date',
       proposal:'proposal', resolution:'resolution', archived:'archived',
     };
     const row = {};
@@ -880,6 +908,7 @@ const Store = (() => {
     return activeParlays().filter(p =>
       (p.status === 'pending_partner' && !p.isMine) ||
       (p.status === 'partner_replied' && p.isMine) ||
+      (p.status === 'counter_proposed' && p.isMine) ||
       (p.status === 'active')
     ).length;
   }
@@ -1684,10 +1713,11 @@ Router.register('home', () => {
         </div>
         <div style="background:var(--terra);color:#fff;font-size:.7rem;font-weight:800;min-width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:0 7px;">${totalPending}</div>
       </div>
-      ${activeParlays.filter(p => (p.status === 'pending_partner' && !p.isMine) || (p.status === 'partner_replied' && p.isMine) || p.status === 'active').slice(0,3).map(p => {
+      ${activeParlays.filter(p => (p.status === 'pending_partner' && !p.isMine) || (p.status === 'partner_replied' && p.isMine) || (p.status === 'counter_proposed' && p.isMine) || p.status === 'active').slice(0,3).map(p => {
         const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
         const label = (p.status === 'pending_partner' && !p.isMine) ? 'Reply needed'
           : (p.status === 'partner_replied' && p.isMine) ? 'Reply received'
+          : (p.status === 'counter_proposed' && p.isMine) ? 'New times suggested'
           : 'Proposal ready';
         return `<div onclick="Router.go('parlay-detail',{id:'${p.id}'})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;cursor:pointer;margin-bottom:6px;">
           <span style="font-size:1.1rem;">${topic.icon}</span>
@@ -1765,6 +1795,8 @@ Router.register('plan', () => {
     if (p.status === 'pending_partner' && p.isMine)  return ['Sent — awaiting reply', '#E8B88A', '#E8B88A18'];
     if (p.status === 'partner_replied' && p.isMine)   return ['Reply received ↩', '#7A6A9B', '#7A6A9B18'];
     if (p.status === 'partner_replied' && !p.isMine)  return ['Sent — awaiting proposal', '#7A6A9B', '#7A6A9B18'];
+    if (p.status === 'counter_proposed' && p.isMine)   return ['New times ↩', '#6A8CAA', '#6A8CAA18'];
+    if (p.status === 'counter_proposed' && !p.isMine)  return ['Counter sent', '#6A8CAA', '#6A8CAA18'];
     if (p.status === 'active')                         return ['Proposal ready', '#C4714A', '#C4714A18'];
     return [p.status, '#9B8880', '#9B888018'];
   };
@@ -1877,15 +1909,23 @@ Router.register('compose', ({ topicId } = {}) => {
 
       <!-- Date options -->
       <div>
-        <div class="input-label">Date options (optional)</div>
+        <div class="input-label">Date &amp; time options (optional, up to 4)</div>
         <div style="display:flex;flex-direction:column;gap:8px;" id="date-slots">
           <div style="display:flex;gap:8px;">
             <input type="date" class="input" style="flex:2;" data-slot="1" data-type="date">
-            <input type="text" class="input" style="flex:1;" placeholder="Time" data-slot="1" data-type="time">
+            ${U.timeSelectHtml(1)}
           </div>
           <div style="display:flex;gap:8px;">
             <input type="date" class="input" style="flex:2;" data-slot="2" data-type="date">
-            <input type="text" class="input" style="flex:1;" placeholder="Time" data-slot="2" data-type="time">
+            ${U.timeSelectHtml(2)}
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input type="date" class="input" style="flex:2;" data-slot="3" data-type="date">
+            ${U.timeSelectHtml(3)}
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input type="date" class="input" style="flex:2;" data-slot="4" data-type="date">
+            ${U.timeSelectHtml(4)}
           </div>
         </div>
       </div>
@@ -1993,9 +2033,9 @@ Router.register('compose', ({ topicId } = {}) => {
 
     // Gather date options
     const dateOptions = [];
-    for (let n = 1; n <= 2; n++) {
+    for (let n = 1; n <= 4; n++) {
       const d = el.querySelector(`input[data-slot="${n}"][data-type="date"]`)?.value;
-      const t = el.querySelector(`input[data-slot="${n}"][data-type="time"]`)?.value || '';
+      const t = el.querySelector(`[data-slot="${n}"][data-type="time"]`)?.value || '';
       if (d) dateOptions.push({ id: 'opt_' + n, date: d, timeLabel: t || 'Any time' });
     }
     if (dateOptions.length) {
@@ -2082,25 +2122,47 @@ Router.register('parlay-detail', ({ id } = {}) => {
   const statusText = {
     pending_partner: isMine ? `Waiting for ${recipN}` : 'Your turn to respond',
     partner_replied: isMine ? `${recipN} has replied` : 'Awaiting proposal',
+    counter_proposed: isMine ? `${recipN} suggested new times` : 'Counter-proposal sent',
     active: 'Proposal ready',
-    resolved: p.resolution === 'needs_discussion' ? 'Needs conversation' : 'Resolved',
+    resolved: p.resolution === 'needs_discussion' ? 'Needs conversation'
+      : p.resolution === 'date_accepted' ? 'Event confirmed'
+      : 'Resolved',
   };
 
-  const statusColor = { pending_partner:'#E8B88A', partner_replied:'#7A6A9B', active:'#C4714A', resolved:'#7A9E8A' };
+  const statusColor = { pending_partner:'#E8B88A', partner_replied:'#7A6A9B', counter_proposed:'#6A8CAA', active:'#C4714A', resolved:'#7A9E8A' };
   const sc = statusColor[p.status] || '#9B8880';
 
   // Date options
+  const isConfirmed = p.resolution === 'date_accepted';
   const dateHtml = (p.dateOptions?.length > 0) ? `
     <div style="margin-top:12px;">
-      <div class="input-label">📅 Proposed dates</div>
+      <div class="input-label">📅 ${isConfirmed ? 'Confirmed date' : 'Proposed dates'}</div>
       <div style="display:flex;flex-direction:column;gap:6px;">
         ${p.dateOptions.map(o => {
           const d = new Date(o.date + 'T12:00:00');
           const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
           const sel = p.partnerDateResponse === o.id;
+          if (isConfirmed && !sel) return '';
           return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1.5px solid ${sel ? 'var(--sage)' : 'var(--border)'};border-radius:12px;background:${sel ? '#EDF4F0' : 'var(--surface)'};">
             <div><div style="font-size:.88rem;font-weight:600;">${label}</div>${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}</div>
-            ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Selected</span>` : ''}
+            ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">${isConfirmed ? '✓ Confirmed' : '✓ Selected'}</span>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+  // Counter-proposed dates
+  const counterHtml = (p.counterDates?.length > 0) ? `
+    <div style="margin-top:16px;margin-bottom:16px;">
+      <div class="input-label">📅 ${!isMine ? 'Your suggested times' : recipN + "'s suggested times"}</div>
+      <div style="display:flex;flex-direction:column;gap:6px;" id="counter-dates-list">
+        ${p.counterDates.map(o => {
+          const d = new Date(o.date + 'T12:00:00');
+          const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+          const sel = p.confirmedDate?.id === o.id;
+          return `<div class="counter-date-opt" data-opt="${o.id}" data-date="${o.date}" data-time="${o.timeLabel || ''}" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1.5px solid ${sel ? 'var(--sage)' : 'var(--border)'};border-radius:12px;background:${sel ? '#EDF4F0' : 'var(--surface)'};${p.status === 'counter_proposed' && isMine ? 'cursor:pointer;' : ''}">
+            <div><div style="font-size:.88rem;font-weight:600;">${label}</div>${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}</div>
+            ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Confirmed</span>` : (p.status === 'counter_proposed' && isMine ? `<div class="counter-check" style="width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.7rem;"></div>` : '')}
           </div>`;
         }).join('')}
       </div>
@@ -2128,6 +2190,13 @@ Router.register('parlay-detail', ({ id } = {}) => {
     actionHtml = `<button class="btn" style="background:linear-gradient(135deg,#4A3568,#7A6A9B);color:#fff;" id="gen-proposal-btn"><span id="gen-btn-text">⚖️ Generate Proposal</span></button>`;
   } else if (p.status === 'partner_replied' && !isMine) {
     actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">✓ Position sent. Waiting for ${U.esc(creatorN)} to generate proposal.</div></div>`;
+  } else if (p.status === 'counter_proposed' && isMine) {
+    actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn" style="background:var(--sage);color:#fff;" id="accept-counter-btn" disabled><span id="accept-counter-text">Select a date above to confirm</span></button>
+      <button class="btn btn-outline" id="discuss-btn">💬 This needs a conversation</button>
+    </div>`;
+  } else if (p.status === 'counter_proposed' && !isMine) {
+    actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">⏳ Waiting for ${U.esc(creatorN)} to pick a time</div></div>`;
   } else if (p.status === 'active' && p.proposal) {
     actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept Proposal</button>
@@ -2139,6 +2208,12 @@ Router.register('parlay-detail', ({ id } = {}) => {
         <div style="font-size:.85rem;color:var(--muted);font-weight:600;">💬 Marked for conversation</div>
         <div style="font-size:.75rem;color:var(--muted);margin-top:6px;">Talk it through together, then come back to resolve.</div>
         <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="reopen-btn">↻ Reopen Parlay</button>
+      </div>`;
+    } else if (p.resolution === 'date_accepted') {
+      actionHtml = `<div style="text-align:center;padding:16px;background:#EDF4F0;border:1.5px solid var(--sage);border-radius:var(--r-md);">
+        <div style="font-size:1.5rem;margin-bottom:6px;">🎉</div>
+        <div style="font-size:.92rem;color:var(--sage);font-weight:700;">Event Confirmed</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:4px;">You're all set — the date is locked in.</div>
       </div>`;
     } else {
       actionHtml = `<div style="text-align:center;padding:12px;font-size:.85rem;color:var(--sage);font-weight:600;">✓ Proposal accepted</div>`;
@@ -2188,6 +2263,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
       </div>
     </div>` : ''}
 
+    ${counterHtml}
     ${proposalHtml}
 
     <div style="margin-top:20px;" class="a5">${actionHtml}</div>
@@ -2226,6 +2302,53 @@ Router.register('parlay-detail', ({ id } = {}) => {
     Badges.update();
     U.toast('💬 Time to talk this one through');
     Router.go('plan');
+  });
+
+  // Counter-proposed date selection + accept (creator picks from partner's counter-dates)
+  let _selectedCounterDate = null;
+  el.querySelectorAll('.counter-date-opt').forEach(card => {
+    card.addEventListener('click', () => {
+      if (p.status !== 'counter_proposed' || !p.isMine) return;
+      _selectedCounterDate = card.dataset.opt;
+      el.querySelectorAll('.counter-date-opt').forEach(c => {
+        const sel = c.dataset.opt === _selectedCounterDate;
+        c.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
+        c.style.background = sel ? '#EDF4F0' : 'var(--surface)';
+        const check = c.querySelector('.counter-check');
+        if (check) {
+          check.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
+          check.style.background = sel ? 'rgba(122,158,138,.4)' : 'transparent';
+          check.textContent = sel ? '✓' : '';
+          check.style.color = 'var(--sage)';
+        }
+      });
+      const btn = el.querySelector('#accept-counter-btn');
+      if (btn) btn.disabled = false;
+      const txt = el.querySelector('#accept-counter-text');
+      if (txt) txt.textContent = '✓ Accept & Confirm Event';
+    });
+  });
+
+  el.querySelector('#accept-counter-btn')?.addEventListener('click', async () => {
+    if (!_selectedCounterDate) return;
+    const btn = el.querySelector('#accept-counter-btn');
+    const txt = el.querySelector('#accept-counter-text');
+    btn.disabled = true; txt.textContent = 'Confirming…';
+    const selectedOpt = p.counterDates?.find(o => o.id === _selectedCounterDate);
+    try {
+      await Store.updateParlay(p.id, {
+        confirmedDate: selectedOpt || { id: _selectedCounterDate },
+        status: 'resolved',
+        resolution: 'date_accepted',
+      });
+      Badges.update();
+      U.toast('Event confirmed ✓');
+      Router.go('parlay-detail', { id: p.id });
+    } catch(e) {
+      btn.disabled = false;
+      txt.textContent = '✓ Accept & Confirm Event';
+      U.toast('⚠️ Failed — try again');
+    }
   });
 
   // Reopen (from needs_discussion resolved state)
@@ -2272,6 +2395,7 @@ Router.register('parlay-reply', ({ id } = {}) => {
 
   const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
   const creatorN = Auth.theirName();
+  const hasDates = p.dateOptions?.length > 0;
 
   return `
   <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
@@ -2284,22 +2408,69 @@ Router.register('parlay-reply', ({ id } = {}) => {
     <div style="background:var(--espresso);border-radius:var(--r-lg);padding:18px;margin-bottom:24px;" class="a2">
       <div class="input-label" style="color:rgba(232,184,138,.7);">${U.esc(creatorN)}'s position</div>
       <div style="font-size:.85rem;color:rgba(250,246,241,.88);line-height:1.65;font-style:italic;">"${p.filteredInput || p.rawInput || ''}"</div>
-      ${p.dateOptions?.length > 0 ? `
-      <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);">
-        <div class="input-label" style="color:rgba(232,184,138,.6);">📅 Proposed dates</div>
-        <div style="display:flex;flex-direction:column;gap:6px;" id="reply-dates">
-          ${p.dateOptions.map(o => {
-            const d = new Date(o.date + 'T12:00:00');
-            const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
-            return `<div class="reply-date-opt" data-opt="${o.id}" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1.5px solid rgba(255,255,255,.15);border-radius:10px;cursor:pointer;background:rgba(255,255,255,.05);">
-              <div><div style="font-size:.82rem;font-weight:600;color:rgba(250,246,241,.9);">${label}</div>${o.timeLabel ? `<div style="font-size:.68rem;color:rgba(250,246,241,.5);">${o.timeLabel}</div>` : ''}</div>
-              <div class="date-check" style="width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.25);"></div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>` : ''}
     </div>
 
+    ${hasDates ? `
+    <!-- ── Date selection: pick one and accept ── -->
+    <div class="a3" style="margin-bottom:20px;">
+      <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:300;margin-bottom:6px;">Pick a <em style="color:var(--terra)">date</em></div>
+      <div style="font-size:.8rem;color:var(--muted);line-height:1.6;">Select a time that works and confirm the event, or suggest different times below.</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;" id="reply-dates">
+      ${p.dateOptions.map(o => {
+        const d = new Date(o.date + 'T12:00:00');
+        const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+        return `<div class="reply-date-opt" data-opt="${o.id}" data-date="${o.date}" data-time="${o.timeLabel || ''}" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;cursor:pointer;background:var(--surface);transition:all .15s;">
+          <div><div style="font-size:.88rem;font-weight:600;">${label}</div>${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}</div>
+          <div class="date-check" style="width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.7rem;"></div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <button class="btn" style="background:var(--sage);color:#fff;margin-bottom:24px;" id="accept-date-btn" disabled>
+      <span id="accept-date-text">Select a date to confirm</span>
+    </button>
+
+    <!-- ── Divider ── -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+      <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">or</div>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+
+    <!-- ── Counter-propose dates ── -->
+    <div style="margin-bottom:16px;">
+      <div style="font-family:var(--font-display);font-size:1.2rem;font-weight:300;margin-bottom:8px;">Suggest <em style="color:var(--terra)">different times</em></div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:12px;">None of these work? Propose up to 4 alternatives.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;" id="counter-date-slots">
+        <div style="display:flex;gap:8px;">
+          <input type="date" class="input" style="flex:2;" data-cslot="1" data-type="date">
+          ${U.timeSelectHtml('c1')}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input type="date" class="input" style="flex:2;" data-cslot="2" data-type="date">
+          ${U.timeSelectHtml('c2')}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input type="date" class="input" style="flex:2;" data-cslot="3" data-type="date">
+          ${U.timeSelectHtml('c3')}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input type="date" class="input" style="flex:2;" data-cslot="4" data-type="date">
+          ${U.timeSelectHtml('c4')}
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div class="input-label">Add a note (optional)</div>
+      <textarea id="reply-text" class="input" rows="3" placeholder="e.g. Those times don't work — how about these instead?" style="resize:none;line-height:1.6;"></textarea>
+    </div>
+
+    <button class="btn btn-accent" id="counter-submit"><span id="counter-btn-text">Send counter-proposal →</span></button>
+    ` : `
+    <!-- ── No dates: standard position reply ── -->
     <div class="a3" style="margin-bottom:16px;">
       <div style="font-family:var(--font-display);font-size:1.7rem;font-weight:300;margin-bottom:6px;">Your <em style="color:var(--terra)">position</em></div>
       <div style="font-size:.8rem;color:var(--muted);line-height:1.6;">Be honest — Parlay filters everything before ${U.esc(creatorN)} sees it.</div>
@@ -2315,6 +2486,8 @@ Router.register('parlay-reply', ({ id } = {}) => {
     </div>
 
     <button class="btn btn-accent" id="reply-submit"><span id="reply-btn-text">Send my position →</span></button>
+    `}
+
     <button class="btn btn-outline" style="margin-top:10px;" onclick="Router.go('parlay-detail',{id:'${p.id}'})">Cancel</button>
   </div>`;
 }, (el, { id } = {}) => {
@@ -2322,66 +2495,140 @@ Router.register('parlay-reply', ({ id } = {}) => {
   if (!p) return;
   let _selectedDate = null;
   let _submitting = false;
+  const hasDates = p.dateOptions?.length > 0;
 
-  // Date selection
-  el.querySelectorAll('.reply-date-opt').forEach(card => {
-    card.addEventListener('click', () => {
-      _selectedDate = card.dataset.opt;
-      el.querySelectorAll('.reply-date-opt').forEach(c => {
-        const sel = c.dataset.opt === _selectedDate;
-        c.style.borderColor = sel ? 'rgba(122,158,138,.6)' : 'rgba(255,255,255,.15)';
-        c.style.background = sel ? 'rgba(122,158,138,.15)' : 'rgba(255,255,255,.05)';
-        const check = c.querySelector('.date-check');
-        if (check) {
-          check.style.borderColor = sel ? 'rgba(122,158,138,.8)' : 'rgba(255,255,255,.25)';
-          check.style.background = sel ? 'rgba(122,158,138,.4)' : 'transparent';
-          check.textContent = sel ? '✓' : '';
-          check.style.color = 'rgba(122,158,138,1)';
-          check.style.fontSize = '.7rem';
-          check.style.display = 'flex';
-          check.style.alignItems = 'center';
-          check.style.justifyContent = 'center';
-        }
+  if (hasDates) {
+    // ── Date selection (accept directly) ──
+    el.querySelectorAll('.reply-date-opt').forEach(card => {
+      card.addEventListener('click', () => {
+        _selectedDate = card.dataset.opt;
+        el.querySelectorAll('.reply-date-opt').forEach(c => {
+          const sel = c.dataset.opt === _selectedDate;
+          c.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
+          c.style.background = sel ? '#EDF4F0' : 'var(--surface)';
+          const check = c.querySelector('.date-check');
+          if (check) {
+            check.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
+            check.style.background = sel ? 'rgba(122,158,138,.4)' : 'transparent';
+            check.textContent = sel ? '✓' : '';
+            check.style.color = 'var(--sage)';
+          }
+        });
+        const btn = el.querySelector('#accept-date-btn');
+        if (btn) { btn.disabled = false; }
+        const txt = el.querySelector('#accept-date-text');
+        if (txt) { txt.textContent = '✓ Accept & Confirm Event'; }
       });
     });
-  });
 
-  // Submit
-  el.querySelector('#reply-submit')?.addEventListener('click', async () => {
-    if (_submitting) return;
-    const raw = el.querySelector('#reply-text')?.value.trim();
-    if (!raw) { U.toast('Share your position first'); return; }
-    _submitting = true;
+    // Accept date directly — confirms the event
+    el.querySelector('#accept-date-btn')?.addEventListener('click', async () => {
+      if (_submitting || !_selectedDate) return;
+      _submitting = true;
+      const btn = el.querySelector('#accept-date-btn');
+      const txt = el.querySelector('#accept-date-text');
+      btn.disabled = true; txt.textContent = 'Confirming…';
 
-    const btn = el.querySelector('#reply-submit');
-    const btnText = el.querySelector('#reply-btn-text');
-    btn.disabled = true; btnText.textContent = 'Filtering…';
+      const selectedOpt = p.dateOptions.find(o => o.id === _selectedDate);
+      try {
+        await Store.updateParlay(p.id, {
+          partnerDateResponse: _selectedDate,
+          confirmedDate: selectedOpt || { id: _selectedDate },
+          status: 'resolved',
+          resolution: 'date_accepted',
+        });
+        Badges.update();
+        U.toast('Event confirmed ✓');
+        Router.go('parlay-detail', { id: p.id });
+      } catch(e) {
+        console.error('[reply] accept error:', e);
+        _submitting = false;
+        btn.disabled = false;
+        txt.textContent = '✓ Accept & Confirm Event';
+        U.toast('⚠️ Failed — try again');
+      }
+    });
 
-    let filtered = raw;
-    try {
-      filtered = await runToneFilter(raw, p.intentContext || '');
-    } catch(e) { filtered = raw; }
+    // Counter-propose dates
+    el.querySelector('#counter-submit')?.addEventListener('click', async () => {
+      if (_submitting) return;
+      const counterDates = [];
+      for (let n = 1; n <= 4; n++) {
+        const d = el.querySelector(`[data-cslot="${n}"][data-type="date"]`)?.value;
+        const t = el.querySelector(`[data-slot="c${n}"][data-type="time"]`)?.value || '';
+        if (d) counterDates.push({ id: 'counter_' + n, date: d, timeLabel: t || 'Any time' });
+      }
+      if (counterDates.length === 0) {
+        U.toast('Add at least one date to counter-propose');
+        return;
+      }
+      _submitting = true;
+      const btn = el.querySelector('#counter-submit');
+      const txt = el.querySelector('#counter-btn-text');
+      btn.disabled = true; txt.textContent = 'Sending…';
 
-    const patch = {
-      partnerRawReply: raw,
-      partnerFilteredReply: filtered,
-      status: 'partner_replied',
-    };
-    if (_selectedDate) patch.partnerDateResponse = _selectedDate;
+      const raw = el.querySelector('#reply-text')?.value.trim() || '';
+      let filtered = raw;
+      if (raw) {
+        try { filtered = await runToneFilter(raw, p.intentContext || ''); } catch(e) { filtered = raw; }
+      }
 
-    try {
-      await Store.updateParlay(p.id, patch);
-      Badges.update();
-      U.toast('Position sent ✓');
-      Router.go('parlay-detail', { id: p.id });
-    } catch(e) {
-      console.error('[reply] save error:', e);
-      _submitting = false;
-      btn.disabled = false;
-      btnText.textContent = 'Send my position →';
-      U.toast('⚠️ Failed to send — try again');
-    }
-  });
+      try {
+        await Store.updateParlay(p.id, {
+          partnerRawReply: raw || null,
+          partnerFilteredReply: filtered || null,
+          counterDates,
+          status: 'counter_proposed',
+        });
+        Badges.update();
+        U.toast('Counter-proposal sent ✓');
+        Router.go('parlay-detail', { id: p.id });
+      } catch(e) {
+        console.error('[reply] counter error:', e);
+        _submitting = false;
+        btn.disabled = false;
+        txt.textContent = 'Send counter-proposal →';
+        U.toast('⚠️ Failed — try again');
+      }
+    });
+
+  } else {
+    // ── Standard position reply (no dates) ──
+    el.querySelector('#reply-submit')?.addEventListener('click', async () => {
+      if (_submitting) return;
+      const raw = el.querySelector('#reply-text')?.value.trim();
+      if (!raw) { U.toast('Share your position first'); return; }
+      _submitting = true;
+
+      const btn = el.querySelector('#reply-submit');
+      const btnText = el.querySelector('#reply-btn-text');
+      btn.disabled = true; btnText.textContent = 'Filtering…';
+
+      let filtered = raw;
+      try {
+        filtered = await runToneFilter(raw, p.intentContext || '');
+      } catch(e) { filtered = raw; }
+
+      const patch = {
+        partnerRawReply: raw,
+        partnerFilteredReply: filtered,
+        status: 'partner_replied',
+      };
+
+      try {
+        await Store.updateParlay(p.id, patch);
+        Badges.update();
+        U.toast('Position sent ✓');
+        Router.go('parlay-detail', { id: p.id });
+      } catch(e) {
+        console.error('[reply] save error:', e);
+        _submitting = false;
+        btn.disabled = false;
+        btnText.textContent = 'Send my position →';
+        U.toast('⚠️ Failed to send — try again');
+      }
+    });
+  }
 });
 
 
