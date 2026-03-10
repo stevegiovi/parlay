@@ -90,17 +90,17 @@ a { color: inherit; text-decoration: none; }
 }
 .nav-btn {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
-  background: none; border: none; cursor: pointer; padding: 6px 12px;
-  position: relative;
+  background: none; border: none; cursor: pointer; padding: 10px 14px;
+  position: relative; min-width: 48px; min-height: 48px;
 }
 .nav-btn .icon { font-size: 1.3rem; }
-.nav-btn .label { font-size: .62rem; font-weight: 600; color: var(--muted); }
+.nav-btn .label { font-size: .68rem; font-weight: 600; color: var(--muted); }
 .nav-btn.active .label { color: var(--terra); }
 .nav-badge {
   position: absolute; top: 2px; right: 4px;
   min-width: 16px; height: 16px; border-radius: 8px;
   background: var(--terra); color: #fff;
-  font-size: .58rem; font-weight: 700;
+  font-size: .65rem; font-weight: 700;
   display: none; align-items: center; justify-content: center;
   padding: 0 4px;
 }
@@ -138,11 +138,15 @@ select.input {
   background-repeat: no-repeat; background-position: right 12px center;
   padding-right: 32px;
 }
-.input:focus { border-color: var(--terra); }
+.input:focus { border-color: var(--terra); outline: none; }
+.input:focus-visible { border-color: var(--terra); box-shadow: 0 0 0 2px rgba(184,107,68,.25); }
 .input::placeholder { color: var(--muted); opacity: .6; }
 .input:disabled { opacity: .5; cursor: not-allowed; }
+.btn:focus-visible, .btn-ghost:focus-visible, .radio-opt:focus-visible {
+  outline: 2px solid var(--terra); outline-offset: 2px;
+}
 .input-label {
-  display: block; font-size: .62rem; font-weight: 700;
+  display: block; font-size: .68rem; font-weight: 700;
   letter-spacing: .1em; text-transform: uppercase;
   color: var(--muted); margin-bottom: 8px;
 }
@@ -209,7 +213,7 @@ select.input {
    SECTION LABELS
    ═══════════════════════════════════════════════ */
 .section-label {
-  font-size: .62rem; font-weight: 700; letter-spacing: .12em;
+  font-size: .68rem; font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase; color: var(--muted);
   padding: 0 20px; margin-bottom: 10px;
 }
@@ -274,7 +278,7 @@ select.input {
 }
 .parlay-card:active { border-color: var(--terra); }
 .status-chip {
-  font-size: .62rem; font-weight: 700;
+  font-size: .68rem; font-weight: 700;
   padding: 3px 10px; border-radius: var(--r-pill);
   white-space: nowrap;
 }
@@ -338,7 +342,7 @@ select.input {
 .fieldset-badge {
   position: absolute; top: -10px; left: 16px;
   display: inline-block; padding: 4px 12px;
-  font-size: .58rem; font-weight: 700; letter-spacing: .12em;
+  font-size: .65rem; font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase;
   background: var(--terra); color: #fff;
   border-radius: 20px; line-height: 1.2;
@@ -458,14 +462,15 @@ const VERSION = '2.0.5';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
-// Auto-login: ?as=1 (Partner 1) or ?as=2 (Partner 2)
-// Set your test credentials here:
+// Auto-login: ?dev&as=1 (Partner 1) or ?dev&as=2 (Partner 2)
+// Set credentials via URL params: ?dev&as=1&email=...&pw=...&name=...
+const _devParams = new URLSearchParams(location.search);
 const DEV = {
-  enabled: new URLSearchParams(location.search).has('dev'),
-  autoAs:  new URLSearchParams(location.search).get('as'),
+  enabled: _devParams.has('dev'),
+  autoAs:  _devParams.get('as'),
   accounts: {
-    '1': { email: 'stevegiovi+1234@gmail.com', password: 'parlay123', label: 'Steve (P1)' },
-    '2': { email: 'stevegiovi+4567@gmail.com', password: 'parlay123', label: 'Taryn (P2)' },
+    '1': { email: _devParams.get('email') || '', password: _devParams.get('pw') || '', label: _devParams.get('name') || 'Partner 1' },
+    '2': { email: _devParams.get('email') || '', password: _devParams.get('pw') || '', label: _devParams.get('name') || 'Partner 2' },
   },
 };
 
@@ -582,7 +587,6 @@ const Auth = (() => {
   const isReady    = () => !!_session && !!_couple;
   const hasPartner = () => !!them().uid;
   const amSpouse1  = () => _amSpouse1;
-  const supabase_  = () => sb;
 
   // ── Auth operations ───────────────────────────
   async function signUp(email, password, name) {
@@ -612,15 +616,6 @@ const Auth = (() => {
     _myProfile = null; _themProfile = null; _amSpouse1 = true;
     Store.clear();
     Router.go('auth-entry');
-  }
-
-  async function signInWithGoogle() {
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.href.split('#')[0] }
-    });
-    if (error) return { error: error.message };
-    return {};
   }
 
   // ── Session ───────────────────────────────────
@@ -681,8 +676,6 @@ const Auth = (() => {
       _couple = coupleData || null;
       _amSpouse1 = _couple ? (_couple.spouse_1_id === _uid) : true;
 
-      console.log('[bootstrap] Role:', _amSpouse1 ? 'spouse_1' : 'spouse_2', '| uid:', _uid?.slice(0,8));
-
       // 3. Load my profile
       const { data: myP } = await sb.from('profiles').select('*').eq('id', _uid).maybeSingle();
       _myProfile = myP || null;
@@ -715,7 +708,6 @@ const Auth = (() => {
         Store.set('equity', _couple.equity || {});
       }
 
-      console.log('[bootstrap] Done. Me:', myName(), '| Partner:', theirName());
       _bootstrapping = false;
 
       return {
@@ -815,13 +807,11 @@ const Auth = (() => {
             const { data: theirP } = await sb.from('profiles')
               .select('*').eq('id', newPartnerUid).maybeSingle();
             _themProfile = theirP || null;
-            console.log('[realtime] Partner joined:', _themProfile?.name);
           } catch(e) {}
         }
         Router.reload();
       })
       .subscribe((status) => {
-        console.log('[realtime] Status:', status);
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           // Reconnect after 3 seconds
           console.warn('[realtime] Disconnected — reconnecting in 3s');
@@ -869,7 +859,7 @@ const Auth = (() => {
   return {
     sb: () => sb, me, them, myName, theirName, myUid, theirUid,
     couple, isReady, hasPartner, amSpouse1, getToken,
-    signUp, signIn, signOut, signInWithGoogle, refreshSession, refresh,
+    signUp, signIn, signOut, refreshSession, refresh,
     createCouple, joinCouple, bootstrap,
     updateMyProfile, saveCoupleSettings, saveMyCommPrefs,
   };
@@ -954,12 +944,6 @@ const Store = (() => {
   }
 
   // ── Task helpers ──────────────────────────────
-  function _roleToUid(role) {
-    // In parlay-v2 we store UIDs directly, but tasks use a simple role pattern
-    if (role === Auth.myUid()) return role; // already a UID
-    return role === 'me' ? Auth.myUid() : Auth.theirUid();
-  }
-
   function _uidToRole(uid) {
     return uid === Auth.myUid() ? 'me' : 'them';
   }
@@ -1023,7 +1007,6 @@ const Store = (() => {
   function parlays()        { return _parlays; }
   function activeParlays()  { return _parlays.filter(p => !p.archived && p.status !== 'resolved'); }
   function resolvedParlays(){ return _parlays.filter(p => !p.archived && p.status === 'resolved'); }
-  function archivedParlays(){ return _parlays.filter(p => p.archived); }
   function findParlay(id)   { return _parlays.find(p => p.id === id) || null; }
 
   /** Count of parlays that need MY attention */
@@ -1105,7 +1088,14 @@ const Store = (() => {
         declineReason:'decline_reason', filteredDecline:'filtered_decline',
         counterCount:'counter_count',
       };
-      for (const [k,v] of Object.entries(patch)) { if (map[k]) rowPatch[map[k]] = v; }
+      for (const [k,v] of Object.entries(patch)) {
+        if (k === 'assignedTo' || k === 'pendingResponseFrom') continue; // handled below
+        if (map[k]) rowPatch[map[k]] = v;
+      }
+      if (patch.assignedTo !== undefined) {
+        rowPatch.assigned_to = patch.assignedTo === 'me' ? Auth.myUid()
+          : patch.assignedTo === 'them' ? Auth.theirUid() : patch.assignedTo;
+      }
       if (patch.pendingResponseFrom !== undefined) {
         rowPatch.pending_response_from = patch.pendingResponseFrom === 'me' ? Auth.myUid()
           : patch.pendingResponseFrom === 'them' ? Auth.theirUid() : null;
@@ -1152,7 +1142,7 @@ const Store = (() => {
   }
 
   return {
-    loadParlays, parlays, activeParlays, resolvedParlays, archivedParlays,
+    loadParlays, parlays, activeParlays, resolvedParlays,
     findParlay, myPendingParlayCount, addParlay, updateParlay, deleteParlay,
     loadTasks, tasks, myTasks, sentTasks, myActionTasks, doneTasks,
     findTask, addTask, updateTask, deleteTask,
@@ -1935,7 +1925,7 @@ Router.register('home', () => {
       <div style="color:var(--muted);font-size:1.2rem;">›</div>
     </div>
 
-    <div style="text-align:center;padding:20px 0 8px;font-size:.58rem;color:var(--border);">Parlay v${VERSION}</div>
+    <div style="text-align:center;padding:20px 0 8px;font-size:.65rem;color:var(--border);">Parlay v${VERSION}</div>
   </div>`;
 }, () => { Badges.update(); });
 
@@ -2032,6 +2022,19 @@ Router.register('compose', ({ topicId } = {}) => {
   const theirN = Auth.theirName();
   const needsIntent = INTENT_TOPICS.includes(topicId);
 
+  if (!Auth.hasPartner()) {
+    return `
+    <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;text-align:center;">
+      <div style="font-size:2.8rem;margin-bottom:16px;">👫</div>
+      <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">Partner needed</div>
+      <div style="font-size:.85rem;color:var(--muted);max-width:280px;margin:0 auto 24px;line-height:1.5;">
+        You need a connected partner before you can create a parlay. Share your invite code to get started.
+      </div>
+      <button class="btn btn-primary" style="max-width:240px;" onclick="Router.go('setup')">Go to Setup</button>
+      <button class="btn btn-outline" style="max-width:240px;margin-top:10px;" onclick="Router.go('plan')">‹ Back</button>
+    </div>`;
+  }
+
   return `
   <div data-topic="${topicId}" style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
@@ -2075,7 +2078,7 @@ Router.register('compose', ({ topicId } = {}) => {
         <div class="fieldset-badge">📅 Propose date options</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
           <div class="input-label" style="margin-bottom:0;">Propose date options</div>
-          <span style="font-size:.62rem;color:var(--muted);background:var(--parchment);padding:2px 8px;border-radius:10px;">up to 4</span>
+          <span style="font-size:.68rem;color:var(--muted);background:var(--parchment);padding:2px 8px;border-radius:10px;">up to 4</span>
         </div>
         <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">Give your partner real options to choose from &mdash; no guessing games.</div>
         <div style="display:flex;flex-direction:column;gap:10px;" id="date-slots">
@@ -2431,7 +2434,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
       <div class="input-label">${isMine ? 'Your position' : creatorN + "'s position"}</div>
       <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);">
         <div style="font-size:.88rem;line-height:1.65;">${p.filteredInput || p.rawInput || ''}</div>
-        <div style="font-size:.62rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
       </div>
       ${dateHtml}
     </div>
@@ -2442,7 +2445,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
       <div class="input-label">${!isMine ? 'Your response' : recipN + "'s response"}</div>
       <div style="padding:14px 16px;background:var(--surface);border:1px solid rgba(122,106,155,.25);border-radius:var(--r-md);">
         <div style="font-size:.88rem;line-height:1.65;">${p.partnerFilteredReply}</div>
-        <div style="font-size:.62rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
       </div>
     </div>` : ''}
 
@@ -2844,7 +2847,7 @@ Router.register('tasks', () => {
       <div style="flex:1;">
         <div style="font-size:.9rem;font-weight:600;margin-bottom:3px;">${U.esc(t.title)}</div>
         <div style="font-size:.72rem;color:var(--muted);">${t.assignedTo === 'me' ? 'From ' + from : 'To ' + to}</div>
-        ${needsMe ? `<div style="font-size:.62rem;font-weight:700;color:var(--purple);margin-top:4px;">⚡ Your turn</div>` : ''}
+        ${needsMe ? `<div style="font-size:.68rem;font-weight:700;color:var(--purple);margin-top:4px;">⚡ Your turn</div>` : ''}
       </div>
     </div>`;
   };
@@ -2879,7 +2882,13 @@ Router.register('tasks', () => {
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${sent.map(taskCard).join('')}</div>
     </div>` : ''}
 
-    ${my.length === 0 && sent.length === 0 ? `
+    ${done.length > 0 ? `
+    <div style="padding:20px 20px 0;">
+      <div class="section-label" style="padding:0;color:var(--sage);">✓ Completed (${done.length})</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;opacity:.65;">${done.map(taskCard).join('')}</div>
+    </div>` : ''}
+
+    ${my.length === 0 && sent.length === 0 && done.length === 0 ? `
     <div style="padding:52px 24px;text-align:center;" class="a4">
       <div style="font-size:2.8rem;margin-bottom:16px;">📋</div>
       <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">No tasks yet</div>
@@ -2892,7 +2901,20 @@ Router.register('tasks', () => {
 // ──────────────────────────────────────────────
 // NEW TASK
 // ──────────────────────────────────────────────
-Router.register('task-new', () => `
+Router.register('task-new', () => {
+  if (!Auth.hasPartner()) {
+    return `
+    <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;text-align:center;">
+      <div style="font-size:2.8rem;margin-bottom:16px;">👫</div>
+      <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">Partner needed</div>
+      <div style="font-size:.85rem;color:var(--muted);max-width:280px;margin:0 auto 24px;line-height:1.5;">
+        You need a connected partner before you can assign tasks.
+      </div>
+      <button class="btn btn-primary" style="max-width:240px;" onclick="Router.go('setup')">Go to Setup</button>
+      <button class="btn btn-outline" style="max-width:240px;margin-top:10px;" onclick="Router.go('tasks')">‹ Back</button>
+    </div>`;
+  }
+  return `
   <div style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
       <button class="btn btn-outline btn-sm" onclick="Router.go('tasks')">‹ Back</button>
@@ -2916,8 +2938,8 @@ Router.register('task-new', () => `
       </div>
       <button class="btn btn-primary" id="tn-submit">Assign Task</button>
     </div>
-  </div>
-`, (el) => {
+  </div>`;
+}, (el) => {
   let _assignTo = 'them';
   const themBtn = el.querySelector('#tn-them');
   const meBtn = el.querySelector('#tn-me');
@@ -3227,7 +3249,7 @@ Router.register('setup', () => {
 
     <div style="padding:28px 20px;text-align:center;" class="a4">
       <button class="btn btn-danger" style="max-width:220px;margin:0 auto;" id="signout-btn">Sign Out</button>
-      <div style="margin-top:16px;font-size:.58rem;color:var(--border);">Parlay v${VERSION}</div>
+      <div style="margin-top:16px;font-size:.65rem;color:var(--border);">Parlay v${VERSION}</div>
     </div>
   </div>`;
 }, (el) => {
@@ -3387,7 +3409,6 @@ Router.register('setup-tone', () => {
 
   // ── Normal flow ───────────────────────────────
   const boot = await Auth.bootstrap();
-  console.log('[init] Bootstrap result:', boot);
 
   if (boot.mode === 'unauthenticated') {
     Router.go('auth-entry');
