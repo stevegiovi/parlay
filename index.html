@@ -130,8 +130,17 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--r-md); font-size: .88rem;
   color: var(--espresso); outline: none;
   transition: border-color .2s;
+  font-family: var(--font-body);
+}
+select.input {
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239B8880' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 32px;
 }
 .input:focus { border-color: var(--terra); }
+.input::placeholder { color: var(--muted); opacity: .6; }
+.input:disabled { opacity: .5; cursor: not-allowed; }
 .input-label {
   display: block; font-size: .62rem; font-weight: 700;
   letter-spacing: .1em; text-transform: uppercase;
@@ -149,6 +158,9 @@ a { color: inherit; text-decoration: none; }
 .btn-outline { background: none; color: var(--muted); border: 1.5px solid var(--border); }
 .btn-sm { padding: 8px 14px; font-size: .82rem; width: auto; }
 .btn-ghost { background: none; border: none; color: var(--muted); font-size: .82rem; cursor: pointer; padding: 8px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-danger { background: none; color: #EF4444; border: 1.5px solid #EF4444; }
+.btn-danger:active { background: #FEF2F2; }
 
 /* ═══════════════════════════════════════════════
    CARDS
@@ -350,6 +362,42 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ═══════════════════════════════════════════════
+   BOTTOM SHEET / ACTION MENU
+   ═══════════════════════════════════════════════ */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(26,18,8,.45); opacity: 0;
+  transition: opacity .2s ease;
+}
+.sheet-backdrop.show { opacity: 1; }
+.sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+  background: var(--cream); border-radius: 20px 20px 0 0;
+  padding: 8px 20px max(20px, env(safe-area-inset-bottom));
+  transform: translateY(100%); transition: transform .25s ease;
+}
+.sheet-backdrop.show + .sheet, .sheet.show { transform: translateY(0); }
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border); margin: 0 auto 16px;
+}
+.sheet-title {
+  font-family: var(--font-display); font-size: 1.15rem;
+  margin-bottom: 16px; text-align: center;
+}
+.sheet-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* ═══════════════════════════════════════════════
+   LOADING SPINNER
+   ═══════════════════════════════════════════════ */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 18px; height: 18px; border: 2px solid var(--border);
+  border-top-color: var(--terra); border-radius: 50%;
+  animation: spin .6s linear infinite; display: inline-block;
+}
+
+/* ═══════════════════════════════════════════════
    DEV TOOLBAR
    ═══════════════════════════════════════════════ */
 #dev-bar {
@@ -447,6 +495,44 @@ const U = {
   code: () => Math.random().toString(36).slice(2,8).toUpperCase(),
   esc: s => (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'),
   shortDate: d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  /** Show a bottom sheet with action buttons. Returns a promise that resolves with the chosen action key. */
+  sheet(title, actions) {
+    return new Promise(resolve => {
+      const existing = document.querySelector('.sheet-backdrop');
+      if (existing) { existing.remove(); document.querySelector('.sheet')?.remove(); }
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'sheet-backdrop';
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      sheet.innerHTML = `
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">${title}</div>
+        <div class="sheet-actions">
+          ${actions.map(a => `<button class="btn ${a.cls || 'btn-outline'}" data-action="${a.key}">${a.label}</button>`).join('')}
+          <button class="btn btn-ghost" data-action="_cancel" style="margin-top:4px;">Cancel</button>
+        </div>`;
+
+      function close(action) {
+        backdrop.classList.remove('show');
+        sheet.classList.remove('show');
+        setTimeout(() => { backdrop.remove(); sheet.remove(); }, 250);
+        resolve(action);
+      }
+
+      backdrop.addEventListener('click', () => close(null));
+      sheet.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => close(btn.dataset.action));
+      });
+
+      document.body.appendChild(backdrop);
+      document.body.appendChild(sheet);
+      requestAnimationFrame(() => {
+        backdrop.classList.add('show');
+        sheet.classList.add('show');
+      });
+    });
+  },
   timeOptions: () => [
     '', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
     '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
@@ -2042,6 +2128,10 @@ Router.register('compose', ({ topicId } = {}) => {
     });
   });
 
+  // Set min date on date inputs to today
+  const today = new Date().toISOString().split('T')[0];
+  el.querySelectorAll('input[type="date"]').forEach(d => { d.min = today; });
+
   // Tension detection (debounced, versioned)
   let _toneTimer, _tensionV = 0;
   textarea?.addEventListener('input', () => {
@@ -2081,7 +2171,7 @@ Router.register('compose', ({ topicId } = {}) => {
     const btn = el.querySelector('#compose-submit');
     const btnText = el.querySelector('#compose-btn-text');
     btn.disabled = true;
-    btnText.textContent = 'Filtering your message…';
+    btnText.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Filtering your message…';
 
     // ── Gather intent context from structured questions ────
     let intentContext = '';
@@ -2369,7 +2459,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
   el.querySelector('#gen-proposal-btn')?.addEventListener('click', async () => {
     const btn = el.querySelector('#gen-proposal-btn');
     const txt = el.querySelector('#gen-btn-text');
-    btn.disabled = true; txt.textContent = 'Generating…';
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.3);margin-right:8px;"></span> Generating proposal…';
 
     try {
       const parsed = await generateProposal(p);
@@ -2426,7 +2516,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
     if (!_selectedCounterDate) return;
     const btn = el.querySelector('#accept-counter-btn');
     const txt = el.querySelector('#accept-counter-text');
-    btn.disabled = true; txt.textContent = 'Confirming…';
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Confirming…';
     const selectedOpt = p.counterDates?.find(o => o.id === _selectedCounterDate);
     try {
       await Store.updateParlay(p.id, {
@@ -2454,9 +2544,17 @@ Router.register('parlay-detail', ({ id } = {}) => {
   });
 
   // Manage
-  el.querySelector('#manage-btn')?.addEventListener('click', () => {
-    if (confirm('Delete this parlay for both partners?')) {
-      Store.deleteParlay(p.id);
+  el.querySelector('#manage-btn')?.addEventListener('click', async () => {
+    const action = await U.sheet('Manage Parlay', [
+      { key: 'archive', label: '📦 Archive', cls: 'btn-outline' },
+      { key: 'delete', label: '🗑 Delete for both partners', cls: 'btn-danger' },
+    ]);
+    if (action === 'archive') {
+      await Store.updateParlay(p.id, { archived: true });
+      U.toast('Parlay archived');
+      Router.go('plan');
+    } else if (action === 'delete') {
+      await Store.deleteParlay(p.id);
       U.toast('Parlay deleted');
       Router.go('plan');
     }
@@ -2620,7 +2718,7 @@ Router.register('parlay-reply', ({ id } = {}) => {
       _submitting = true;
       const btn = el.querySelector('#accept-date-btn');
       const txt = el.querySelector('#accept-date-text');
-      btn.disabled = true; txt.textContent = 'Confirming…';
+      btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Confirming…';
 
       const selectedOpt = p.dateOptions.find(o => o.id === _selectedDate);
       try {
@@ -2658,7 +2756,7 @@ Router.register('parlay-reply', ({ id } = {}) => {
       _submitting = true;
       const btn = el.querySelector('#counter-submit');
       const txt = el.querySelector('#counter-btn-text');
-      btn.disabled = true; txt.textContent = 'Sending…';
+      btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Sending…';
 
       const raw = el.querySelector('#reply-text')?.value.trim() || '';
       let filtered = raw;
@@ -2695,7 +2793,7 @@ Router.register('parlay-reply', ({ id } = {}) => {
 
       const btn = el.querySelector('#reply-submit');
       const btnText = el.querySelector('#reply-btn-text');
-      btn.disabled = true; btnText.textContent = 'Filtering…';
+      btn.disabled = true; btnText.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Filtering…';
 
       let filtered = raw;
       try {
@@ -2906,7 +3004,13 @@ Router.register('task-detail', ({ id } = {}) => {
     <div id="td-counter-form" style="display:none;margin-top:12px;">
       <div class="input-label">What would work better?</div>
       <textarea id="td-counter-msg" class="input" rows="3" placeholder="e.g. I can do this Thursday instead" style="resize:none;margin-bottom:12px;"></textarea>
-      <button class="btn btn-accent" id="td-counter-submit">Send suggestion →</button>
+      <button class="btn btn-accent" id="td-counter-submit">Send suggestion &rarr;</button>
+    </div>
+    <!-- Decline form (hidden until Decline clicked) -->
+    <div id="td-decline-form" style="display:none;margin-top:12px;">
+      <div class="input-label">Why are you declining? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
+      <textarea id="td-decline-msg" class="input" rows="2" placeholder="e.g. I don't have bandwidth for this right now" style="resize:none;margin-bottom:12px;"></textarea>
+      <button class="btn btn-danger" id="td-decline-submit">Decline task</button>
     </div>`;
   } else if (t.status === 'accepted' && iAmAssignee) {
     actionHtml = `<div style="margin-top:20px;">
@@ -3014,8 +3118,22 @@ Router.register('task-detail', ({ id } = {}) => {
     Router.go('tasks');
   });
 
-  el.querySelector('#td-decline')?.addEventListener('click', async () => {
-    const reason = prompt('Optional: why are you declining?') || '';
+  el.querySelector('#td-decline')?.addEventListener('click', () => {
+    const form = el.querySelector('#td-decline-form');
+    if (form) form.style.display = 'block';
+    el.querySelector('#td-decline').style.display = 'none';
+    // Hide counter form if open
+    const cf = el.querySelector('#td-counter-form');
+    if (cf) cf.style.display = 'none';
+    const cb = el.querySelector('#td-counter');
+    if (cb) cb.style.display = '';
+  });
+
+  el.querySelector('#td-decline-submit')?.addEventListener('click', async () => {
+    const reason = el.querySelector('#td-decline-msg')?.value.trim() || '';
+    const btn = el.querySelector('#td-decline-submit');
+    btn.disabled = true; btn.textContent = 'Declining…';
+
     let filtered = reason;
     if (reason) {
       try {
@@ -3036,7 +3154,10 @@ Router.register('task-detail', ({ id } = {}) => {
   });
 
   el.querySelector('#td-delete')?.addEventListener('click', async () => {
-    if (confirm('Delete this task?')) {
+    const action = await U.sheet('Delete this task?', [
+      { key: 'delete', label: '🗑 Delete task', cls: 'btn-danger' },
+    ]);
+    if (action === 'delete') {
       await Store.deleteTask(t.id);
       Badges.update(); U.toast('Task deleted');
       Router.go('tasks');
@@ -3051,14 +3172,42 @@ Router.register('task-detail', ({ id } = {}) => {
 Router.register('setup', () => {
   const tone = Store.get('mediatorTone') || 'neutral';
   const toneLabel = TONES[tone]?.label || 'Neutral';
+  const myN = Auth.myName();
+  const theirN = Auth.theirName();
+  const couple = Auth.couple();
+  const hasPartner = !!Auth.theirUid();
+  const inviteCode = couple?.invite_code || '';
 
   return `
   <div style="padding-bottom:calc(var(--nav-h) + 20px);">
-    <div style="background:var(--espresso);padding:0 24px 24px;padding-top:max(52px,env(safe-area-inset-top));">
+    <div style="background:var(--espresso);padding:0 24px 28px;padding-top:max(52px,env(safe-area-inset-top));">
       <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:var(--cream);" class="a1">Setup</div>
     </div>
 
+    <!-- Profile cards -->
     <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;" class="a2">
+      <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--terra);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0;">${U.initials(myN)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.92rem;font-weight:600;">${U.esc(myN)}</div>
+          <div style="font-size:.72rem;color:var(--muted);">You</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);">
+        <div style="width:44px;height:44px;border-radius:50%;background:${hasPartner ? 'var(--sage)' : 'var(--border)'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0;">${hasPartner ? U.initials(theirN) : '?'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.92rem;font-weight:600;">${hasPartner ? U.esc(theirN) : 'Waiting for partner'}</div>
+          <div style="font-size:.72rem;color:var(--muted);">${hasPartner ? 'Your partner' : 'Share your invite code'}</div>
+        </div>
+        ${!hasPartner && inviteCode ? `<div style="font-family:var(--font-display);font-size:1rem;color:var(--terra);letter-spacing:.1em;align-self:center;" id="setup-code">${inviteCode}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div style="padding:0 20px;margin-top:8px;">
+      <div class="input-label" style="margin-bottom:10px;">Settings</div>
+    </div>
+    <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;" class="a3">
       <div class="mod-card" onclick="Router.go('setup-tone')">
         <div class="mod-icon" style="background:rgba(196,113,74,.1);">⚖️</div>
         <div style="flex:1;">
@@ -3067,7 +3216,7 @@ Router.register('setup', () => {
         </div>
         <div style="color:var(--muted);">›</div>
       </div>
-      <div class="mod-card" style="opacity:.6;">
+      <div class="mod-card" style="opacity:.5;cursor:default;">
         <div class="mod-icon" style="background:rgba(122,158,138,.1);">💬</div>
         <div style="flex:1;">
           <div style="font-size:.9rem;font-weight:600;">Communication Style</div>
@@ -3076,11 +3225,22 @@ Router.register('setup', () => {
       </div>
     </div>
 
-    <div style="padding:20px;text-align:center;" class="a3">
-      <button class="btn btn-outline" style="max-width:200px;margin:0 auto;color:#EF4444;border-color:#EF4444;" onclick="Auth.signOut()">Sign Out</button>
+    <div style="padding:28px 20px;text-align:center;" class="a4">
+      <button class="btn btn-danger" style="max-width:220px;margin:0 auto;" id="signout-btn">Sign Out</button>
       <div style="margin-top:16px;font-size:.58rem;color:var(--border);">Parlay v${VERSION}</div>
     </div>
   </div>`;
+}, (el) => {
+  el.querySelector('#signout-btn')?.addEventListener('click', async () => {
+    const action = await U.sheet('Sign out?', [
+      { key: 'signout', label: 'Sign Out', cls: 'btn-danger' },
+    ]);
+    if (action === 'signout') Auth.signOut();
+  });
+  el.querySelector('#setup-code')?.addEventListener('click', () => {
+    navigator.clipboard?.writeText(Auth.couple()?.invite_code || '');
+    U.toast('Invite code copied ✓');
+  });
 });
 
 
