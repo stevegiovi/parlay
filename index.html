@@ -312,6 +312,43 @@ a { color: inherit; text-decoration: none; }
 .radio-opt.selected .dot::after {
   content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff;
 }
+
+/* ═══════════════════════════════════════════════
+   FIELDSET CARDS
+   ═══════════════════════════════════════════════ */
+.fieldset-card {
+  position: relative;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 24px 16px 16px;
+  background: var(--surface);
+}
+.fieldset-badge {
+  position: absolute; top: -10px; left: 16px;
+  display: inline-block; padding: 4px 12px;
+  font-size: .58rem; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase;
+  background: var(--terra); color: #fff;
+  border-radius: 20px; line-height: 1.2;
+}
+.slot-num {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--espresso); color: var(--cream);
+  font-size: .72rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.family-prompt {
+  background: var(--parchment); border-radius: var(--r-md);
+  padding: 14px 16px; margin-bottom: 16px;
+  font-size: .8rem; line-height: 1.55; color: var(--muted);
+}
+.family-prompt strong { color: var(--espresso); }
+.family-prompt a {
+  color: var(--terra); font-weight: 600; cursor: pointer;
+  text-decoration: none;
+}
+
 /* ═══════════════════════════════════════════════
    DEV TOOLBAR
    ═══════════════════════════════════════════════ */
@@ -1363,78 +1400,112 @@ async function filterTaskContext(rawContext) {
 function renderIntentQuestions(topicId) {
   const theirN = Auth.theirName();
 
-  if (['boys','girls','trip'].includes(topicId)) {
+  const familyPrompt = `
+    <div class="family-prompt">
+      <div>👨‍👩‍👧‍👦 <strong>Set up your family first</strong> to get smarter options here — kids' names, who's covering, and more.</div>
+      <div style="margin-top:6px;"><a onclick="Router.go('setup')">Set up Family &rarr;</a> <span style="font-size:.72rem;margin-left:6px;">or continue without</span></div>
+    </div>`;
+
+  function wrap(inner) {
     return `
-    <div style="margin-bottom:12px;">
-      <div class="input-label">Who's going?</div>
+    <div class="fieldset-card">
+      <div class="fieldset-badge">Clarify intent first</div>
+      ${familyPrompt}
+      ${inner}
+    </div>`;
+  }
+
+  if (['boys','girls','trip'].includes(topicId)) {
+    return wrap(`
+    <div style="margin-bottom:14px;">
+      <div class="input-label">Who is going on this?</div>
       <div class="radio-group" id="iq-who">
-        <div class="radio-opt" data-val="just-me"><div class="dot"></div><div>Just me — ${U.esc(theirN)} stays home</div></div>
+        <div class="radio-opt" data-val="just-me"><div class="dot"></div><div>Just me</div></div>
         <div class="radio-opt" data-val="me-and-kids"><div class="dot"></div><div>Me and the kids</div></div>
         <div class="radio-opt" data-val="just-us"><div class="dot"></div><div>Both of us (no kids)</div></div>
         <div class="radio-opt" data-val="whole-family"><div class="dot"></div><div>Whole family</div></div>
       </div>
     </div>
-    <div style="margin-bottom:12px;">
-      <div class="input-label">${U.esc(theirN)}'s role while you're out</div>
+    <div>
+      <div class="input-label">Is ${U.esc(theirN)} involved in this plan at all?</div>
       <div class="radio-group" id="iq-role">
-        <div class="radio-opt" data-val="not-involved"><div class="dot"></div><div>Not involved — I'm handling it</div></div>
-        <div class="radio-opt" data-val="aware"><div class="dot"></div><div>Just needs to know the timing</div></div>
+        <div class="radio-opt" data-val="not-involved"><div class="dot"></div><div>No &mdash; they stay home</div></div>
+        <div class="radio-opt" data-val="aware"><div class="dot"></div><div>Just needs to know / approve the timing</div></div>
         <div class="radio-opt" data-val="covering-kids"><div class="dot"></div><div>Covering the kids while I go</div></div>
       </div>
-    </div>`;
+    </div>`);
   }
 
   if (topicId === 'date') {
-    return `
-    <div style="margin-bottom:12px;">
+    return wrap(`
+    <div>
       <div class="input-label">What kind of date?</div>
       <div class="radio-group" id="iq-who">
         <div class="radio-opt" data-val="just-us"><div class="dot"></div><div>Just us two</div></div>
         <div class="radio-opt" data-val="double"><div class="dot"></div><div>Double date with friends</div></div>
         <div class="radio-opt" data-val="family-outing"><div class="dot"></div><div>Family outing (kids included)</div></div>
       </div>
-    </div>`;
+    </div>`);
   }
 
   if (topicId === 'inlaw') {
-    return `
-    <div style="margin-bottom:12px;">
-      <div class="input-label">Whose family?</div>
+    return wrap(`
+    <div style="margin-bottom:14px;">
+      <div class="input-label">Who is going on this visit?</div>
       <div class="radio-group" id="iq-who">
         <div class="radio-opt" data-val="my-family"><div class="dot"></div><div>My side</div></div>
         <div class="radio-opt" data-val="their-family"><div class="dot"></div><div>${U.esc(theirN)}'s side</div></div>
         <div class="radio-opt" data-val="both"><div class="dot"></div><div>Both families</div></div>
       </div>
     </div>
-    <div style="margin-bottom:12px;">
-      <div class="input-label">Visit type</div>
+    <div>
+      <div class="input-label">Is ${U.esc(theirN)} involved in this plan at all?</div>
       <div class="radio-group" id="iq-role">
         <div class="radio-opt" data-val="they-visit-us"><div class="dot"></div><div>They come to us</div></div>
         <div class="radio-opt" data-val="we-visit-them"><div class="dot"></div><div>We go to them</div></div>
-        <div class="radio-opt" data-val="meet-somewhere"><div class="dot"></div><div>Meet somewhere</div></div>
+        <div class="radio-opt" data-val="meet-somewhere"><div class="dot"></div><div>Meet somewhere neutral</div></div>
       </div>
-    </div>`;
+    </div>`);
   }
 
   if (topicId === 'host') {
-    return `
-    <div style="margin-bottom:12px;">
+    return wrap(`
+    <div style="margin-bottom:14px;">
       <div class="input-label">Hosting format</div>
       <div class="radio-group" id="iq-who">
         <div class="radio-opt" data-val="dinner"><div class="dot"></div><div>Dinner party</div></div>
-        <div class="radio-opt" data-val="drinks"><div class="dot"></div><div>Drinks & appetizers</div></div>
+        <div class="radio-opt" data-val="drinks"><div class="dot"></div><div>Drinks &amp; appetizers</div></div>
         <div class="radio-opt" data-val="bbq"><div class="dot"></div><div>BBQ / backyard</div></div>
         <div class="radio-opt" data-val="game"><div class="dot"></div><div>Game night</div></div>
       </div>
     </div>
-    <div style="margin-bottom:12px;">
-      <div class="input-label">${U.esc(theirN)}'s role</div>
+    <div>
+      <div class="input-label">Is ${U.esc(theirN)} involved in the prep?</div>
       <div class="radio-group" id="iq-role">
-        <div class="radio-opt" data-val="share-prep"><div class="dot"></div><div>Share cooking & prep</div></div>
+        <div class="radio-opt" data-val="share-prep"><div class="dot"></div><div>Share cooking &amp; prep equally</div></div>
         <div class="radio-opt" data-val="i-handle"><div class="dot"></div><div>I handle it, just need the OK</div></div>
         <div class="radio-opt" data-val="plan-together"><div class="dot"></div><div>Plan it together</div></div>
       </div>
-    </div>`;
+    </div>`);
+  }
+
+  if (topicId === 'playdate') {
+    return wrap(`
+    <div style="margin-bottom:14px;">
+      <div class="input-label">Who is going?</div>
+      <div class="radio-group" id="iq-who">
+        <div class="radio-opt" data-val="just-me"><div class="dot"></div><div>Just me and the kids</div></div>
+        <div class="radio-opt" data-val="whole-family"><div class="dot"></div><div>Both of us and the kids</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="input-label">Is ${U.esc(theirN)} involved?</div>
+      <div class="radio-group" id="iq-role">
+        <div class="radio-opt" data-val="not-involved"><div class="dot"></div><div>No &mdash; they stay home</div></div>
+        <div class="radio-opt" data-val="aware"><div class="dot"></div><div>Just needs to know the timing</div></div>
+        <div class="radio-opt" data-val="covering-kids"><div class="dot"></div><div>Comes along</div></div>
+      </div>
+    </div>`);
   }
 
   return '';
@@ -1887,8 +1958,8 @@ Router.register('compose', ({ topicId } = {}) => {
       <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;">Your <em style="color:var(--terra)">position</em></div>
       <div style="font-size:.82rem;color:var(--muted);line-height:1.6;">
         ${needsIntent
-          ? 'First clarify the basics — then tell Parlay exactly what you want.'
-          : `Say exactly what you want. Don't filter yourself — Parlay does that before ${U.esc(theirN)} sees it.`}
+          ? 'First clarify the basics &mdash; then tell Parlay exactly what you want. It filters everything before your partner sees it.'
+          : `Say exactly what you want. Don't filter yourself &mdash; Parlay does that before ${U.esc(theirN)} sees it.`}
       </div>
     </div>
 
@@ -1904,40 +1975,57 @@ Router.register('compose', ({ topicId } = {}) => {
 
       <div>
         <div class="input-label">What do you want or need? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">speak freely</span></div>
-        <textarea id="compose-text" class="input" rows="5" placeholder="e.g. I want to take a solo trip to visit my college friends March 20-23. I'll need you to handle the kids." style="resize:none;line-height:1.6;"></textarea>
+        <textarea id="compose-text" class="input" rows="5" placeholder="e.g. I really want to see my parents this month. I miss them and feel like we haven't visited in a while." style="resize:none;line-height:1.6;"></textarea>
       </div>
 
-      <!-- Date options -->
+      <!-- Dates or constraints -->
       <div>
-        <div class="input-label">Date &amp; time options (optional, up to 4)</div>
-        <div style="display:flex;flex-direction:column;gap:8px;" id="date-slots">
-          <div style="display:flex;gap:8px;">
+        <div class="input-label">Dates or constraints? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
+        <input type="text" id="compose-constraints" class="input" placeholder="e.g. Not the weekend of the 22nd, prefer a Saturday&hellip;">
+      </div>
+
+      <!-- Date options card -->
+      <div class="fieldset-card">
+        <div class="fieldset-badge">📅 Propose date options</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div class="input-label" style="margin-bottom:0;">Propose date options</div>
+          <span style="font-size:.62rem;color:var(--muted);background:var(--parchment);padding:2px 8px;border-radius:10px;">up to 4</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">Give your partner real options to choose from &mdash; no guessing games.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;" id="date-slots">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">1</div>
             <input type="date" class="input" style="flex:2;" data-slot="1" data-type="date">
             ${U.timeSelectHtml(1)}
           </div>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">2</div>
             <input type="date" class="input" style="flex:2;" data-slot="2" data-type="date">
             ${U.timeSelectHtml(2)}
           </div>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">3</div>
             <input type="date" class="input" style="flex:2;" data-slot="3" data-type="date">
             ${U.timeSelectHtml(3)}
           </div>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">4</div>
             <input type="date" class="input" style="flex:2;" data-slot="4" data-type="date">
             ${U.timeSelectHtml(4)}
           </div>
         </div>
+        <div style="font-size:.72rem;color:var(--muted);font-style:italic;margin-top:12px;line-height:1.5;">Leave blank to skip date options and just send your position.</div>
       </div>
 
-      <div style="background:var(--parchment);border-radius:var(--r-md);padding:12px 14px;">
-        <div style="font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 Private until filtered</div>
-        <div style="font-size:.76rem;color:var(--muted);line-height:1.5;">${U.esc(theirN)} only sees Parlay's rewrite — never your raw words.</div>
+      <div style="background:var(--parchment);border-radius:var(--r-md);padding:16px 18px;">
+        <div style="font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 Private until filtered</div>
+        <div style="font-size:.78rem;color:var(--muted);line-height:1.55;">${U.esc(theirN)} only sees the calm rewritten version &mdash; not your raw words above.</div>
       </div>
 
-      <button class="btn btn-primary" id="compose-submit">
-        <span id="compose-btn-text">Let Parlay Mediate →</span>
+      <button class="btn btn-accent" id="compose-submit">
+        <span id="compose-btn-text">Let Parlay Mediate &rarr;</span>
       </button>
+      <button class="btn btn-outline" onclick="Router.go('plan')" style="margin-top:-4px;">Cancel</button>
     </div>
   </div>`;
 }, (el, { topicId } = {}) => {
@@ -2040,6 +2128,11 @@ Router.register('compose', ({ topicId } = {}) => {
     }
     if (dateOptions.length) {
       intentContext += `DATE OPTIONS: ${dateOptions.map(o => o.date + (o.timeLabel ? ' ' + o.timeLabel : '')).join('; ')}\n`;
+    }
+
+    const constraints = el.querySelector('#compose-constraints')?.value.trim();
+    if (constraints) {
+      intentContext += `DATE CONSTRAINTS: ${constraints}\n`;
     }
 
     // ── AI tone filter (best-effort) ────
