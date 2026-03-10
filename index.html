@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Parlay helps couples plan events, negotiate decisions, and manage tasks — with AI-powered tone filtering to keep things calm.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a1208">
 <title>Parlay — for couples who talk it through</title>
@@ -27,9 +28,7 @@
   --surface: #FEFCFA;
   --border: #E8E2DA;
   --purple: #7A6A9B;
-  --blush: #9B6B8A;
 
-  --r-sm: 10px;
   --r-md: 14px;
   --r-lg: 18px;
   --r-pill: 100px;
@@ -56,6 +55,7 @@ a { color: inherit; text-decoration: none; }
    SCROLLBAR
    ═══════════════════════════════════════════════ */
 ::-webkit-scrollbar { width: 0; height: 0; }
+* { scrollbar-width: none; }
 
 /* ═══════════════════════════════════════════════
    ANIMATIONS
@@ -117,6 +117,7 @@ a { color: inherit; text-decoration: none; }
   opacity: 0; pointer-events: none;
   transition: all .3s ease; z-index: 9999;
   white-space: nowrap; max-width: calc(100vw - 40px);
+  overflow: hidden; text-overflow: ellipsis;
   text-align: center;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -418,6 +419,17 @@ select.input {
 }
 #dev-bar button:hover { background: rgba(255,255,255,.25); }
 #dev-bar .sep { width: 1px; height: 16px; background: rgba(255,255,255,.15); }
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════ */
+@media (min-width: 600px) {
+  #app { max-width: 480px; margin: 0 auto; }
+  .topic-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1024px) {
+  #app { max-width: 540px; }
+}
 </style>
 </head>
 <body>
