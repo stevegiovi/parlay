@@ -1975,8 +1975,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.7.1';
-const BUILD_DATE = '2026-03-11T15:00:00Z';
+const VERSION = '5.7.2';
+const BUILD_DATE = '2026-03-11T15:15:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -5470,13 +5470,8 @@ Router.register('auth-signin', () => `
     }
 
     const boot = await Auth.bootstrap();
-    if (boot.coupled && boot.hasPartner) {
-      Router.go('home');
-    } else if (boot.coupled) {
-      Router.go('ob-invite');
-    } else {
-      Router.go('ob-couple');
-    }
+    // Existing user sign-in: always go home (couple already set up)
+    Router.go('home');
   });
 });
 
@@ -16453,11 +16448,8 @@ Router.register('daily-tips', () => {
 
   if (boot.mode === 'unauthenticated') {
     Router.go('auth-entry');
-  } else if (!boot.coupled) {
-    Router.go('ob-couple');
-  } else if (!boot.hasPartner && boot.coupled) {
-    Router.go('ob-invite');
   } else {
+    // Authenticated — go straight to the app
     Router.go('home');
   }
   updateDevBar();
@@ -16478,9 +16470,8 @@ Router.register('daily-tips', () => {
       const b = await Auth.bootstrap();
       // Skip routing if bootstrap was already in progress (sign-in form handles it)
       if (b.mode === 'pending') return;
-      if (b.coupled && b.hasPartner) Router.go('home');
-      else if (b.coupled) Router.go('ob-invite');
-      else Router.go('ob-couple');
+      // Authenticated — go straight to the app
+      Router.go('home');
       updateDevBar();
     }
     if (event === 'SIGNED_OUT') {
