@@ -1596,8 +1596,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.0.1';
-const BUILD_DATE = '2026-03-11T20:00:00Z';
+const VERSION = '5.1.0';
+const BUILD_DATE = '2026-03-11T22:30:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -1873,6 +1873,7 @@ const DEMO = {
     Auth._demoOverride = {
       me:   () => ({ uid: me.uid, name: me.name, email: me.email }),
       them: () => ({ uid: them.uid, name: them.name, email: them.email }),
+      user:      () => ({ id: me.uid, email: me.email }),
       myName:    () => me.name,
       theirName: () => them.name,
       myUid:     () => me.uid,
@@ -2356,7 +2357,7 @@ const Auth = (() => {
   }
 
   return {
-    sb: () => sb, me, them, myName, theirName, myUid, theirUid,
+    sb: () => sb, me, them, user: () => (_session?.user ? { id: _session.user.id, email: _session.user.email } : null), myName, theirName, myUid, theirUid,
     couple, isReady, hasPartner, amSpouse1, getToken,
     signUp, signIn, signOut, refreshSession, refresh,
     createCouple, joinCouple, bootstrap,
@@ -2664,7 +2665,7 @@ const Store = (() => {
 // Wraps key methods so they return mock data when DEMO.active
 (function _installDemoProxy() {
   // Read-only Auth methods → return mock identity
-  const _authKeys = ['me','them','myName','theirName','myUid','theirUid','couple','isReady','hasPartner','amSpouse1','getToken'];
+  const _authKeys = ['me','them','user','myName','theirName','myUid','theirUid','couple','isReady','hasPartner','amSpouse1','getToken'];
   _authKeys.forEach(k => {
     const orig = Auth[k];
     Auth[k] = function() { return (DEMO.active && Auth._demoOverride?.[k]) ? Auth._demoOverride[k](...arguments) : orig.apply(this, arguments); };
@@ -4054,7 +4055,8 @@ const DemoRewriter = (() => {
   /** Extract the quoted raw message from the prompt format:
    *  'Name wrote: "message text"\n\nApply the framework...' */
   function extractQuoted(usr) {
-    const m = usr.match(/wrote:\s*"([\s\S]*?)"\s*\n/);
+    // Match various AI prompt formats: wrote: "...", Rewrite this: "...", etc.
+    const m = usr.match(/(?:wrote|Rewrite this|Rewrite|Filter this):\s*"([\s\S]*?)"/) ;
     return m ? m[1].trim() : usr.trim();
   }
 
@@ -7141,10 +7143,20 @@ Router.register('profile-edit', () => {
     const btn = el.querySelector('#profile-save');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
+      if (DEMO.active) {
+        // In demo mode, just update the override and reload
+        const p = DEMO.currentPartner;
+        DEMO.partners[p].name = name;
+        DEMO._applyPerspective();
+        await Auth.refresh();
+        U.toast('Saved ✓');
+        Router.go('setup');
+        return;
+      }
       await Auth.sb().from('couple_members')
         .update({ display_name: name })
-        .eq('user_id', Auth.user().id)
-        .eq('couple_id', Auth.couple().id);
+        .eq('user_id', Auth.user()?.id)
+        .eq('couple_id', Auth.couple()?.id);
       await Auth.refresh();
       U.toast('Saved ✓');
       Router.go('setup');
@@ -9191,11 +9203,30 @@ const CoupleChat = (() => {
   // Invalidate cache for fresh load
   function invalidate() { _messages = null; }
 
+  // Toggle helpers for inline onclick handlers
+  function _toggleSearch() {
+    const bar = document.querySelector('#cc-search-bar');
+    if (!bar) return;
+    bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
+    if (bar.style.display === 'block') bar.querySelector('#cc-search-input')?.focus();
+  }
+
+  function _toggleActions() {
+    const qa = document.querySelector('#cc-quick-actions');
+    const btn = document.querySelector('#cc-plus-btn');
+    if (!qa || !btn) return;
+    const opening = qa.style.display === 'none';
+    qa.style.display = opening ? 'flex' : 'none';
+    btn.textContent = opening ? '×' : '+';
+    btn.style.background = opening ? 'var(--terra)' : 'var(--parchment)';
+    btn.style.color = opening ? '#fff' : 'var(--muted)';
+  }
+
   return {
     messages, send, receivePartner, addSystemMessage, addAIInsight,
     react, unreadCount, markAllRead, recentMessages, messagesByDate,
     searchMessages, lastMessage, todayMessageCount, quickActions,
-    getAIHint, invalidate,
+    getAIHint, invalidate, _toggleSearch, _toggleActions,
   };
 })();
 
@@ -10988,7 +11019,7 @@ Router.register('couple-chat', () => {
       <div style="display:flex;gap:4px;">
         <button class="cal-nav-btn" style="background:rgba(250,246,241,.08);" onclick="Router.go('mediator')" title="AI Mediator">🤖</button>
         <button class="cal-nav-btn" style="background:rgba(250,246,241,.08);" onclick="Router.go('calendar')" title="Calendar">📅</button>
-        <button class="cal-nav-btn" style="background:rgba(250,246,241,.08);" id="cc-search-btn" title="Search">🔍</button>
+        <button class="cal-nav-btn" style="background:rgba(250,246,241,.08);" id="cc-search-btn" title="Search" onclick="CoupleChat._toggleSearch()">🔍</button>
       </div>
     </div>
 
@@ -11027,8 +11058,8 @@ Router.register('couple-chat', () => {
     <div class="cc-input-area">
       <div class="tone-coach tone-coach-hidden" id="cc-coach" style="margin-bottom:4px;"></div>
       <div class="cc-input-row">
-        <button class="cc-send-btn" style="background:var(--parchment);color:var(--muted);font-size:.82rem;" id="cc-plus-btn">+</button>
-        <textarea class="cc-textarea" id="cc-input" rows="1" placeholder="Message ${U.esc(theirN)}..."></textarea>
+        <button class="cc-send-btn" style="background:var(--parchment);color:var(--muted);font-size:.82rem;" id="cc-plus-btn" onclick="CoupleChat._toggleActions()">+</button>
+        <textarea class="cc-textarea" id="cc-input" rows="1" placeholder="Message ${U.esc(theirN)}..." oninput="var s=document.querySelector('#cc-send');if(s)s.disabled=!this.value.trim();this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';"></textarea>
         <button class="cc-send-btn" id="cc-send" disabled>↑</button>
       </div>
       <div class="cc-actions" id="cc-quick-actions" style="display:none;">
@@ -11175,11 +11206,43 @@ Router.register('couple-chat', () => {
     }, 300);
   });
 
-  // Send message
+  // Dismiss any open toxicity review prompt
+  function dismissToxicityPrompt() {
+    const prompt = document.querySelector('#cc-toxicity-prompt');
+    if (prompt) prompt.remove();
+  }
+
+  // Show toxicity filtering prompt with filtered version
+  function showToxicityPrompt(rawText, filteredText) {
+    dismissToxicityPrompt();
+    const inputArea = el.querySelector('.cc-input-area');
+    if (!inputArea) return;
+    const promptDiv = document.createElement('div');
+    promptDiv.id = 'cc-toxicity-prompt';
+    promptDiv.style.cssText = 'padding:12px 16px;background:linear-gradient(135deg,rgba(122,158,138,.12),rgba(196,113,74,.08));border-top:1px solid var(--border);';
+    promptDiv.innerHTML = `
+      <div style="font-size:.72rem;font-weight:600;color:var(--sage);margin-bottom:6px;">✨ Parlay refined your message</div>
+      <div style="font-size:.88rem;line-height:1.5;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;color:var(--espresso);">${U.esc(filteredText)}</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-accent btn-sm" id="cc-send-filtered" style="flex:1;font-size:.82rem;padding:8px 12px;">Send refined message ✓</button>
+        <button class="btn btn-outline btn-sm" id="cc-send-original" style="font-size:.72rem;padding:8px 10px;color:var(--muted);">Send original</button>
+      </div>
+    `;
+    inputArea.insertBefore(promptDiv, inputArea.firstChild);
+    promptDiv.querySelector('#cc-send-filtered').addEventListener('click', () => {
+      finishSend(rawText, filteredText);
+    });
+    promptDiv.querySelector('#cc-send-original').addEventListener('click', () => {
+      finishSend(rawText, rawText);
+    });
+  }
+
+  // Send message flow: filter through AI, then show prompt if changed
   async function doSend() {
     const text = input.value.trim();
     if (!text) return;
 
+    dismissToxicityPrompt();
     sendBtn.disabled = true;
     sendBtn.textContent = '…';
     input.value = '';
@@ -11187,7 +11250,10 @@ Router.register('couple-chat', () => {
 
     // Hide hints and actions
     if (hintArea) hintArea.style.display = 'none';
-    if (quickActions) { quickActions.style.display = 'none'; _actionsOpen = false; plusBtn.textContent = '+'; plusBtn.style.background = 'var(--parchment)'; plusBtn.style.color = 'var(--muted)'; }
+    const qa = document.querySelector('#cc-quick-actions');
+    const pb = document.querySelector('#cc-plus-btn');
+    if (qa) { qa.style.display = 'none'; }
+    if (pb) { pb.textContent = '+'; pb.style.background = 'var(--parchment)'; pb.style.color = 'var(--muted)'; }
 
     // Filter through AI
     let filtered = text;
@@ -11195,7 +11261,22 @@ Router.register('couple-chat', () => {
       filtered = await AIContext.enhancedToneFilter(text);
     } catch(e) { filtered = text; }
 
-    // Send
+    sendBtn.textContent = '↑';
+    sendBtn.disabled = false;
+
+    // If the message was changed by the filter, show the prompt
+    if (filtered && filtered !== text && filtered.toLowerCase() !== text.toLowerCase()) {
+      showToxicityPrompt(text, filtered);
+      return;
+    }
+
+    // Message wasn't changed — send directly
+    finishSend(text, filtered);
+  }
+
+  // Send message (with optional pre-filtered text)
+  function finishSend(text, filtered) {
+    dismissToxicityPrompt();
     const msg = CoupleChat.send(text, { filtered });
 
     // Check if AI insight should be injected
