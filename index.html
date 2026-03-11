@@ -1165,6 +1165,7 @@ select.input {
   display: flex; flex-direction: column;
   height: calc(100dvh - var(--nav-h)); width: 100%;
   overflow: hidden; position: relative;
+  min-height: 0;
 }
 .cc-header {
   position: sticky; top: 0; z-index: 50;
@@ -1213,6 +1214,7 @@ select.input {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
   position: relative;
+  min-height: 0;
 }
 
 /* Date dividers */
@@ -1427,9 +1429,9 @@ select.input {
 .cc-typing .dots span:nth-child(2) { animation-delay: .2s; }
 .cc-typing .dots span:nth-child(3) { animation-delay: .4s; }
 
-/* Input area */
+/* Input area — always pinned at bottom like iMessage */
 .cc-input-area {
-  position: sticky; bottom: 0; z-index: 50;
+  position: relative; z-index: 50;
   padding: 6px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom));
   background: var(--cream);
   border-top: 1px solid var(--border);
@@ -1477,10 +1479,10 @@ select.input {
 .cc-textarea {
   flex: 1; border: 1.5px solid var(--border); border-radius: 22px;
   padding: 10px 16px; font-size: .88rem; line-height: 1.45;
-  resize: none; min-height: 42px; max-height: 140px;
+  resize: none; min-height: 42px; max-height: 160px;
   background: var(--surface); color: var(--espresso);
   font-family: var(--font-body);
-  outline: none; transition: border-color .2s ease, box-shadow .2s ease;
+  outline: none; transition: border-color .2s ease, box-shadow .2s ease, height .1s ease;
 }
 .cc-textarea:focus {
   border-color: var(--terra);
@@ -1973,8 +1975,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.2.0';
-const BUILD_DATE = '2026-03-11T23:45:00Z';
+const VERSION = '5.3.0';
+const BUILD_DATE = '2026-03-11T14:30:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -11879,7 +11881,7 @@ Router.register('couple-chat', () => {
     </div>
 
     <!-- Messages area (with scroll container for FAB) -->
-    <div style="flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;">
+    <div style="flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:0;">
       <div class="cc-msgs" id="cc-messages">
         ${hasRealMessages ? rendered : `
           <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;">
@@ -11898,7 +11900,7 @@ Router.register('couple-chat', () => {
     </div>
 
     <!-- Smart Replies -->
-    <div id="cc-smart-replies" style="display:none;padding:6px 16px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;border-top:1px solid var(--border);background:var(--cream);"></div>
+    <div id="cc-smart-replies" style="display:none;padding:6px 16px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;border-top:1px solid var(--border);background:var(--cream);flex-shrink:0;"></div>
 
     <!-- Conversation Starters (shown when no real messages) -->
     ${!hasRealMessages ? `
@@ -12012,9 +12014,11 @@ Router.register('couple-chat', () => {
   // ─── Input handling ────────────────────────
   input?.addEventListener('input', () => {
     sendBtn.disabled = !input.value.trim();
-    // Auto-resize
+    // Auto-resize (iMessage-style: textarea grows, messages stay scrolled to bottom)
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+    // Keep messages scrolled to bottom as textarea grows
+    if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight;
 
     // Update send button appearance for edit mode
     if (_editingMsg) {
@@ -12052,7 +12056,7 @@ Router.register('couple-chat', () => {
   if (input && input.value) {
     sendBtn.disabled = false;
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 160) + 'px';
   }
 
   // ─── Plus button / quick actions ───────────
@@ -12645,8 +12649,10 @@ Router.register('couple-chat', () => {
     sendBtn.textContent = '↑';
     sendBtn.disabled = false;
 
-    // If the message was changed by the filter, show the prompt
-    if (filtered && filtered !== text && filtered.toLowerCase() !== text.toLowerCase()) {
+    // If the message was meaningfully changed by the filter, show the prompt
+    // Ignore trivial changes: capitalization, trailing punctuation, extra spaces
+    const normalize = s => s.toLowerCase().replace(/[\s.!?,;:]+/g, ' ').trim();
+    if (filtered && filtered !== text && normalize(filtered) !== normalize(text)) {
       showToxicityPrompt(text, filtered);
       return;
     }
