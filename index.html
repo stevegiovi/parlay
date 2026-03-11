@@ -824,36 +824,58 @@ const DEMO = {
 
     this._mockTasks = [
       {
-        id: 'demo-t1', title: 'Schedule dentist appointments for kids',
-        context: 'Both kids are overdue for checkups', rawContext: 'Both kids are overdue', filteredContext: 'Both kids are overdue for their dental checkups.',
-        categoryId: 'kids', priority: 'normal', dueDate: '2026-03-15',
-        assignedTo: 'them', createdBy: 'me', status: 'pending_response',
-        pendingResponseFrom: 'them', counterCount: 0,
+        id: 'demo-t1', title: 'Grab groceries',
+        context: 'We need milk, eggs, bread, and fruit for the week', rawContext: 'We need milk, eggs, bread, and fruit', filteredContext: 'We need milk, eggs, bread, and fruit for the week.',
+        categoryId: 'errands', presetIcon: '🛒', priority: 'normal', dueDate: new Date().toISOString().split('T')[0],
+        assignedTo: 'me', createdBy: 'them', status: 'pending_response',
+        pendingResponseFrom: 'me', counterCount: 0,
         counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+        completedAt: null, completedBy: null,
       },
       {
         id: 'demo-t2', title: 'Fix leaky kitchen faucet',
-        context: "It's been dripping for a week", rawContext: "It's been dripping", filteredContext: "The kitchen faucet has been dripping for about a week.",
-        categoryId: 'maintenance', priority: 'normal', dueDate: null,
+        context: "The kitchen faucet has been dripping for about a week.", rawContext: "It's been dripping for a week", filteredContext: "The kitchen faucet has been dripping for about a week.",
+        categoryId: 'fix', presetIcon: '🚰', priority: 'normal', dueDate: null,
         assignedTo: 'me', createdBy: 'them', status: 'accepted',
         pendingResponseFrom: null, counterCount: 0,
         counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+        completedAt: null, completedBy: null,
       },
       {
-        id: 'demo-t3', title: 'Grocery run — weekly essentials',
-        context: 'We need milk, eggs, bread, and fruit', rawContext: null, filteredContext: null,
-        categoryId: 'errands', priority: 'normal', dueDate: '2026-03-11',
-        assignedTo: 'me', createdBy: 'me', status: 'pending_response',
+        id: 'demo-t3', title: 'Schedule doctor appt',
+        context: 'Both kids are overdue for their dental checkups.', rawContext: 'Both kids are overdue for checkups', filteredContext: 'Both kids are overdue for their dental checkups.',
+        categoryId: 'kids', presetIcon: '🩺', priority: 'normal', dueDate: '2026-03-15',
+        assignedTo: 'them', createdBy: 'me', status: 'pending_response',
         pendingResponseFrom: 'them', counterCount: 0,
         counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+        completedAt: null, completedBy: null,
       },
       {
-        id: 'demo-t4', title: 'Call insurance about claim',
-        context: 'Reference #INS-4421', rawContext: null, filteredContext: null,
-        categoryId: 'admin', priority: 'high', dueDate: '2026-03-12',
+        id: 'demo-t4', title: 'Do laundry',
+        context: null, rawContext: null, filteredContext: null,
+        categoryId: 'household', presetIcon: '🧺', priority: 'normal', dueDate: '2026-03-14',
+        assignedTo: 'me', createdBy: 'me', status: 'accepted',
+        pendingResponseFrom: null, counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+        completedAt: null, completedBy: null,
+      },
+      {
+        id: 'demo-t5', title: 'Call insurance about claim',
+        context: 'Reference #INS-4421', rawContext: null, filteredContext: 'Reference number INS-4421.',
+        categoryId: 'admin', presetIcon: '📞', priority: 'high', dueDate: '2026-03-12',
         assignedTo: 'them', createdBy: 'them', status: 'accepted',
         pendingResponseFrom: null, counterCount: 0,
         counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+        completedAt: null, completedBy: null,
+      },
+      {
+        id: 'demo-t6', title: 'Walk the dog',
+        context: null, rawContext: null, filteredContext: null,
+        categoryId: 'pets', presetIcon: '🐕', priority: 'normal', dueDate: ago(1).toISOString().split('T')[0],
+        assignedTo: 'them', createdBy: 'me', status: 'done',
+        pendingResponseFrom: null, counterCount: 0,
+        counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
+        completedAt: ago(1).toISOString(), completedBy: 'demo-uid-b',
       },
     ];
 
@@ -1473,6 +1495,7 @@ const Store = (() => {
       rawContext: row.raw_context,
       filteredContext: row.filtered_context,
       categoryId: row.category_id || 'other',
+      presetIcon: row.preset_icon || null,
       priority: row.priority || 'normal',
       dueDate: row.due_date,
       assignedTo: _uidToRole(row.assigned_to),
@@ -1484,6 +1507,8 @@ const Store = (() => {
       filteredCounter: row.filtered_counter,
       declineReason: row.decline_reason,
       filteredDecline: row.filtered_decline,
+      completedAt: row.completed_at || null,
+      completedBy: row.completed_by || null,
     };
   }
 
@@ -1496,6 +1521,7 @@ const Store = (() => {
       raw_context: t.rawContext,
       filtered_context: t.filteredContext,
       category_id: t.categoryId,
+      preset_icon: t.presetIcon || null,
       priority: t.priority,
       due_date: t.dueDate || null,
       assigned_to: t.assignedTo === 'me' ? Auth.myUid() : Auth.theirUid(),
@@ -1508,6 +1534,8 @@ const Store = (() => {
       filtered_counter: t.filteredCounter,
       decline_reason: t.declineReason,
       filtered_decline: t.filteredDecline,
+      completed_at: t.completedAt || null,
+      completed_by: t.completedBy || null,
     };
   }
 
@@ -1600,11 +1628,12 @@ const Store = (() => {
       const map = {
         title:'title', context:'context', rawContext:'raw_context',
         filteredContext:'filtered_context', priority:'priority',
-        dueDate:'due_date', status:'status',
-        assignedTo:'assigned_to',
+        dueDate:'due_date', status:'status', categoryId:'category_id',
+        presetIcon:'preset_icon', assignedTo:'assigned_to',
         counterMessage:'counter_message', filteredCounter:'filtered_counter',
         declineReason:'decline_reason', filteredDecline:'filtered_decline',
         counterCount:'counter_count',
+        completedAt:'completed_at', completedBy:'completed_by',
       };
       for (const [k,v] of Object.entries(patch)) {
         if (k === 'assignedTo' || k === 'pendingResponseFrom') continue; // handled below
@@ -2262,14 +2291,109 @@ const TONES = {
 };
 
 const TASK_CATEGORIES = [
-  { id: 'household', icon: '🏠', label: 'Household' },
-  { id: 'kids',      icon: '👧', label: 'Kids' },
-  { id: 'errands',   icon: '🛒', label: 'Errands' },
-  { id: 'admin',     icon: '📋', label: 'Admin' },
-  { id: 'maintenance',icon:'🔧', label: 'Fix/Repair' },
-  { id: 'pets',      icon: '🐾', label: 'Pets' },
-  { id: 'other',     icon: '📌', label: 'Other' },
+  { id: 'errands',     icon: '🛒', label: 'Errands',      color: '#E8B88A' },
+  { id: 'household',   icon: '🏠', label: 'Household',    color: '#C4714A' },
+  { id: 'kids',        icon: '👧', label: 'Kids',          color: '#7A6A9B' },
+  { id: 'fix',         icon: '🔧', label: 'Fix & Repair',  color: '#6A8CAA' },
+  { id: 'admin',       icon: '📋', label: 'Admin',         color: '#9B8880' },
+  { id: 'pets',        icon: '🐾', label: 'Pets',          color: '#7A9E8A' },
+  { id: 'selfcare',    icon: '💆', label: 'Self-care',     color: '#D4A5A5' },
+  { id: 'other',       icon: '📌', label: 'Other',         color: '#9B8880' },
 ];
+
+const TASK_PRESETS = {
+  errands: [
+    { title: 'Grab groceries',          icon: '🛒' },
+    { title: 'Pick up prescriptions',   icon: '💊' },
+    { title: 'Return an item',          icon: '📦' },
+    { title: 'Drop off dry cleaning',   icon: '👔' },
+    { title: 'Get gas',                 icon: '⛽' },
+  ],
+  household: [
+    { title: 'Do the dishes',           icon: '🍽️' },
+    { title: 'Do laundry',              icon: '🧺' },
+    { title: 'Vacuum / mop',            icon: '🧹' },
+    { title: 'Take out trash',          icon: '🗑️' },
+    { title: 'Clean the bathroom',      icon: '🚿' },
+    { title: 'Tidy the kitchen',        icon: '🧽' },
+  ],
+  kids: [
+    { title: 'Pack lunches',            icon: '🥪' },
+    { title: 'School pickup',           icon: '🚗' },
+    { title: 'Schedule doctor appt',    icon: '🩺' },
+    { title: 'Help with homework',      icon: '📚' },
+    { title: 'Give kids a bath',        icon: '🛁' },
+    { title: 'Sign school form',        icon: '✍️' },
+  ],
+  fix: [
+    { title: 'Fix the leaky faucet',    icon: '🚰' },
+    { title: 'Change a lightbulb',      icon: '💡' },
+    { title: 'Mow the lawn',            icon: '🌿' },
+    { title: 'Take car for service',    icon: '🚙' },
+    { title: 'Hang shelves / pictures', icon: '🖼️' },
+    { title: 'Yard work',               icon: '🌳' },
+  ],
+  admin: [
+    { title: 'Pay a bill',              icon: '💳' },
+    { title: 'Call insurance',          icon: '📞' },
+    { title: 'Schedule appointment',    icon: '📅' },
+    { title: 'File paperwork',          icon: '📄' },
+    { title: 'Update subscription',     icon: '🔄' },
+  ],
+  pets: [
+    { title: 'Walk the dog',            icon: '🐕' },
+    { title: 'Feed the pets',           icon: '🥣' },
+    { title: 'Vet appointment',         icon: '🏥' },
+    { title: 'Groom / bathe pet',       icon: '🐩' },
+  ],
+  selfcare: [
+    { title: 'Schedule haircut',        icon: '💇' },
+    { title: 'Gym / workout',           icon: '🏋️' },
+    { title: 'Book massage / spa',      icon: '💆' },
+  ],
+};
+
+function autoCategorize(title) {
+  const t = title.toLowerCase();
+  if (/grocer|pick up|buy|errand|return|dry clean|gas|pharmacy|prescription|store/.test(t)) return 'errands';
+  if (/dish|laundry|vacuum|mop|clean|trash|tidy|organiz|declutter|dust/.test(t)) return 'household';
+  if (/kid|school|homework|lunch|bath|playdate|doctor|dentist|permission|daycare|pickup|drop.?off/.test(t)) return 'kids';
+  if (/fix|repair|mow|lawn|yard|install|hang|lightbulb|faucet|paint|car.*service|garage/.test(t)) return 'fix';
+  if (/call|pay|bill|insurance|appoint|file|paper|tax|subscri|renew|cancel/.test(t)) return 'admin';
+  if (/dog|cat|pet|vet|walk|feed|groom/.test(t)) return 'pets';
+  if (/hair|gym|workout|massage|spa|self.?care|nail/.test(t)) return 'selfcare';
+  return 'other';
+}
+
+function dueLabel(dueDate) {
+  if (!dueDate) return { text: 'No due date', color: 'var(--muted)', urgent: false };
+  const now = new Date(); now.setHours(0,0,0,0);
+  const due = new Date(dueDate + 'T12:00:00'); due.setHours(0,0,0,0);
+  const diff = Math.round((due - now) / 86400000);
+  if (diff < 0) return { text: 'Overdue!', color: '#EF4444', urgent: true };
+  if (diff === 0) return { text: 'Due today', color: '#E8913A', urgent: true };
+  if (diff === 1) return { text: 'Due tomorrow', color: '#E8B88A', urgent: false };
+  if (diff <= 7) {
+    const dayName = due.toLocaleDateString('en-US', { weekday: 'short' });
+    return { text: `Due ${dayName}`, color: 'var(--muted)', urgent: false };
+  }
+  const label = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return { text: `Due ${label}`, color: 'var(--muted)', urgent: false };
+}
+
+function sortTasks(tasks) {
+  return [...tasks].sort((a, b) => {
+    // Overdue first, then today, then by date ascending, no-date last
+    const da = dueLabel(a.dueDate);
+    const db = dueLabel(b.dueDate);
+    if (da.urgent && !db.urgent) return -1;
+    if (!da.urgent && db.urgent) return 1;
+    if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+    if (a.dueDate && !b.dueDate) return -1;
+    if (!a.dueDate && b.dueDate) return 1;
+    return 0;
+  });
+}
 
 // ──────────────────────────────────────────────
 // EVENT FIELD CONFIGS — Dynamic structured fields per event type
@@ -3141,10 +3265,11 @@ Router.register('home', () => {
       }).join('')}
       ${actionTasks.length > 0 ? `
       ${actionTasks.slice(0, 3).map(t => {
-        const cat = TASK_CATEGORIES.find(c => c.id === t.categoryId) || TASK_CATEGORIES[6];
+        const cat = TASK_CATEGORIES.find(c => c.id === t.categoryId) || TASK_CATEGORIES[7];
+        const tIcon = t.presetIcon || cat.icon;
         const from = t.createdBy === 'me' ? myN : theirN;
         return `<div onclick="Router.go('task-detail',{id:'${t.id}'})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(122,101,180,.08);border:1px solid rgba(122,101,180,.15);border-radius:12px;cursor:pointer;margin-bottom:6px;">
-          <span style="font-size:1.1rem;">${cat.icon}</span>
+          <span style="font-size:1.1rem;">${tIcon}</span>
           <div style="flex:1;min-width:0;">
             <div style="font-size:.82rem;font-weight:600;color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc(t.title)}</div>
             <div style="font-size:.68rem;color:rgba(250,246,241,.65);">From ${U.esc(from)}</div>
@@ -4111,79 +4236,109 @@ Router.register('parlay-reply', ({ id } = {}) => {
 
 
 // ──────────────────────────────────────────────
-// TASKS LIST
+// TASKS LIST — Smart sections + inline done
 // ──────────────────────────────────────────────
 Router.register('tasks', () => {
-  const my = Store.myTasks();
-  const sent = Store.sentTasks();
+  const allOpen = Store.myTasks().concat(Store.sentTasks().filter(t => !Store.myTasks().includes(t)));
   const action = Store.myActionTasks();
+  const myAccepted = Store.myTasks().filter(t => t.status === 'accepted');
+  const myOther = Store.myTasks().filter(t => t.status !== 'accepted' && t.pendingResponseFrom !== 'me');
+  const sent = Store.sentTasks();
   const done = Store.doneTasks();
   const myN = Auth.myName();
   const theirN = Auth.theirName();
 
-  const taskCard = (t) => {
-    const cat = TASK_CATEGORIES.find(c => c.id === t.categoryId) || TASK_CATEGORIES[6];
+  const taskCard = (t, opts = {}) => {
+    const cat = TASK_CATEGORIES.find(c => c.id === t.categoryId) || TASK_CATEGORIES[7];
+    const icon = t.presetIcon || cat.icon;
     const from = t.createdBy === 'me' ? myN : theirN;
     const to = t.assignedTo === 'me' ? myN : theirN;
+    const dl = dueLabel(t.dueDate);
     const needsMe = t.pendingResponseFrom === 'me';
-    return `<div class="task-card" onclick="Router.go('task-detail',{id:'${t.id}'})">
-      <div style="width:38px;height:38px;border-radius:10px;background:var(--parchment);display:flex;align-items:center;justify-content:center;font-size:1.15rem;">${cat.icon}</div>
-      <div style="flex:1;">
-        <div style="font-size:.9rem;font-weight:600;margin-bottom:3px;">${U.esc(t.title)}</div>
-        <div style="font-size:.72rem;color:var(--muted);">${t.assignedTo === 'me' ? 'From ' + from : 'To ' + to}</div>
-        ${needsMe ? `<div style="font-size:.68rem;font-weight:700;color:var(--purple);margin-top:4px;">⚡ Your turn</div>` : ''}
+    const showDone = opts.showDone && t.status === 'accepted' && t.assignedTo === 'me';
+    return `<div class="task-card" data-task-id="${t.id}" ${!showDone ? `onclick="Router.go('task-detail',{id:'${t.id}'})"` : ''}>
+      <div style="width:38px;height:38px;border-radius:10px;background:${cat.color}18;display:flex;align-items:center;justify-content:center;font-size:1.15rem;">${icon}</div>
+      <div style="flex:1;min-width:0;" ${showDone ? `onclick="Router.go('task-detail',{id:'${t.id}'})"` : ''}>
+        <div style="font-size:.88rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc(t.title)}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:3px;">
+          <span style="font-size:.68rem;color:${dl.color};${dl.urgent ? 'font-weight:700;' : ''}">${dl.text}</span>
+          ${t.priority === 'high' ? '<span style="font-size:.62rem;font-weight:700;color:#EF4444;background:#FEE2E2;padding:1px 6px;border-radius:8px;">⚡ HIGH</span>' : ''}
+          <span style="font-size:.68rem;color:var(--muted);">· ${t.assignedTo === 'me' ? from : 'To ' + to}</span>
+        </div>
+        ${needsMe ? '<div style="font-size:.68rem;font-weight:700;color:var(--purple);margin-top:4px;">⚡ Accept or respond</div>' : ''}
+      </div>
+      ${showDone ? `<button class="btn btn-sm" style="background:var(--sage);color:#fff;flex-shrink:0;font-size:.72rem;padding:6px 12px;" data-done-id="${t.id}" onclick="event.stopPropagation()">✓ Done</button>` : ''}
+    </div>`;
+  };
+
+  const sectionHtml = (title, items, opts = {}) => {
+    if (items.length === 0) return '';
+    const sorted = sortTasks(items);
+    const collapsed = opts.collapsed ? ' collapsed' : '';
+    return `
+    <div style="padding:8px 0;">
+      <div class="section-toggle${collapsed}" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed');" style="padding:0 20px;">
+        <div class="section-label" style="margin-bottom:0;padding:0;${opts.labelColor ? 'color:' + opts.labelColor + ';' : ''}">${title} (${items.length})</div>
+        <div class="toggle-arrow">▾</div>
+      </div>
+      <div class="section-body${collapsed}">
+        <div style="display:flex;flex-direction:column;gap:8px;padding:4px 20px 0;">${sorted.map(t => taskCard(t, opts)).join('')}</div>
       </div>
     </div>`;
   };
+
+  const total = allOpen.length + done.length;
 
   return `
   <div style="padding-bottom:calc(var(--nav-h) + 20px);">
     <div style="background:var(--espresso);padding:0 24px 24px;padding-top:max(52px,env(safe-area-inset-top));">
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:var(--cream);" class="a1">Tasks <em style="color:var(--amber)">& Chores</em></div>
+        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:var(--cream);" class="a1">Tasks <em style="color:var(--amber)">& To-Dos</em></div>
         <button class="btn-ghost" style="color:rgba(250,246,241,.65);font-size:1.1rem;" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
       </div>
+      <div style="font-size:.72rem;color:rgba(250,246,241,.65);" class="a1">Quick asks, household ops, life logistics.</div>
+    </div>
+
+    <div style="padding:16px 20px 0;" class="a2">
+      <button class="btn btn-accent" onclick="Router.go('task-new')">+ Assign a Task</button>
     </div>
 
     ${action.length > 0 ? `
-    <div style="margin:16px 20px 0;padding:14px 16px;background:linear-gradient(135deg,rgba(122,58,237,.04),transparent);border:1.5px solid rgba(122,58,237,.15);border-radius:var(--r-md);" class="a2">
-      <div style="font-size:.85rem;font-weight:700;color:var(--purple);">⚡ ${action.length} task${action.length !== 1 ? 's' : ''} need your response</div>
+    <div style="padding:12px 0 0;">
+      <div class="section-label" style="color:var(--terra);">⚡ NEEDS YOUR ACTION (${action.length})</div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:0 20px;">
+        ${sortTasks(action).map(t => taskCard(t)).join('')}
+      </div>
     </div>` : ''}
 
-    <div style="padding:16px 20px 0;" class="a3">
-      <button class="btn btn-primary" onclick="Router.go('task-new')">+ Assign a Task</button>
-    </div>
+    ${sectionHtml('My Tasks', myAccepted.concat(myOther), { showDone: true })}
+    ${sectionHtml('I Assigned', sent.filter(t => t.status !== 'done'))}
+    ${sectionHtml('Completed', done, { collapsed: true, labelColor: 'var(--sage)' })}
 
-    ${my.length > 0 ? `
-    <div style="padding:20px 20px 0;" class="a4">
-      <div class="section-label" style="padding:0;">My Tasks (${my.length})</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${my.map(taskCard).join('')}</div>
-    </div>` : ''}
-
-    ${sent.length > 0 ? `
-    <div style="padding:20px 20px 0;">
-      <div class="section-label" style="padding:0;">I Assigned (${sent.length})</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">${sent.map(taskCard).join('')}</div>
-    </div>` : ''}
-
-    ${done.length > 0 ? `
-    <div style="padding:20px 20px 0;">
-      <div class="section-label" style="padding:0;color:var(--sage);">✓ Completed (${done.length})</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;opacity:.65;">${done.map(taskCard).join('')}</div>
-    </div>` : ''}
-
-    ${my.length === 0 && sent.length === 0 && done.length === 0 ? `
-    <div style="padding:52px 24px;text-align:center;" class="a4">
+    ${total === 0 ? `
+    <div style="padding:52px 24px;text-align:center;" class="a3">
       <div style="font-size:2.8rem;margin-bottom:16px;">📋</div>
       <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">No tasks yet</div>
-      <div style="font-size:.82rem;color:var(--muted);max-width:240px;margin:0 auto;">Assign tasks with context, not conflict.</div>
+      <div style="font-size:.82rem;color:var(--muted);max-width:240px;margin:0 auto;">Assign tasks with context, not conflict. Tap the button above to get started.</div>
     </div>` : ''}
   </div>`;
-}, () => { Badges.update(); });
+}, (el) => {
+  // Inline done buttons
+  el.querySelectorAll('[data-done-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.doneId;
+      btn.disabled = true; btn.textContent = '...';
+      await Store.updateTask(id, { status: 'done', pendingResponseFrom: null });
+      Badges.update(); U.toast('Task done ✓');
+      Router.go('tasks');
+    });
+  });
+  Badges.update();
+});
 
 
 // ──────────────────────────────────────────────
-// NEW TASK
+// NEW TASK — Step 1: Pick preset or type custom
 // ──────────────────────────────────────────────
 Router.register('task-new', () => {
   if (!Auth.hasPartner()) {
@@ -4198,124 +4353,277 @@ Router.register('task-new', () => {
       <button class="btn btn-outline" style="max-width:240px;margin-top:10px;" onclick="Router.go('tasks')">‹ Back</button>
     </div>`;
   }
+
+  const defaultCat = TASK_CATEGORIES[0].id;
   return `
   <div style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" class="a1">
       <button class="btn btn-outline btn-sm" onclick="Router.go('tasks')">‹ Back</button>
       <span style="font-family:var(--font-display);font-size:1.1rem;">New Task</span>
     </div>
-    <div style="display:flex;flex-direction:column;gap:16px;" class="a2">
-      <div>
-        <div class="input-label">Task title</div>
-        <input id="tn-title" class="input" placeholder="e.g. Pick up groceries">
-      </div>
-      <div>
-        <div class="input-label">Assign to</div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline" data-assign="them" id="tn-them" style="flex:1;">${Auth.theirName()}</button>
-          <button class="btn btn-outline" data-assign="me" id="tn-me" style="flex:1;">Myself</button>
+
+    <div class="a2" style="margin-bottom:16px;">
+      <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:4px;">What needs <em style="color:var(--terra)">doing?</em></div>
+      <div style="font-size:.78rem;color:var(--muted);line-height:1.6;">Tap a common task or type your own.</div>
+    </div>
+
+    <!-- Category tabs -->
+    <div id="cat-tabs" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;" class="a3">
+      ${TASK_CATEGORIES.filter(c => c.id !== 'other').map((c, i) => `
+        <div class="filter-chip${i === 0 ? ' active' : ''}" data-cat="${c.id}" style="white-space:nowrap;flex-shrink:0;">${c.icon} ${c.label}</div>
+      `).join('')}
+    </div>
+
+    <!-- Preset grid -->
+    <div id="preset-grid" class="a3" style="margin-bottom:16px;">
+      ${TASK_CATEGORIES.filter(c => c.id !== 'other').map(c => `
+        <div class="preset-section" data-cat-section="${c.id}" style="display:${c.id !== defaultCat ? 'none' : 'flex'};flex-wrap:wrap;gap:8px;">
+          ${(TASK_PRESETS[c.id] || []).map(p => `
+            <div class="pill" data-preset-title="${U.esc(p.title)}" data-preset-icon="${p.icon}" data-preset-cat="${c.id}" style="font-size:.82rem;padding:8px 14px;cursor:pointer;">${p.icon} ${p.title}</div>
+          `).join('')}
         </div>
-      </div>
-      <div>
-        <div class="input-label">Context (optional)</div>
-        <textarea id="tn-context" class="input" rows="3" placeholder="Why, when, any details" style="resize:none;"></textarea>
-      </div>
-      <button class="btn btn-primary" id="tn-submit">Assign Task</button>
+      `).join('')}
+    </div>
+
+    <!-- Or type custom -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+      <div style="font-size:.72rem;color:var(--muted);font-weight:600;">OR TYPE YOUR OWN</div>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <input id="tn-custom" class="input" placeholder="e.g. Organize the garage" style="flex:1;">
+      <button class="btn btn-accent" id="tn-custom-go" style="flex-shrink:0;padding:0 20px;">Next →</button>
     </div>
   </div>`;
 }, (el) => {
-  let _assignTo = 'them';
-  const themBtn = el.querySelector('#tn-them');
-  const meBtn = el.querySelector('#tn-me');
+  let _activeCat = TASK_CATEGORIES[0].id;
 
-  const updateBtns = () => {
-    themBtn.style.background = _assignTo === 'them' ? 'var(--terra)' : '';
-    themBtn.style.color = _assignTo === 'them' ? '#fff' : '';
-    themBtn.style.borderColor = _assignTo === 'them' ? 'var(--terra)' : '';
-    meBtn.style.background = _assignTo === 'me' ? 'var(--terra)' : '';
-    meBtn.style.color = _assignTo === 'me' ? '#fff' : '';
-    meBtn.style.borderColor = _assignTo === 'me' ? 'var(--terra)' : '';
-  };
-  updateBtns();
-
-  themBtn.addEventListener('click', () => { _assignTo = 'them'; updateBtns(); });
-  meBtn.addEventListener('click', () => { _assignTo = 'me'; updateBtns(); });
-
-  let _taskSubmitting = false;
-  el.querySelector('#tn-submit').addEventListener('click', async () => {
-    if (_taskSubmitting) return;
-    const title = el.querySelector('#tn-title').value.trim();
-    if (!title) { U.toast('Add a title'); return; }
-    _taskSubmitting = true;
-    const btn = el.querySelector('#tn-submit');
-    btn.disabled = true; btn.textContent = 'Assigning…';
-
-    const rawContext = el.querySelector('#tn-context').value.trim();
-    const filteredContext = await filterTaskContext(rawContext);
-
-    await Store.addTask({
-      id: 'task_' + Date.now(),
-      title,
-      context: rawContext,
-      rawContext,
-      filteredContext,
-      categoryId: 'other',
-      priority: 'normal',
-      dueDate: null,
-      assignedTo: _assignTo,
-      createdBy: 'me',
-      status: 'pending_response',
-      pendingResponseFrom: _assignTo,
-      counterCount: 0,
+  // Category tab switching
+  el.querySelectorAll('#cat-tabs .filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      el.querySelectorAll('#cat-tabs .filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      _activeCat = chip.dataset.cat;
+      el.querySelectorAll('[data-cat-section]').forEach(s => {
+        s.style.display = s.dataset.catSection === _activeCat ? 'flex' : 'none';
+      });
     });
+  });
 
-    Badges.update();
-    U.toast('Task assigned ✓');
-    Router.go('tasks');
+  // Preset click → go to step 2
+  el.querySelectorAll('.pill[data-preset-title]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      Router.go('task-new-details', {
+        title: pill.dataset.presetTitle,
+        icon: pill.dataset.presetIcon,
+        categoryId: pill.dataset.presetCat,
+      });
+    });
+  });
+
+  // Custom input → go to step 2
+  const goCustom = () => {
+    const title = el.querySelector('#tn-custom')?.value.trim();
+    if (!title) { U.toast('Type a task'); return; }
+    const catId = autoCategorize(title);
+    Router.go('task-new-details', { title, icon: '', categoryId: catId });
+  };
+  el.querySelector('#tn-custom-go')?.addEventListener('click', goCustom);
+  el.querySelector('#tn-custom')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); goCustom(); }
   });
 });
 
 
 // ──────────────────────────────────────────────
-// TASK DETAIL
+// NEW TASK — Step 2: Details (assign, due, priority, notes)
+// ──────────────────────────────────────────────
+Router.register('task-new-details', ({ title = '', icon = '', categoryId = 'other' } = {}) => {
+  const cat = TASK_CATEGORIES.find(c => c.id === categoryId) || TASK_CATEGORIES[7];
+  const theirN = Auth.theirName();
+  const displayIcon = icon || cat.icon;
+  const today = new Date().toISOString().split('T')[0];
+
+  return `
+  <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" class="a1">
+      <button class="btn btn-outline btn-sm" onclick="Router.go('task-new')">‹ Back</button>
+      <span style="font-size:1.2rem;">${displayIcon}</span>
+      <span style="font-family:var(--font-display);font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc(title)}</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;" class="a2">
+      <!-- Title (editable) -->
+      <div>
+        <div class="input-label">Task</div>
+        <input id="tnd-title" class="input" value="${U.esc(title)}">
+      </div>
+
+      <!-- Assign to -->
+      <div>
+        <div class="input-label">Assign to</div>
+        <div class="pill-group" data-field="tnd-assign">
+          <div class="pill selected" data-val="them">${U.esc(theirN)}</div>
+          <div class="pill" data-val="me">Myself</div>
+        </div>
+      </div>
+
+      <!-- Due date -->
+      <div>
+        <div class="input-label">📅 Due by <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
+        <input type="date" id="tnd-due" class="input" min="${today}">
+      </div>
+
+      <!-- Priority -->
+      <div>
+        <div class="input-label">Priority</div>
+        <div class="pill-group" data-field="tnd-priority">
+          <div class="pill selected" data-val="normal">Normal</div>
+          <div class="pill" data-val="high">⚡ High</div>
+        </div>
+      </div>
+
+      <!-- Optional details -->
+      <div>
+        <div id="tnd-note-toggle" style="display:flex;align-items:center;gap:8px;padding:10px 0;cursor:pointer;color:var(--terra);font-size:.82rem;font-weight:600;">
+          <span>💬</span> Add details
+        </div>
+        <div id="tnd-note-area" style="display:none;">
+          <textarea id="tnd-context" class="input" rows="3" placeholder="Why, when, any specifics..." style="resize:none;line-height:1.6;"></textarea>
+          <div style="font-size:.68rem;color:var(--muted);margin-top:4px;">🔒 Filtered by Parlay before ${U.esc(theirN)} sees it</div>
+        </div>
+      </div>
+
+      <input type="hidden" id="tnd-cat" value="${categoryId}">
+      <input type="hidden" id="tnd-icon" value="${U.esc(icon)}">
+
+      <button class="btn btn-accent" id="tnd-submit"><span id="tnd-btn-text">Assign Task →</span></button>
+      <button class="btn btn-outline" onclick="Router.go('task-new')" style="margin-top:-4px;">Cancel</button>
+    </div>
+  </div>`;
+}, (el) => {
+  let _submitting = false;
+
+  // Wire pill groups
+  el.querySelectorAll('.pill-group').forEach(group => {
+    group.querySelectorAll('.pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        group.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+        pill.classList.add('selected');
+      });
+    });
+  });
+
+  // Note toggle
+  el.querySelector('#tnd-note-toggle')?.addEventListener('click', () => {
+    el.querySelector('#tnd-note-area').style.display = 'block';
+    el.querySelector('#tnd-note-toggle').style.display = 'none';
+    el.querySelector('#tnd-context')?.focus();
+  });
+
+  // Submit
+  el.querySelector('#tnd-submit')?.addEventListener('click', async () => {
+    if (_submitting) return;
+    const title = el.querySelector('#tnd-title')?.value.trim();
+    if (!title) { U.toast('Add a title'); return; }
+    _submitting = true;
+    const btn = el.querySelector('#tnd-submit');
+    const txt = el.querySelector('#tnd-btn-text');
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Assigning…';
+
+    const assignTo = el.querySelector('[data-field="tnd-assign"] .pill.selected')?.dataset.val || 'them';
+    const priority = el.querySelector('[data-field="tnd-priority"] .pill.selected')?.dataset.val || 'normal';
+    const dueDate = el.querySelector('#tnd-due')?.value || null;
+    const rawContext = el.querySelector('#tnd-context')?.value.trim() || '';
+    const filteredContext = await filterTaskContext(rawContext);
+    const categoryId = el.querySelector('#tnd-cat')?.value || autoCategorize(title);
+    const presetIcon = el.querySelector('#tnd-icon')?.value || null;
+
+    const id = 'task_' + Date.now();
+    await Store.addTask({
+      id, title, context: rawContext, rawContext, filteredContext,
+      categoryId, presetIcon: presetIcon || null,
+      priority, dueDate,
+      assignedTo: assignTo, createdBy: 'me',
+      status: 'pending_response',
+      pendingResponseFrom: assignTo,
+      counterCount: 0,
+      completedAt: null, completedBy: null,
+    });
+
+    Badges.update();
+    Router.go('task-sent', { id, title });
+  });
+});
+
+
+// ──────────────────────────────────────────────
+// TASK SENT — Confirmation
+// ──────────────────────────────────────────────
+Router.register('task-sent', ({ id, title = '' } = {}) => {
+  const t = Store.findTask(id);
+  const cat = t ? (TASK_CATEGORIES.find(c => c.id === t.categoryId) || TASK_CATEGORIES[7]) : TASK_CATEGORIES[7];
+  const icon = t?.presetIcon || cat.icon;
+  const theirN = Auth.theirName();
+
+  return `
+  <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;text-align:center;">
+    <div style="font-size:3rem;margin-bottom:20px;animation:float 4s ease-in-out infinite;">📋</div>
+    <div style="font-family:var(--font-display);font-size:2rem;font-weight:300;margin-bottom:8px;" class="a1">Task <em style="color:var(--terra)">assigned</em></div>
+    <div style="font-size:.85rem;color:var(--muted);line-height:1.7;max-width:280px;margin-bottom:24px;" class="a2">
+      ${U.esc(theirN)} will see your task${t?.rawContext ? ' with details filtered for tone' : ''}.
+    </div>
+    <div style="font-size:.75rem;color:var(--muted);background:var(--parchment);border-radius:var(--r-pill);padding:5px 14px;margin-bottom:28px;">${icon} ${U.esc(title || (t?.title) || 'Task')}</div>
+    <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px;" class="a3">
+      <button class="btn btn-primary" onclick="Router.go('tasks')">View All Tasks →</button>
+      <button class="btn btn-outline" onclick="Router.go('home')">Back to Home</button>
+    </div>
+  </div>`;
+});
+
+
+// ──────────────────────────────────────────────
+// TASK DETAIL — Enhanced with due date, priority, manage menu
 // ──────────────────────────────────────────────
 Router.register('task-detail', ({ id } = {}) => {
   const t = Store.findTask(id);
   if (!t) return `<div style="padding:60px 24px;text-align:center;">Task not found.<br><button class="btn btn-outline btn-sm" style="margin-top:16px;" onclick="Router.go('tasks')">‹ Back</button></div>`;
 
-  const cat = TASK_CATEGORIES.find(c => c.id === t.categoryId) || TASK_CATEGORIES[6];
+  const cat = TASK_CATEGORIES.find(c => c.id === t.categoryId) || TASK_CATEGORIES[7];
+  const icon = t.presetIcon || cat.icon;
   const from = t.createdBy === 'me' ? Auth.myName() : Auth.theirName();
   const to = t.assignedTo === 'me' ? Auth.myName() : Auth.theirName();
   const needsMe = t.pendingResponseFrom === 'me';
   const iAmAssignee = t.assignedTo === 'me';
+  const dl = dueLabel(t.dueDate);
 
-  // Status label
-  const statusLabel = {
-    pending_response: needsMe ? '⚡ Your turn' : 'Awaiting response',
-    accepted: '✓ Accepted',
-    declined: '❌ Declined',
-    countered: '↩ Changes suggested',
-    done: '✓ Done',
-  }[t.status] || t.status;
+  // Status config
+  const statusMap = {
+    pending_response: needsMe ? ['⚡ Your turn', 'var(--terra)', 'rgba(196,113,74,.12)'] : ['Awaiting response', '#E8B88A', '#E8B88A18'],
+    accepted: ['✓ Accepted', 'var(--sage)', 'rgba(122,158,138,.12)'],
+    declined: ['✕ Declined', '#EF4444', 'rgba(239,68,68,.08)'],
+    countered: ['↩ Changes suggested', 'var(--purple)', 'rgba(122,106,155,.12)'],
+    done: ['✓ Done', 'var(--sage)', 'rgba(122,158,138,.12)'],
+  };
+  const [statusLabel, statusColor, statusBg] = statusMap[t.status] || [t.status, 'var(--muted)', 'var(--parchment)'];
 
-  // Action area — every combo covered
+  // Action area
   let actionHtml = '';
   if (t.status === 'pending_response' && needsMe) {
     actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;margin-top:20px;">
       <button class="btn" style="background:var(--sage);color:#fff;" id="td-accept">✓ Accept</button>
       <button class="btn btn-outline" id="td-counter">↩ Suggest Changes</button>
-      <button class="btn btn-outline" id="td-decline" style="color:#EF4444;border-color:#EF4444;">Decline</button>
+      <button class="btn btn-outline" id="td-decline" style="color:#EF4444;border-color:#EF4444;">✕ Decline</button>
     </div>
-    <!-- Counter form (hidden until Suggest Changes clicked) -->
     <div id="td-counter-form" style="display:none;margin-top:12px;">
       <div class="input-label">What would work better?</div>
       <textarea id="td-counter-msg" class="input" rows="3" placeholder="e.g. I can do this Thursday instead" style="resize:none;margin-bottom:12px;"></textarea>
-      <button class="btn btn-accent" id="td-counter-submit">Send suggestion &rarr;</button>
+      <button class="btn btn-accent" id="td-counter-submit"><span id="td-counter-text">Send suggestion →</span></button>
     </div>
-    <!-- Decline form (hidden until Decline clicked) -->
     <div id="td-decline-form" style="display:none;margin-top:12px;">
       <div class="input-label">Why are you declining? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
-      <textarea id="td-decline-msg" class="input" rows="2" placeholder="e.g. I don't have bandwidth for this right now" style="resize:none;margin-bottom:12px;"></textarea>
+      <textarea id="td-decline-msg" class="input" rows="2" placeholder="e.g. I don't have bandwidth right now" style="resize:none;margin-bottom:12px;"></textarea>
       <button class="btn btn-danger" id="td-decline-submit">Decline task</button>
     </div>`;
   } else if (t.status === 'accepted' && iAmAssignee) {
@@ -4344,70 +4652,89 @@ Router.register('task-detail', ({ id } = {}) => {
       <div style="text-align:center;padding:12px;font-size:.85rem;color:var(--muted);">This task was declined.</div>
     </div>`;
   } else if (t.status === 'done') {
-    actionHtml = `<div style="text-align:center;padding:16px;color:var(--sage);font-weight:600;">✓ Completed</div>`;
+    actionHtml = `<div style="text-align:center;padding:16px;background:#EDF4F0;border:1.5px solid var(--sage);border-radius:var(--r-md);margin-top:20px;">
+      <div style="font-size:1.3rem;margin-bottom:4px;">🎉</div>
+      <div style="font-size:.92rem;color:var(--sage);font-weight:700;">Completed</div>
+      ${t.completedAt ? `<div style="font-size:.68rem;color:var(--muted);margin-top:4px;">${new Date(t.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>` : ''}
+    </div>`;
   } else if (t.status === 'pending_response' && !needsMe) {
     actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);margin-top:20px;font-size:.85rem;color:var(--muted);">⏳ Waiting for ${U.esc(to)} to respond</div>`;
   }
 
   return `
-  <div data-task-id="${t.id}" style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;" class="a1">
+  <div data-task-id="${t.id}" style="min-height:100dvh;padding:0 20px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(60px,env(safe-area-inset-bottom));">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;" class="a1">
       <button class="btn btn-outline btn-sm" onclick="Router.go('tasks')">‹ Tasks</button>
-      <button class="btn-ghost" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
+        <button class="btn-ghost" id="td-manage">⋯</button>
+      </div>
     </div>
+
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;" class="a2">
-      <div style="width:48px;height:48px;border-radius:14px;background:var(--parchment);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${cat.icon}</div>
+      <div style="width:48px;height:48px;border-radius:14px;background:${cat.color}18;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${icon}</div>
       <div>
         <div style="font-family:var(--font-display);font-size:1.3rem;">${U.esc(t.title)}</div>
         <div style="font-size:.72rem;color:var(--muted);">From ${U.esc(from)} → ${U.esc(to)}</div>
       </div>
     </div>
-    <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--parchment);border-radius:var(--r-pill);margin-bottom:16px;font-size:.72rem;font-weight:600;color:var(--muted);">${statusLabel}</div>
+
+    <!-- Status + meta -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;" class="a2">
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:${statusBg};border:1px solid ${statusColor}44;border-radius:var(--r-pill);">
+        <div style="width:6px;height:6px;border-radius:50%;background:${statusColor};"></div>
+        <div style="font-size:.72rem;font-weight:700;color:${statusColor};">${statusLabel}</div>
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;background:var(--parchment);border-radius:var(--r-pill);font-size:.72rem;color:${dl.color};${dl.urgent ? 'font-weight:700;' : ''}">📅 ${dl.text}</div>
+      ${t.priority === 'high' ? '<div style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;background:#FEE2E2;border-radius:var(--r-pill);font-size:.72rem;font-weight:700;color:#EF4444;">⚡ High priority</div>' : ''}
+    </div>
+
     ${t.filteredContext || t.context ? `
     <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:16px;" class="a3">
-      <div class="input-label">Context</div>
+      <div class="input-label">Details</div>
       <div style="font-size:.88rem;line-height:1.65;">${U.esc(t.filteredContext || t.context)}</div>
+      <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by Parlay</div>
     </div>` : ''}
+
     ${actionHtml}
-    <div style="text-align:center;margin-top:20px;">
-      <button class="btn-ghost" id="td-delete">Delete task</button>
-    </div>
   </div>`;
 }, (el, { id } = {}) => {
   const t = Store.findTask(id);
   if (!t) return;
 
   el.querySelector('#td-accept')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#td-accept');
+    btn.disabled = true; btn.textContent = 'Accepting…';
     await Store.updateTask(t.id, { status: 'accepted', pendingResponseFrom: null });
     Badges.update(); U.toast('Task accepted ✓');
     Router.go('tasks');
   });
 
   el.querySelector('#td-done')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#td-done');
+    btn.disabled = true; btn.textContent = 'Completing…';
     await Store.updateTask(t.id, { status: 'done', pendingResponseFrom: null });
     Badges.update(); U.toast('Task done ✓');
     Router.go('tasks');
   });
 
-  // Suggest changes — show form, then submit
+  // Suggest changes
   el.querySelector('#td-counter')?.addEventListener('click', () => {
-    const form = el.querySelector('#td-counter-form');
-    if (form) form.style.display = 'block';
+    el.querySelector('#td-counter-form').style.display = 'block';
     el.querySelector('#td-counter').style.display = 'none';
   });
 
   el.querySelector('#td-counter-submit')?.addEventListener('click', async () => {
     const msg = el.querySelector('#td-counter-msg')?.value.trim();
     if (!msg) { U.toast('Say what would work better'); return; }
-
     const btn = el.querySelector('#td-counter-submit');
-    btn.disabled = true; btn.textContent = 'Sending…';
+    const txt = el.querySelector('#td-counter-text');
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Sending…';
 
-    // AI filter the counter message (best-effort)
     let filtered = msg;
     try {
       filtered = await AI.call(
-        'You are Parlay\'s Communication Translator. Rewrite this task counter-proposal to be constructive. 1-2 sentences. First person. ONLY the rewrite.',
+        `You are Parlay's Communication Translator. Rewrite this task counter-proposal to be constructive. 1-2 sentences. First person. ONLY the rewrite.`,
         `${Auth.myName()} wrote: "${msg}"\nRewrite:`
       );
     } catch(e) { filtered = msg; }
@@ -4419,16 +4746,15 @@ Router.register('task-detail', ({ id } = {}) => {
       counterCount: (t.counterCount || 0) + 1,
       pendingResponseFrom: t.createdBy === 'me' ? 'me' : 'them',
     });
-    Badges.update();
-    U.toast('Suggestion sent ✓');
+    Badges.update(); U.toast('Suggestion sent ✓');
     Router.go('tasks');
   });
 
+  // Decline
   el.querySelector('#td-decline')?.addEventListener('click', () => {
     const form = el.querySelector('#td-decline-form');
     if (form) form.style.display = 'block';
     el.querySelector('#td-decline').style.display = 'none';
-    // Hide counter form if open
     const cf = el.querySelector('#td-counter-form');
     if (cf) cf.style.display = 'none';
     const cb = el.querySelector('#td-counter');
@@ -4459,8 +4785,9 @@ Router.register('task-detail', ({ id } = {}) => {
     Router.go('tasks');
   });
 
-  el.querySelector('#td-delete')?.addEventListener('click', async () => {
-    const action = await U.sheet('Delete this task?', [
+  // Manage menu
+  el.querySelector('#td-manage')?.addEventListener('click', async () => {
+    const action = await U.sheet('Manage Task', [
       { key: 'delete', label: '🗑 Delete task', cls: 'btn-danger' },
     ]);
     if (action === 'delete') {
