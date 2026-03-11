@@ -1975,8 +1975,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.5.0';
-const BUILD_DATE = '2026-03-11T22:00:00Z';
+const VERSION = '5.6.0';
+const BUILD_DATE = '2026-03-11T23:30:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2577,6 +2577,7 @@ const Auth = (() => {
           Store.loadTasks(),
           Store.loadCommPrefs(),
           FamilyStore.load(),
+          CoupleChat.loadMessages(),
         ]);
         _subscribeRealtime();
       }
@@ -2673,6 +2674,10 @@ const Auth = (() => {
           }
         });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages',
+          filter: `couple_id=eq.${_couple.id}` }, (payload) => {
+        CoupleChat._handleRealtime(payload);
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples',
           filter: `id=eq.${_couple.id}` }, async (payload) => {
         _couple = payload.new;
@@ -2727,7 +2732,7 @@ const Auth = (() => {
 
     // Reload shared data
     if (_couple) {
-      await Promise.all([Store.loadParlays(), Store.loadTasks(), Store.loadCommPrefs(), FamilyStore.load()]);
+      await Promise.all([Store.loadParlays(), Store.loadTasks(), Store.loadCommPrefs(), FamilyStore.load(), CoupleChat.loadMessages()]);
       if (!_realtime) _subscribeRealtime();
     }
 
@@ -3026,6 +3031,7 @@ const Store = (() => {
   // ── Clear ─────────────────────────────────────
   function clear() {
     _parlays = []; _tasks = []; _commPrefs = { me: null, them: null }; _kv = {};
+    try { CoupleChat.invalidate(); } catch(e) {}
     try { FamilyStore.clear(); } catch(e) {}
     try { EventMessages.clear(); } catch(e) {}
   }
@@ -9704,32 +9710,51 @@ const DailyRitual = (() => {
    ═══════════════════════════════════════════════════════════════ */
 
 const CoupleChat = (() => {
-  const KEY = 'parlay_couple_chat';
-  const READ_KEY = 'parlay_chat_read_ts';
-  const PINS_KEY = 'parlay_chat_pins';
   const DRAFTS_KEY = 'parlay_chat_drafts';
-  let _messages = null;
-  let _pins = null;
+  const READ_KEY = 'parlay_chat_read_ts';
+  let _messages = [];
   let _listeners = [];
 
-  // ─── Core persistence ───────────────────────
-  function _load() {
-    if (_messages) return _messages;
-    try { _messages = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { _messages = []; }
-    // Migrate older messages missing new fields
-    _messages.forEach(m => {
-      if (!m.reactions) m.reactions = [];
-      if (m.status === undefined && m.from === 'me') m.status = 'read';
-      if (m.editedAt === undefined) m.editedAt = null;
-      if (m.deleted === undefined) m.deleted = false;
-      if (m.pinned === undefined) m.pinned = false;
-    });
-    return _messages;
+  // ─── Supabase helpers ───────────────────────
+  function _sb() { return Auth.sb(); }
+  function _coupleId() { return Auth.couple()?.id; }
+  function _myUid() { return Auth.myUid(); }
+
+  // Convert DB row → in-memory message format
+  function _rowToMsg(row) {
+    const myUid = _myUid();
+    const isMine = row.sender_id === myUid;
+    return {
+      id: row.id,
+      from: row.type === 'system' ? 'system' : row.type === 'ai-insight' ? 'ai' : (isMine ? 'me' : 'them'),
+      raw: row.content,
+      filtered: row.filtered_content || row.content,
+      type: row.type || 'text',
+      timestamp: row.created_at,
+      read: isMine ? true : !!(row.read_at),
+      status: isMine ? (row.read_at ? 'read' : (row.delivered_at ? 'delivered' : 'sent')) : null,
+      replyTo: row.reply_to || null,
+      reactions: row.reactions || [],
+      metadata: row.metadata || null,
+      editedAt: row.edited_at || null,
+      deleted: row.deleted || false,
+      pinned: row.pinned || false,
+      _senderId: row.sender_id,
+    };
   }
 
-  function _save() {
-    localStorage.setItem(KEY, JSON.stringify(_messages || []));
-    _notify('change');
+  // ─── Load messages from Supabase ────────────
+  async function loadMessages() {
+    if (!Auth.isReady()) return;
+    const coupleId = _coupleId();
+    if (!coupleId) return;
+    const { data, error } = await _sb().from('chat_messages')
+      .select('*')
+      .eq('couple_id', coupleId)
+      .order('created_at', { ascending: true })
+      .limit(500);
+    if (error) { console.warn('[CoupleChat] loadMessages error:', error.message); return; }
+    _messages = (data || []).map(_rowToMsg);
   }
 
   // ─── Event system for live updates ──────────
@@ -9737,70 +9762,117 @@ const CoupleChat = (() => {
   function off(event, fn) { _listeners = _listeners.filter(l => !(l.event === event && l.fn === fn)); }
   function _notify(event, data) { _listeners.forEach(l => { if (l.event === event) l.fn(data); }); }
 
-  // ─── Message retrieval ──────────────────────
-  function messages() { return _load(); }
-
-  function getById(msgId) {
-    return _load().find(m => m.id === msgId) || null;
+  // ─── Handle realtime event from Supabase ────
+  function _handleRealtime(payload) {
+    const myUid = _myUid();
+    if (payload.eventType === 'INSERT') {
+      const row = payload.new;
+      // Skip if we already have this message (from our own send)
+      if (_messages.find(m => m.id === row.id)) return;
+      const msg = _rowToMsg(row);
+      _messages.push(msg);
+      _messages.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      _notify('newMessage', msg);
+      _notify('change');
+      // Auto re-render if on chat screen
+      if (Router.current() === 'couple-chat') Router.reload();
+    } else if (payload.eventType === 'UPDATE') {
+      const row = payload.new;
+      const idx = _messages.findIndex(m => m.id === row.id);
+      if (idx >= 0) {
+        _messages[idx] = _rowToMsg(row);
+        _notify('change');
+        if (Router.current() === 'couple-chat') Router.reload();
+      }
+    } else if (payload.eventType === 'DELETE') {
+      _messages = _messages.filter(m => m.id !== payload.old?.id);
+      _notify('change');
+      if (Router.current() === 'couple-chat') Router.reload();
+    }
   }
 
-  function recentMessages(n = 50) { return _load().slice(-n); }
+  // ─── Message retrieval ──────────────────────
+  function messages() { return _messages; }
+
+  function getById(msgId) {
+    return _messages.find(m => m.id === msgId) || null;
+  }
+
+  function recentMessages(n = 50) { return _messages.slice(-n); }
 
   function messagesByDate(dateStr) {
-    return _load().filter(m => m.timestamp.startsWith(dateStr));
+    return _messages.filter(m => m.timestamp.startsWith(dateStr));
   }
 
   function lastMessage() {
-    const msgs = _load();
-    return msgs.length > 0 ? msgs[msgs.length - 1] : null;
+    return _messages.length > 0 ? _messages[_messages.length - 1] : null;
   }
 
   function todayMessageCount() {
     const today = new Date().toISOString().split('T')[0];
-    return _load().filter(m => m.timestamp.startsWith(today) && !m.deleted).length;
+    return _messages.filter(m => m.timestamp.startsWith(today) && !m.deleted).length;
   }
 
   // ─── Send a message ─────────────────────────
   function send(rawText, options = {}) {
-    _load();
+    const coupleId = _coupleId();
+    const myUid = _myUid();
+    if (!coupleId || !myUid) return null;
+
+    const now = new Date().toISOString();
+    const tempId = 'cc_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+
+    // Optimistic local message
     const msg = {
-      id: 'cc_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      id: tempId,
       from: 'me',
       raw: rawText,
       filtered: options.filtered || rawText,
       type: options.type || 'text',
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       read: true,
-      status: 'sent', // sent → delivered → read
+      status: 'sent',
       replyTo: options.replyTo || null,
       reactions: [],
       metadata: options.metadata || null,
       editedAt: null,
       deleted: false,
       pinned: false,
+      _senderId: myUid,
     };
     _messages.push(msg);
-    _save();
-    _updateReadTimestamp();
+    _notify('change');
 
-    // Simulate delivery status progression
-    setTimeout(() => {
-      const m = _messages.find(x => x.id === msg.id);
-      if (m && m.status === 'sent') { m.status = 'delivered'; _save(); }
-    }, 800 + Math.random() * 600);
-    setTimeout(() => {
-      const m = _messages.find(x => x.id === msg.id);
-      if (m && m.status === 'delivered') { m.status = 'read'; _save(); }
-    }, 3000 + Math.random() * 2000);
+    // Insert into Supabase
+    _sb().from('chat_messages').insert({
+      couple_id: coupleId,
+      sender_id: myUid,
+      content: rawText,
+      filtered_content: options.filtered || rawText,
+      type: options.type || 'text',
+      reply_to: options.replyTo || null,
+      metadata: options.metadata || null,
+    }).select().maybeSingle().then(({ data, error }) => {
+      if (error) {
+        console.error('[CoupleChat] send error:', error.message);
+        return;
+      }
+      if (data) {
+        // Replace temp message with real DB row
+        const idx = _messages.findIndex(m => m.id === tempId);
+        if (idx >= 0) _messages[idx] = _rowToMsg(data);
+        _notify('change');
+      }
+    });
 
-    // Clear draft after sending
     _clearDraft();
     return msg;
   }
 
-  // ─── Receive partner message ────────────────
+  // ─── Receive partner message (from realtime) ─
   function receivePartner(rawText, options = {}) {
-    _load();
+    // This is now handled by realtime subscription automatically.
+    // Keep for backwards compatibility / demo mode.
     const msg = {
       id: 'cc_' + Date.now() + '_p_' + Math.random().toString(36).slice(2,6),
       from: 'them',
@@ -9818,14 +9890,14 @@ const CoupleChat = (() => {
       pinned: false,
     };
     _messages.push(msg);
-    _save();
     _notify('newMessage', msg);
     return msg;
   }
 
   // ─── System + AI messages ───────────────────
   function addSystemMessage(text, metadata = null) {
-    _load();
+    const coupleId = _coupleId();
+    const myUid = _myUid();
     const msg = {
       id: 'cc_sys_' + Date.now(),
       from: 'system', raw: text, filtered: text,
@@ -9833,12 +9905,21 @@ const CoupleChat = (() => {
       read: true, metadata, deleted: false,
     };
     _messages.push(msg);
-    _save();
+    _notify('change');
+    // Persist to Supabase if connected
+    if (coupleId && myUid) {
+      _sb().from('chat_messages').insert({
+        couple_id: coupleId, sender_id: myUid,
+        content: text, filtered_content: text,
+        type: 'system', metadata,
+      }).then(() => {});
+    }
     return msg;
   }
 
   function addAIInsight(text, actionRoute = null) {
-    _load();
+    const coupleId = _coupleId();
+    const myUid = _myUid();
     const msg = {
       id: 'cc_ai_' + Date.now(),
       from: 'ai', raw: text, filtered: text,
@@ -9846,32 +9927,47 @@ const CoupleChat = (() => {
       read: true, metadata: { actionRoute }, deleted: false,
     };
     _messages.push(msg);
-    _save();
+    _notify('change');
+    // Persist to Supabase if connected
+    if (coupleId && myUid) {
+      _sb().from('chat_messages').insert({
+        couple_id: coupleId, sender_id: myUid,
+        content: text, filtered_content: text,
+        type: 'ai-insight', metadata: { actionRoute },
+      }).then(() => {});
+    }
     return msg;
   }
 
   // ─── Edit a message ─────────────────────────
   function editMessage(msgId, newText) {
-    _load();
     const msg = _messages.find(m => m.id === msgId);
     if (!msg || msg.from !== 'me' || msg.deleted) return null;
+    const now = new Date().toISOString();
     msg.raw = newText;
     msg.filtered = newText;
-    msg.editedAt = new Date().toISOString();
-    _save();
+    msg.editedAt = now;
+    _notify('change');
+    // Update in Supabase
+    _sb().from('chat_messages').update({
+      content: newText, filtered_content: newText, edited_at: now,
+    }).eq('id', msgId).then(() => {});
     return msg;
   }
 
   // ─── Delete a message ───────────────────────
   function deleteMessage(msgId) {
-    _load();
     const msg = _messages.find(m => m.id === msgId);
     if (!msg) return false;
     if (msg.from === 'me') {
       msg.deleted = true;
       msg.raw = '';
       msg.filtered = '';
-      _save();
+      _notify('change');
+      // Update in Supabase
+      _sb().from('chat_messages').update({
+        deleted: true, content: '', filtered_content: '',
+      }).eq('id', msgId).then(() => {});
       return true;
     }
     return false;
@@ -9879,47 +9975,64 @@ const CoupleChat = (() => {
 
   // ─── Reactions (multi-emoji) ────────────────
   function react(msgId, emoji) {
-    _load();
     const msg = _messages.find(m => m.id === msgId);
     if (!msg || msg.deleted) return msg;
     if (!msg.reactions) msg.reactions = [];
     const existing = msg.reactions.findIndex(r => r.from === 'me' && r.emoji === emoji);
     if (existing >= 0) {
-      msg.reactions.splice(existing, 1); // Toggle off same emoji
+      msg.reactions.splice(existing, 1);
     } else {
-      // Remove any other reaction from me, add new one
       msg.reactions = msg.reactions.filter(r => r.from !== 'me');
       msg.reactions.push({ from: 'me', emoji, ts: new Date().toISOString() });
     }
-    _save();
+    _notify('change');
+    // Update in Supabase
+    _sb().from('chat_messages').update({
+      reactions: msg.reactions,
+    }).eq('id', msgId).then(() => {});
     return msg;
   }
 
   // ─── Pin / Unpin ────────────────────────────
   function togglePin(msgId) {
-    _load();
     const msg = _messages.find(m => m.id === msgId);
     if (!msg || msg.deleted) return false;
     msg.pinned = !msg.pinned;
-    _save();
+    _notify('change');
+    // Update in Supabase
+    _sb().from('chat_messages').update({
+      pinned: msg.pinned,
+    }).eq('id', msgId).then(() => {});
     return msg.pinned;
   }
 
   function pinnedMessages() {
-    return _load().filter(m => m.pinned && !m.deleted);
+    return _messages.filter(m => m.pinned && !m.deleted);
   }
 
   // ─── Read tracking ──────────────────────────
   function unreadCount() {
     const readTs = localStorage.getItem(READ_KEY) || '1970-01-01';
-    return _load().filter(m => m.from === 'them' && !m.read && m.timestamp > readTs && !m.deleted).length;
+    return _messages.filter(m => m.from === 'them' && !m.read && m.timestamp > readTs && !m.deleted).length;
   }
 
   function markAllRead() {
-    _load();
-    _messages.forEach(m => { m.read = true; });
-    _save();
+    const myUid = _myUid();
+    const now = new Date().toISOString();
+    const unreadIds = [];
+    _messages.forEach(m => {
+      if (m.from === 'them' && !m.read) {
+        m.read = true;
+        if (m.id && !m.id.startsWith('cc_')) unreadIds.push(m.id);
+      }
+    });
+    _notify('change');
     _updateReadTimestamp();
+    // Mark read in Supabase
+    if (unreadIds.length > 0) {
+      _sb().from('chat_messages').update({ read_at: now })
+        .in('id', unreadIds).then(() => {});
+    }
   }
 
   function _updateReadTimestamp() {
@@ -9927,10 +10040,9 @@ const CoupleChat = (() => {
   }
 
   function firstUnreadIndex() {
-    const msgs = _load();
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].from === 'them' && !msgs[i].read) continue;
-      return i + 1 < msgs.length ? i + 1 : -1;
+    for (let i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i].from === 'them' && !_messages[i].read) continue;
+      return i + 1 < _messages.length ? i + 1 : -1;
     }
     return 0;
   }
@@ -9938,7 +10050,7 @@ const CoupleChat = (() => {
   // ─── Search with result navigation ──────────
   function searchMessages(query) {
     const q = query.toLowerCase();
-    return _load().filter(m =>
+    return _messages.filter(m =>
       !m.deleted &&
       ((m.raw || '').toLowerCase().includes(q) ||
        (m.filtered || '').toLowerCase().includes(q))
@@ -10066,7 +10178,7 @@ const CoupleChat = (() => {
 
   // ─── Export chat history ────────────────────
   function exportChat(format = 'text') {
-    const msgs = _load().filter(m => !m.deleted && m.from !== 'ai');
+    const msgs = _messages.filter(m => !m.deleted && m.from !== 'ai');
     if (format === 'text') {
       return msgs.map(m => {
         const time = new Date(m.timestamp).toLocaleString();
@@ -10079,7 +10191,7 @@ const CoupleChat = (() => {
 
   // ─── Chat statistics ───────────────────────
   function stats() {
-    const msgs = _load().filter(m => !m.deleted && m.from !== 'system' && m.from !== 'ai');
+    const msgs = _messages.filter(m => !m.deleted && m.from !== 'system' && m.from !== 'ai');
     const myMsgs = msgs.filter(m => m.from === 'me');
     const theirMsgs = msgs.filter(m => m.from === 'them');
     const today = new Date().toISOString().split('T')[0];
@@ -10098,7 +10210,7 @@ const CoupleChat = (() => {
   }
 
   // ─── Cache invalidation ─────────────────────
-  function invalidate() { _messages = null; }
+  function invalidate() { _messages = []; }
 
   // ─── Toggle helpers (for inline onclick) ────
   function _toggleSearch() {
@@ -10131,6 +10243,7 @@ const CoupleChat = (() => {
     todayMessageCount, groupedMessages, quickActions, getAIHint,
     detectLinks, exportChat, stats,
     saveDraft, getDraft,
+    loadMessages, _handleRealtime,
     invalidate, on, off,
     _toggleSearch, _toggleActions,
   };
@@ -13030,9 +13143,12 @@ Router.register('couple-chat', () => {
     });
 
     // Clear chat
-    drawer.querySelector('#cc-clear-chat')?.addEventListener('click', () => {
+    drawer.querySelector('#cc-clear-chat')?.addEventListener('click', async () => {
       if (confirm('Are you sure you want to clear all messages? This cannot be undone.')) {
-        localStorage.removeItem('parlay_couple_chat');
+        const coupleId = Auth.couple()?.id;
+        if (coupleId) {
+          await Auth.sb().from('chat_messages').delete().eq('couple_id', coupleId);
+        }
         CoupleChat.invalidate();
         drawer.remove();
         Router.reload();
@@ -16272,6 +16388,8 @@ Router.register('daily-tips', () => {
     if (event === 'INITIAL_SESSION') return;
     if (event === 'SIGNED_IN' && session) {
       const b = await Auth.bootstrap();
+      // Skip routing if bootstrap was already in progress (sign-in form handles it)
+      if (b.mode === 'pending') return;
       if (b.coupled && b.hasPartner) Router.go('home');
       else if (b.coupled) Router.go('ob-invite');
       else Router.go('ob-couple');
