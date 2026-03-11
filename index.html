@@ -697,8 +697,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '2.0.6';
-const BUILD_DATE = '2026-03-11T12:00:00Z';
+const VERSION = '2.0.7';
+const BUILD_DATE = '2026-03-11T18:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -903,13 +903,19 @@ const DEMO = {
 
   /** Activate demo mode — monkey-patches Auth & Store */
   activate(partner = 'A') {
-    this.active = true;
-    this.currentPartner = partner;
-    if (!this._mockParlays) this.buildMockData();
-    this._applyPerspective();
-    document.body.style.paddingTop = '40px';
-    this._createBar();
-    Router.go('home');
+    try {
+      this.active = true;
+      this.currentPartner = partner;
+      if (!this._mockParlays) this.buildMockData();
+      this._applyPerspective();
+      document.body.style.paddingTop = '40px';
+      this._createBar();
+      Router.go('home');
+    } catch(e) {
+      console.error('[DEMO] activate error:', e);
+      this.active = false;
+      U.toast('Demo failed: ' + e.message);
+    }
   },
 
   /** Switch perspective (A or B) and re-render */
@@ -2054,7 +2060,9 @@ const Router = (() => {
     const app = document.getElementById('app');
 
     // Render
-    const html = route.render(params);
+    let html;
+    try { html = route.render(params); }
+    catch(e) { console.error('[Router] render error on', name, e); html = `<div style="padding:40px;color:red;">Render error: ${e.message}</div>`; }
     let el = document.getElementById('screen-' + name);
     if (!el) {
       el = document.createElement('div');
