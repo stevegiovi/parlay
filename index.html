@@ -1975,8 +1975,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.3.0';
-const BUILD_DATE = '2026-03-11T14:30:00Z';
+const VERSION = '5.3.1';
+const BUILD_DATE = '2026-03-11T19:45:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -11684,6 +11684,150 @@ Router.register('partner-profile', () => {
 
 
 // ──────────────────────────────────────────────
+// SMART REPLIES — Context-aware chat suggestions
+// (Must be defined before couple-chat screen)
+// ──────────────────────────────────────────────
+const SmartReplies = (() => {
+  function forMessage(msg) {
+    if (!msg || !msg.raw) return [];
+    const text = (msg.filtered || msg.raw || '').toLowerCase();
+    const replies = [];
+
+    // ─── Question handling (context-specific) ─
+    if (text.includes('?')) {
+      if (text.includes('what do you think') || text.includes('what should we') || text.includes('your thoughts')) {
+        replies.push("Good idea, let's do it!", 'I need to think about it', 'Can we discuss tonight?', "I'm open to anything");
+      } else if (text.includes('want to') || text.includes('wanna') || text.includes('shall we')) {
+        replies.push('Yes, sounds fun!', 'Maybe another time', 'What time?', "I'd love that!");
+      } else if (text.includes('can you') || text.includes('could you') || text.includes('would you mind')) {
+        replies.push('Sure, no problem!', "I'll try my best", 'When do you need it by?', 'Already on it!');
+      } else if (text.includes('when') || text.includes('what time')) {
+        replies.push('How about this evening?', 'This weekend works', 'Let me check my calendar', "I'm flexible, you pick!");
+      } else if (text.includes('where') || text.includes('which place') || text.includes('restaurant')) {
+        replies.push("You choose, I'm easy!", 'How about that new place?', "Let's look at options together", 'Somewhere close to home?');
+      } else if (text.includes('how are') || text.includes('how was') || text.includes('how did')) {
+        replies.push("Great, thanks for asking!", "It was good!", "A bit tired, but okay", "I'll tell you all about it later");
+      } else if (text.includes('do you want') || text.includes('should i') || text.includes('should we')) {
+        replies.push('Yes please!', "That'd be great", "I'm good either way", "Let's figure it out together");
+      } else {
+        replies.push('Yes!', 'Let me think about it', 'Can we talk later?', 'Tell me more');
+      }
+    }
+
+    // ─── Emotional messages ────────────────────
+    if (text.includes('thank') || text.includes('appreciate') || text.includes('love you')) {
+      replies.push("You're the best!", 'Always here for you', 'That means so much', 'Love you too ❤️');
+    }
+    if (text.includes('miss') && (text.includes('you') || text.includes('home'))) {
+      replies.push('Miss you too!', 'Coming home soon ❤️', "Can't wait to see you");
+    }
+    if (text.includes('sorry') || text.includes('apologize') || text.includes('my fault')) {
+      replies.push("It's okay, I understand", "Let's move past it together", 'I appreciate you saying that', "We're good ❤️");
+    }
+    if (text.includes('stressed') || text.includes('tough day') || text.includes('exhausted') || text.includes('tired')) {
+      replies.push("I'm here for you ❤️", 'What can I do to help?', "Let's have a relaxing evening", 'Want to talk about it?');
+    }
+    if (text.includes('good news') || text.includes('exciting') || text.includes('guess what') || text.includes('amazing')) {
+      replies.push('Tell me everything!', "That's amazing! 🎉", "I'm so happy for you!", "Can't wait to hear!");
+    }
+
+    // ─── Logistics / coordination ──────────────
+    if (text.includes('need to') || text.includes("don't forget") || text.includes('remember to')) {
+      replies.push('On it!', 'Added to my list', "I'll take care of it", "Thanks for the reminder!");
+    }
+    if (text.includes('kids') || text.includes('school') || text.includes('pickup') || text.includes('daycare')) {
+      replies.push('I got it covered', "I'll handle it", 'Can we split this?', "What time?");
+    }
+    if (text.includes('dinner') || text.includes('lunch') || text.includes('eat') || text.includes('food') || text.includes('cook')) {
+      replies.push('Sounds delicious!', "I'll cook tonight", 'Want to order in?', "Let's try something new!");
+    }
+    if (text.includes('grocery') || text.includes('shopping') || text.includes('store') || text.includes('buy')) {
+      replies.push("I'll add it to the list", 'Want me to grab it?', 'After work?', "I'll stop on the way home");
+    }
+
+    // ─── Plans / events ────────────────────────
+    if (text.includes('weekend') || text.includes('saturday') || text.includes('sunday')) {
+      replies.push("Let's make plans!", "That sounds perfect!", 'Check the calendar?', "I'm in!");
+    }
+    if (text.includes('tonight') || text.includes('this evening')) {
+      replies.push("Can't wait!", "I'm free!", 'What time?', "Sounds like a plan!");
+    }
+
+    // ─── Fallback: add greetings if no replies yet ─
+    if (replies.length === 0) {
+      const hour = new Date().getHours();
+      if (hour < 12) replies.push('Good morning! ☀️', 'Hope you slept well');
+      else if (hour < 17) replies.push("How's your day?", 'Thinking of you 💛');
+      else replies.push('How was your day?', 'Love you ❤️');
+    }
+
+    return [...new Set(replies)].slice(0, 4);
+  }
+
+  function greetings() {
+    const hour = new Date().getHours();
+    if (hour < 12) return ['Good morning! ☀️', 'Hope you slept well', 'Ready for the day?', "Can't wait to see you"];
+    if (hour < 17) return ["How's your day going?", 'Thinking of you', 'Need anything?', 'Just checking in 💛'];
+    return ['How was your day?', 'What should we do tonight?', 'I missed you today', 'Want to watch something?'];
+  }
+
+  function conversationStarters() {
+    const mood = MoodStore.todayMood();
+    const parlays = Store.activeParlays();
+    const tasks = Store.myActionTasks();
+    const hour = new Date().getHours();
+
+    const starters = [];
+
+    // Context-aware starters
+    if (parlays.length > 0) {
+      starters.push(`We have ${parlays.length} open plan${parlays.length > 1 ? 's' : ''} — want to go through them?`);
+    }
+    if (tasks.length > 0) {
+      starters.push(`I noticed we have some tasks to coordinate — want to tackle them?`);
+    }
+    if (mood?.moodId === 'happy' || mood?.moodId === 'grateful') {
+      starters.push("I'm feeling great today — let's plan something fun!");
+    }
+    if (mood?.moodId === 'stressed') {
+      starters.push("I've had a stressful day and could use your support");
+    }
+
+    // Time-aware
+    if (hour >= 17 && hour <= 21) {
+      starters.push('What should we have for dinner tonight?');
+      starters.push('Want to do something fun this evening?');
+    }
+    if (hour >= 6 && hour < 10) {
+      starters.push("Good morning! What's your schedule like today?");
+    }
+
+    // Evergreen starters
+    const evergreen = [
+      'What was the best part of your day?',
+      "I've been thinking about us...",
+      'Can we plan something fun this weekend?',
+      'I want to tell you something nice',
+      'I need your opinion on something',
+      "Let's plan a date night soon",
+      'How are you really doing today?',
+      'I had an idea I want to run by you',
+      'What are you looking forward to this week?',
+      "There's something I want to appreciate you for",
+      'Remember when we... 💭',
+      "What's one thing I can do for you today?",
+    ];
+
+    // Combine and deduplicate
+    starters.push(...evergreen);
+    return [...new Set(starters)].sort(() => Math.random() - 0.5).slice(0, 5);
+  }
+
+  return { forMessage, greetings, conversationStarters };
+})();
+
+
+// ──────────────────────────────────────────────
 // QUICK ACTIONS HUB — Central navigation for all features
 // ──────────────────────────────────────────────
 /* ═══════════════════════════════════════════════════════════════
@@ -13797,149 +13941,6 @@ const DecisionHelper = (() => {
   function invalidate() { _cache = null; }
 
   return { create, get, vote, addPro, addCon, decide, all, open, decided, remove, invalidate };
-})();
-
-
-// ──────────────────────────────────────────────
-// SMART REPLIES — Context-aware chat suggestions
-// ──────────────────────────────────────────────
-const SmartReplies = (() => {
-  function forMessage(msg) {
-    if (!msg || !msg.raw) return [];
-    const text = (msg.filtered || msg.raw || '').toLowerCase();
-    const replies = [];
-
-    // ─── Question handling (context-specific) ─
-    if (text.includes('?')) {
-      if (text.includes('what do you think') || text.includes('what should we') || text.includes('your thoughts')) {
-        replies.push("Good idea, let's do it!", 'I need to think about it', 'Can we discuss tonight?', "I'm open to anything");
-      } else if (text.includes('want to') || text.includes('wanna') || text.includes('shall we')) {
-        replies.push('Yes, sounds fun!', 'Maybe another time', 'What time?', "I'd love that!");
-      } else if (text.includes('can you') || text.includes('could you') || text.includes('would you mind')) {
-        replies.push('Sure, no problem!', "I'll try my best", 'When do you need it by?', 'Already on it!');
-      } else if (text.includes('when') || text.includes('what time')) {
-        replies.push('How about this evening?', 'This weekend works', 'Let me check my calendar', "I'm flexible, you pick!");
-      } else if (text.includes('where') || text.includes('which place') || text.includes('restaurant')) {
-        replies.push("You choose, I'm easy!", 'How about that new place?', "Let's look at options together", 'Somewhere close to home?');
-      } else if (text.includes('how are') || text.includes('how was') || text.includes('how did')) {
-        replies.push("Great, thanks for asking!", "It was good!", "A bit tired, but okay", "I'll tell you all about it later");
-      } else if (text.includes('do you want') || text.includes('should i') || text.includes('should we')) {
-        replies.push('Yes please!', "That'd be great", "I'm good either way", "Let's figure it out together");
-      } else {
-        replies.push('Yes!', 'Let me think about it', 'Can we talk later?', 'Tell me more');
-      }
-    }
-
-    // ─── Emotional messages ────────────────────
-    if (text.includes('thank') || text.includes('appreciate') || text.includes('love you')) {
-      replies.push("You're the best!", 'Always here for you', 'That means so much', 'Love you too ❤️');
-    }
-    if (text.includes('miss') && (text.includes('you') || text.includes('home'))) {
-      replies.push('Miss you too!', 'Coming home soon ❤️', "Can't wait to see you");
-    }
-    if (text.includes('sorry') || text.includes('apologize') || text.includes('my fault')) {
-      replies.push("It's okay, I understand", "Let's move past it together", 'I appreciate you saying that', "We're good ❤️");
-    }
-    if (text.includes('stressed') || text.includes('tough day') || text.includes('exhausted') || text.includes('tired')) {
-      replies.push("I'm here for you ❤️", 'What can I do to help?', "Let's have a relaxing evening", 'Want to talk about it?');
-    }
-    if (text.includes('good news') || text.includes('exciting') || text.includes('guess what') || text.includes('amazing')) {
-      replies.push('Tell me everything!', "That's amazing! 🎉", "I'm so happy for you!", "Can't wait to hear!");
-    }
-
-    // ─── Logistics / coordination ──────────────
-    if (text.includes('need to') || text.includes("don't forget") || text.includes('remember to')) {
-      replies.push('On it!', 'Added to my list', "I'll take care of it", "Thanks for the reminder!");
-    }
-    if (text.includes('kids') || text.includes('school') || text.includes('pickup') || text.includes('daycare')) {
-      replies.push('I got it covered', "I'll handle it", 'Can we split this?', "What time?");
-    }
-    if (text.includes('dinner') || text.includes('lunch') || text.includes('eat') || text.includes('food') || text.includes('cook')) {
-      replies.push('Sounds delicious!', "I'll cook tonight", 'Want to order in?', "Let's try something new!");
-    }
-    if (text.includes('grocery') || text.includes('shopping') || text.includes('store') || text.includes('buy')) {
-      replies.push("I'll add it to the list", 'Want me to grab it?', 'After work?', "I'll stop on the way home");
-    }
-
-    // ─── Plans / events ────────────────────────
-    if (text.includes('weekend') || text.includes('saturday') || text.includes('sunday')) {
-      replies.push("Let's make plans!", "That sounds perfect!", 'Check the calendar?', "I'm in!");
-    }
-    if (text.includes('tonight') || text.includes('this evening')) {
-      replies.push("Can't wait!", "I'm free!", 'What time?', "Sounds like a plan!");
-    }
-
-    // ─── Fallback: add greetings if no replies yet ─
-    if (replies.length === 0) {
-      const hour = new Date().getHours();
-      if (hour < 12) replies.push('Good morning! ☀️', 'Hope you slept well');
-      else if (hour < 17) replies.push("How's your day?", 'Thinking of you 💛');
-      else replies.push('How was your day?', 'Love you ❤️');
-    }
-
-    return [...new Set(replies)].slice(0, 4);
-  }
-
-  function greetings() {
-    const hour = new Date().getHours();
-    if (hour < 12) return ['Good morning! ☀️', 'Hope you slept well', 'Ready for the day?', "Can't wait to see you"];
-    if (hour < 17) return ["How's your day going?", 'Thinking of you', 'Need anything?', 'Just checking in 💛'];
-    return ['How was your day?', 'What should we do tonight?', 'I missed you today', 'Want to watch something?'];
-  }
-
-  function conversationStarters() {
-    const mood = MoodStore.todayMood();
-    const parlays = Store.activeParlays();
-    const tasks = Store.myActionTasks();
-    const hour = new Date().getHours();
-
-    const starters = [];
-
-    // Context-aware starters
-    if (parlays.length > 0) {
-      starters.push(`We have ${parlays.length} open plan${parlays.length > 1 ? 's' : ''} — want to go through them?`);
-    }
-    if (tasks.length > 0) {
-      starters.push(`I noticed we have some tasks to coordinate — want to tackle them?`);
-    }
-    if (mood?.moodId === 'happy' || mood?.moodId === 'grateful') {
-      starters.push("I'm feeling great today — let's plan something fun!");
-    }
-    if (mood?.moodId === 'stressed') {
-      starters.push("I've had a stressful day and could use your support");
-    }
-
-    // Time-aware
-    if (hour >= 17 && hour <= 21) {
-      starters.push('What should we have for dinner tonight?');
-      starters.push('Want to do something fun this evening?');
-    }
-    if (hour >= 6 && hour < 10) {
-      starters.push("Good morning! What's your schedule like today?");
-    }
-
-    // Evergreen starters
-    const evergreen = [
-      'What was the best part of your day?',
-      "I've been thinking about us...",
-      'Can we plan something fun this weekend?',
-      'I want to tell you something nice',
-      'I need your opinion on something',
-      "Let's plan a date night soon",
-      'How are you really doing today?',
-      'I had an idea I want to run by you',
-      'What are you looking forward to this week?',
-      "There's something I want to appreciate you for",
-      'Remember when we... 💭',
-      "What's one thing I can do for you today?",
-    ];
-
-    // Combine and deduplicate
-    starters.push(...evergreen);
-    return [...new Set(starters)].sort(() => Math.random() - 0.5).slice(0, 5);
-  }
-
-  return { forMessage, greetings, conversationStarters };
 })();
 
 
