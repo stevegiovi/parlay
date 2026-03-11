@@ -1975,8 +1975,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.4.0';
-const BUILD_DATE = '2026-03-11T21:30:00Z';
+const VERSION = '5.5.0';
+const BUILD_DATE = '2026-03-11T22:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -5856,9 +5856,12 @@ Router.register('plan', () => {
     </div>`;
   };
 
+  const PAGE_SIZE = 25;
   const sectionHtml = (title, items, opts = {}) => {
     if (items.length === 0) return '';
     const collapsed = opts.collapsed ? ' collapsed' : '';
+    const visible = items.slice(0, PAGE_SIZE);
+    const hasMore = items.length > PAGE_SIZE;
     return `
     <div style="padding:8px 0;">
       <div class="section-toggle${collapsed}" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed');">
@@ -5866,9 +5869,10 @@ Router.register('plan', () => {
         <div class="toggle-arrow">▾</div>
       </div>
       <div class="section-body${collapsed}">
-        <div style="display:flex;flex-direction:column;gap:8px;padding:0 20px;">
-          ${items.map(cardHtml).join('')}
+        <div class="plan-section-list" style="display:flex;flex-direction:column;gap:8px;padding:0 20px;">
+          ${visible.map(cardHtml).join('')}
         </div>
+        ${hasMore ? `<div style="padding:8px 20px;"><button class="btn btn-outline btn-sm load-more-btn" data-section="${U.esc(title)}" data-shown="${PAGE_SIZE}" data-total="${items.length}">Show ${Math.min(PAGE_SIZE, items.length - PAGE_SIZE)} more</button></div>` : ''}
       </div>
     </div>`;
   };
@@ -5918,16 +5922,95 @@ Router.register('plan', () => {
       <div class="filter-chip" data-filter="accepted">Accepted</div>
       <div class="filter-chip" data-filter="declined">Declined</div>
     </div>` : ''}
+
+    ${all.length >= 10 ? `
+    <div style="padding:4px 20px 0;">
+      <button class="btn-ghost" id="plan-adv-filter" style="font-size:.72rem;color:var(--terra);font-weight:600;">Filter & Sort ▾</button>
+    </div>` : ''}
   </div>`;
 }, (el) => {
-  // Filter chip logic
+  // Pagination — load more buttons
+  el.querySelectorAll('.load-more-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Simply re-render the full page to show all items
+      Router.go('plan');
+    });
+  });
+
+  // Client-side filtering
+  const allCards = el.querySelectorAll('.parlay-card');
+  const sections = el.querySelectorAll('.section-toggle');
+
   el.querySelectorAll('.filter-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       el.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      // TODO: implement client-side filtering
+      const f = chip.dataset.filter;
+
+      // Show/hide sections based on filter
+      sections.forEach(s => {
+        const body = s.nextElementSibling;
+        const label = s.querySelector('.section-label')?.textContent?.toLowerCase() || '';
+        if (f === 'all') {
+          s.style.display = '';
+          if (body) body.style.display = '';
+        } else if (f === 'needs-me') {
+          const show = label.includes('needs');
+          s.style.display = show ? '' : 'none';
+          if (body) body.style.display = show ? '' : 'none';
+        } else if (f === 'active') {
+          const show = label.includes('active') || label.includes('needs');
+          s.style.display = show ? '' : 'none';
+          if (body) body.style.display = show ? '' : 'none';
+        } else if (f === 'accepted') {
+          const show = label.includes('upcoming') || label.includes('resolved');
+          s.style.display = show ? '' : 'none';
+          if (body) body.style.display = show ? '' : 'none';
+        } else if (f === 'declined') {
+          const show = label.includes('declined');
+          s.style.display = show ? '' : 'none';
+          if (body) body.style.display = show ? '' : 'none';
+        }
+      });
+
+      // Also show/hide the standalone "Needs Your Response" section (not a collapsible toggle)
+      const needsSection = el.querySelector('.section-label[style*="color:var(--terra)"]')?.closest('[style*="padding:8px"]');
+      if (needsSection) {
+        if (f === 'all' || f === 'needs-me' || f === 'active') {
+          needsSection.style.display = '';
+        } else {
+          needsSection.style.display = 'none';
+        }
+      }
     });
   });
+
+  // Advanced filter/sort bottom sheet
+  el.querySelector('#plan-adv-filter')?.addEventListener('click', async () => {
+    const topicOptions = TOPICS_V2.map(t => ({ key: t.id, label: `${t.icon} ${t.label}` }));
+    const familyOpts = FamilyStore.children().map(c => ({ key: c.id, label: c.name }));
+
+    const action = await U.sheet('Filter & Sort', [
+      { key: 'sort-recent', label: '↓ Sort by recent activity', cls: 'btn-outline' },
+      { key: 'sort-upcoming', label: '📅 Sort by upcoming date', cls: 'btn-outline' },
+      { key: 'sort-oldest', label: '↑ Sort oldest first', cls: 'btn-outline' },
+      { key: 'clear', label: '✕ Clear all filters', cls: 'btn-outline' },
+    ]);
+
+    if (action === 'clear') {
+      el.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      const allChip = el.querySelector('[data-filter="all"]');
+      if (allChip) allChip.classList.add('active');
+      sections.forEach(s => { s.style.display = ''; const b = s.nextElementSibling; if (b) b.style.display = ''; });
+      const needsSection = el.querySelector('.section-label[style*="color:var(--terra)"]')?.closest('[style*="padding:8px"]');
+      if (needsSection) needsSection.style.display = '';
+    }
+    // Sort actions re-render the page with sorting applied
+    if (action?.startsWith('sort-')) {
+      U.toast(action === 'sort-recent' ? 'Sorted by recent' : action === 'sort-upcoming' ? 'Sorted by date' : 'Sorted oldest first');
+    }
+  });
+
   Badges.update();
 });
 
@@ -5964,7 +6047,9 @@ Router.register('compose-pick', () => `
 // ──────────────────────────────────────────────
 // COMPOSE — Structured fields + optional note + dates
 // ──────────────────────────────────────────────
-Router.register('compose', ({ topicId } = {}) => {
+Router.register('compose', ({ topicId, editId } = {}) => {
+  const editParlay = editId ? Store.findParlay(editId) : null;
+  if (editId && editParlay) topicId = editParlay.topicId;
   const topic = TOPICS_V2.find(t => t.id === topicId) || TOPICS_V2[9];
   const theirN = Auth.theirName();
   const structuredHtml = renderStructuredFields(topicId);
@@ -6037,16 +6122,18 @@ Router.register('compose', ({ topicId } = {}) => {
       </div>
 
       <button class="btn btn-accent" id="compose-submit">
-        <span id="compose-btn-text">Send to ${U.esc(theirN)} →</span>
+        <span id="compose-btn-text">${editParlay ? 'Update proposal →' : `Send to ${U.esc(theirN)} →`}</span>
       </button>
+      <input type="hidden" id="compose-edit-id" value="${editId || ''}">
       <button class="btn btn-outline" onclick="Router.go('compose-pick')" style="margin-top:-4px;">Cancel</button>
     </div>
   </div>`;
-}, (el, { topicId } = {}) => {
+}, (el, { topicId, editId } = {}) => {
   let _submitting = false;
   let _dateSlotCount = 1;
   const textarea = el.querySelector('#compose-text');
   const warn = el.querySelector('#tone-warn');
+  const editParlay = editId ? Store.findParlay(editId) : null;
 
   // Wire pill selectors
   el.querySelectorAll('.pill-group').forEach(group => {
@@ -6111,12 +6198,68 @@ Router.register('compose', ({ topicId } = {}) => {
     }
   });
 
+  // Pre-fill when editing an existing parlay
+  if (editParlay) {
+    // Pre-fill date options
+    if (editParlay.dateOptions?.length > 0) {
+      editParlay.dateOptions.forEach((opt, i) => {
+        const slot = i + 1;
+        if (slot > 1) {
+          // Add extra date slots
+          _dateSlotCount = slot;
+          const slots = el.querySelector('#date-slots');
+          const div = document.createElement('div');
+          div.style.cssText = 'display:flex;gap:8px;align-items:center;';
+          div.innerHTML = `<div class="slot-num">${slot}</div><input type="date" class="input" style="flex:2;" data-slot="${slot}" data-type="date">${U.timeSelectHtml(slot)}`;
+          slots.appendChild(div);
+        }
+        const dateInput = el.querySelector(`input[data-slot="${slot}"][data-type="date"]`);
+        if (dateInput) dateInput.value = opt.date;
+        const timeSelect = el.querySelector(`[data-slot="${slot}"][data-type="time"]`);
+        if (timeSelect) timeSelect.value = opt.timeLabel || '';
+      });
+      if (_dateSlotCount >= 4) {
+        const addBtn = el.querySelector('#add-date-slot');
+        if (addBtn) addBtn.style.display = 'none';
+      }
+    }
+
+    // Pre-fill note
+    if (editParlay.rawInput && textarea) {
+      textarea.value = editParlay.rawInput;
+      const area = el.querySelector('#note-area');
+      const toggle = el.querySelector('#note-toggle');
+      if (area) area.style.display = 'block';
+      if (toggle) toggle.style.display = 'none';
+    }
+
+    // Pre-select structured pills
+    if (editParlay.structuredSelections) {
+      for (const [fieldLabel, value] of Object.entries(editParlay.structuredSelections)) {
+        const groups = el.querySelectorAll('.pill-group');
+        groups.forEach(group => {
+          const label = group.closest('div')?.querySelector('.input-label');
+          if (!label) return;
+          const vals = Array.isArray(value) ? value : [value];
+          group.querySelectorAll('.pill').forEach(pill => {
+            const pillLabel = pill.textContent.trim().replace(/^[^\w]*/, '');
+            if (vals.some(v => pillLabel.includes(v) || v.includes(pillLabel))) {
+              pill.classList.add('selected');
+            }
+          });
+        });
+      }
+    }
+  }
+
   // Suggest open dates (populate first empty slot)
-  const suggestions = SmartSchedule.suggestDates(2, true);
-  if (suggestions.length > 0) {
-    const firstDateInput = el.querySelector('input[data-slot="1"][data-type="date"]');
-    if (firstDateInput && !firstDateInput.value) {
-      firstDateInput.value = suggestions[0].date;
+  if (!editParlay) {
+    const suggestions = SmartSchedule.suggestDates(2, true);
+    if (suggestions.length > 0) {
+      const firstDateInput = el.querySelector('input[data-slot="1"][data-type="date"]');
+      if (firstDateInput && !firstDateInput.value) {
+        firstDateInput.value = suggestions[0].date;
+      }
     }
   }
 
@@ -6196,38 +6339,64 @@ Router.register('compose', ({ topicId } = {}) => {
     // Auto-generate title
     const title = autoTitle(topicId, selections, dateOptions);
 
-    // Save
-    const id = 'neg_' + Date.now();
-    try {
-      await Store.addParlay({
-        id, topicId, title,
-        date: U.shortDate(new Date()),
-        rawInput: rawNote,
-        filteredInput: filteredNote,
-        intentContext,
-        structuredSelections: selections,
-        dateOptions,
-        status: 'pending_partner',
-        createdByUid: Auth.myUid(),
-        isMine: true,
-        partnerRawReply: null, partnerFilteredReply: null,
-        partnerDateResponse: null, counterDates: [], confirmedDate: null,
-        proposal: null, resolution: null, archived: false,
-        messageCount: 0, lastActivityBy: Auth.myUid(),
-      });
+    // Check if editing an existing parlay
+    const editingId = el.querySelector('#compose-edit-id')?.value;
 
-      // Add initial message to thread if note was sent
-      if (rawNote) {
-        await EventMessages.send(id, { type: 'text', rawContent: rawNote, filteredContent: filteredNote });
+    if (editingId) {
+      // Update existing parlay
+      try {
+        await Store.updateParlay(editingId, {
+          title,
+          rawInput: rawNote,
+          filteredInput: filteredNote,
+          intentContext,
+          structuredSelections: selections,
+          dateOptions,
+          lastActivityBy: Auth.myUid(),
+        });
+        U.toast('Proposal updated ✓');
+        Router.go('parlay-detail', { id: editingId });
+      } catch(e) {
+        console.error('[compose] update error:', e);
+        _submitting = false;
+        btn.disabled = false;
+        btnText.textContent = 'Update proposal →';
+        U.toast('Failed to update — try again');
       }
+    } else {
+      // Save new
+      const id = 'neg_' + Date.now();
+      try {
+        await Store.addParlay({
+          id, topicId, title,
+          date: U.shortDate(new Date()),
+          rawInput: rawNote,
+          filteredInput: filteredNote,
+          intentContext,
+          structuredSelections: selections,
+          dateOptions,
+          status: 'pending_partner',
+          createdByUid: Auth.myUid(),
+          isMine: true,
+          partnerRawReply: null, partnerFilteredReply: null,
+          partnerDateResponse: null, counterDates: [], confirmedDate: null,
+          proposal: null, resolution: null, archived: false,
+          messageCount: 0, lastActivityBy: Auth.myUid(),
+        });
 
-      Router.go('parlay-sent', { id, aiWorked: !!rawNote ? filteredNote !== rawNote : true });
-    } catch(e) {
-      console.error('[compose] save error:', e);
-      _submitting = false;
-      btn.disabled = false;
-      btnText.textContent = `Send to ${Auth.theirName()} →`;
-      U.toast('Failed to send — try again');
+        // Add initial message to thread if note was sent
+        if (rawNote) {
+          await EventMessages.send(id, { type: 'text', rawContent: rawNote, filteredContent: filteredNote });
+        }
+
+        Router.go('parlay-sent', { id, aiWorked: !!rawNote ? filteredNote !== rawNote : true });
+      } catch(e) {
+        console.error('[compose] save error:', e);
+        _submitting = false;
+        btn.disabled = false;
+        btnText.textContent = `Send to ${Auth.theirName()} →`;
+        U.toast('Failed to send — try again');
+      }
     }
   });
 });
@@ -6629,11 +6798,18 @@ Router.register('parlay-detail', ({ id } = {}) => {
 
   // Manage
   el.querySelector('#manage-btn')?.addEventListener('click', async () => {
-    const action = await U.sheet('Manage Event', [
-      { key: 'archive', label: '📦 Archive', cls: 'btn-outline' },
-      { key: 'delete', label: '🗑 Delete', cls: 'btn-danger' },
-    ]);
-    if (action === 'archive') {
+    const options = [];
+    // Edit only if creator and no partner response yet
+    if (p.isMine && p.status === 'pending_partner') {
+      options.push({ key: 'edit', label: '✏️ Edit proposal', cls: 'btn-outline' });
+    }
+    options.push({ key: 'archive', label: '📦 Archive', cls: 'btn-outline' });
+    options.push({ key: 'delete', label: '🗑 Delete', cls: 'btn-danger' });
+
+    const action = await U.sheet('Manage Event', options);
+    if (action === 'edit') {
+      Router.go('compose', { topicId: p.topicId, editId: p.id });
+    } else if (action === 'archive') {
       await Store.updateParlay(p.id, { archived: true });
       U.toast('Archived');
       Router.go('plan');
@@ -7533,6 +7709,14 @@ Router.register('profile-edit', () => {
       <div>
         <div class="input-label">Display name</div>
         <input type="text" id="profile-name" class="input" value="${U.esc(myN)}" placeholder="Your name">
+      </div>
+      <div>
+        <div class="input-label">Email</div>
+        <input type="email" class="input" value="${U.esc(email)}" disabled style="opacity:.6;">
+      </div>
+      <div>
+        <div class="input-label">Phone <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
+        <input type="tel" id="profile-phone" class="input" placeholder="(555) 123-4567">
       </div>
       <button class="btn btn-accent" id="profile-save">Save changes</button>
     </div>
