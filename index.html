@@ -1159,7 +1159,7 @@ select.input {
 }
 
 /* ═══════════════════════════════════════════════
-   COUPLE CHAT
+   COUPLE CHAT — Enhanced Two-Way Messaging
    ═══════════════════════════════════════════════ */
 .cc-wrapper {
   display: flex; flex-direction: column;
@@ -1169,47 +1169,140 @@ select.input {
 .cc-header {
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; gap: 10px;
-  padding: 0 16px; height: 56px;
+  padding: 0 16px; min-height: 56px;
   padding-top: max(0px, env(safe-area-inset-top));
   background: var(--espresso);
   border-bottom: 1px solid rgba(250,246,241,.08);
   flex-shrink: 0;
+}
+.cc-header .partner-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: #1a2d24; color: var(--sage);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .72rem; flex-shrink: 0;
+  position: relative;
+}
+.cc-header .partner-avatar .online-dot {
+  position: absolute; bottom: 0; right: 0;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #4CAF50; border: 2px solid var(--espresso);
 }
 .cc-header .partner-name {
   font-size: .92rem; font-weight: 600; color: var(--cream);
 }
 .cc-header .partner-status {
   font-size: .62rem; color: rgba(250,246,241,.5);
+  display: flex; align-items: center; gap: 4px;
 }
+.cc-header-actions {
+  display: flex; gap: 4px;
+}
+.cc-header-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(250,246,241,.08); border: none;
+  color: var(--cream); font-size: .82rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s ease;
+}
+.cc-header-btn:active { background: rgba(250,246,241,.2); }
+
+/* Messages container */
 .cc-msgs {
   flex: 1; overflow-y: auto; padding: 8px 16px 16px;
-  display: flex; flex-direction: column; gap: 4px;
+  display: flex; flex-direction: column; gap: 3px;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
+  position: relative;
 }
+
+/* Date dividers */
 .cc-date-divider {
-  text-align: center; margin: 12px 0 6px;
+  text-align: center; margin: 14px 0 8px;
   font-size: .62rem; font-weight: 600; color: var(--muted);
-  letter-spacing: .04em;
+  letter-spacing: .04em; position: relative;
 }
+.cc-date-divider::before, .cc-date-divider::after {
+  content: ''; position: absolute; top: 50%;
+  width: calc(50% - 50px); height: 1px;
+  background: var(--border); opacity: .5;
+}
+.cc-date-divider::before { left: 0; }
+.cc-date-divider::after { right: 0; }
+
+/* New messages divider */
+.cc-new-msgs-divider {
+  text-align: center; margin: 10px 0;
+  font-size: .62rem; font-weight: 700; color: var(--terra);
+  letter-spacing: .04em; position: relative;
+  display: flex; align-items: center; gap: 8px;
+}
+.cc-new-msgs-divider::before, .cc-new-msgs-divider::after {
+  content: ''; flex: 1; height: 1px;
+  background: var(--terra); opacity: .3;
+}
+
+/* Message bubble wrapper */
 .cc-bubble-wrap {
   display: flex; max-width: 82%; gap: 6px;
-  animation: slideUp .2s ease both;
+  animation: ccSlideIn .25s ease both;
+  position: relative;
 }
 .cc-bubble-wrap.me { align-self: flex-end; flex-direction: row-reverse; }
 .cc-bubble-wrap.them { align-self: flex-start; }
+.cc-bubble-wrap.grouped { margin-top: -1px; }
+.cc-bubble-wrap.grouped .cc-meta { display: none; }
+@keyframes ccSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Bubbles */
 .cc-bubble {
   padding: 10px 14px; font-size: .88rem; line-height: 1.55;
-  word-break: break-word;
+  word-break: break-word; position: relative;
+  transition: transform .15s ease;
 }
 .cc-bubble.me {
   background: var(--terra); color: #fff;
   border-radius: 18px 18px 6px 18px;
 }
+.cc-bubble.me.grouped-top { border-radius: 18px 18px 6px 18px; }
+.cc-bubble.me.grouped-mid { border-radius: 6px 18px 6px 18px; }
+.cc-bubble.me.grouped-bot { border-radius: 6px 18px 18px 18px; }
 .cc-bubble.them {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 18px 18px 18px 6px;
 }
+.cc-bubble.them.grouped-top { border-radius: 18px 18px 18px 6px; }
+.cc-bubble.them.grouped-mid { border-radius: 18px 6px 18px 6px; }
+.cc-bubble.them.grouped-bot { border-radius: 18px 6px 18px 18px; }
+
+/* Selected bubble highlight */
+.cc-bubble-wrap.selected .cc-bubble {
+  box-shadow: 0 0 0 2px var(--terra);
+}
+
+/* Reply indicator on bubble */
+.cc-reply-preview {
+  font-size: .7rem; padding: 4px 10px; margin-bottom: 4px;
+  border-left: 2px solid rgba(255,255,255,.4);
+  opacity: .8; line-height: 1.35;
+  max-height: 36px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.cc-bubble.them .cc-reply-preview {
+  border-left-color: var(--terra); color: var(--terra);
+}
+
+/* Message status indicators */
+.cc-status {
+  font-size: .55rem; margin-left: 2px;
+}
+.cc-status.sent { color: rgba(255,255,255,.5); }
+.cc-status.delivered { color: rgba(255,255,255,.7); }
+.cc-status.read { color: #64B5F6; }
+
+/* AI insight banner inside chat */
 .cc-bubble.ai-hint {
   background: linear-gradient(135deg, rgba(122,106,155,.08), rgba(122,158,138,.06));
   border: 1px solid rgba(122,106,155,.2);
@@ -1218,33 +1311,181 @@ select.input {
   padding: 8px 12px;
   align-self: center; max-width: 90%; text-align: center;
 }
+.cc-ai-insight {
+  margin: 6px 0; padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(122,106,155,.06), rgba(122,158,138,.04));
+  border: 1px solid rgba(122,106,155,.15);
+  border-radius: 12px;
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; align-self: center; max-width: 92%;
+  transition: background .15s ease;
+}
+.cc-ai-insight:active { background: rgba(122,106,155,.12); }
+.cc-ai-insight .cc-ai-icon { font-size: 1rem; flex-shrink: 0; }
+.cc-ai-insight .cc-ai-text { font-size: .72rem; line-height: 1.5; color: var(--muted); }
+
+/* Meta line (time, filtered tag, read receipts) */
 .cc-meta {
   font-size: .58rem; color: var(--muted); margin-top: 3px;
   display: flex; align-items: center; gap: 4px;
+  transition: opacity .2s ease;
 }
 .cc-bubble-wrap.me .cc-meta { justify-content: flex-end; }
-.cc-filtered-tag {
-  color: var(--sage); font-weight: 600;
+.cc-filtered-tag { color: var(--sage); font-weight: 600; }
+
+/* Reactions on bubbles */
+.cc-reactions {
+  display: flex; gap: 2px; margin-top: 4px; flex-wrap: wrap;
 }
+.cc-reaction-badge {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px 6px; border-radius: 10px;
+  background: rgba(0,0,0,.06); font-size: .68rem;
+  cursor: pointer; transition: background .15s ease;
+}
+.cc-reaction-badge:active { background: rgba(0,0,0,.12); }
+.cc-reaction-badge.mine { background: rgba(196,113,74,.15); }
+
+/* Reaction picker overlay */
+.cc-reaction-picker {
+  position: absolute; top: -42px; right: 0;
+  display: flex; gap: 4px; padding: 6px 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 22px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  z-index: 60; animation: ccFadeScale .15s ease both;
+}
+.cc-bubble-wrap.them .cc-reaction-picker { left: 0; right: auto; }
+.cc-reaction-picker button {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: none; border: none; font-size: 1.1rem;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: transform .1s ease, background .1s ease;
+}
+.cc-reaction-picker button:active { transform: scale(1.25); background: var(--parchment); }
+@keyframes ccFadeScale {
+  from { opacity: 0; transform: scale(.8) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Context menu (edit, delete, reply, pin) */
+.cc-context-menu {
+  position: fixed; z-index: 200;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  min-width: 180px; overflow: hidden;
+  animation: ccFadeScale .15s ease both;
+}
+.cc-context-menu .cc-ctx-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; font-size: .82rem; font-weight: 500;
+  color: var(--espresso); cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s ease;
+}
+.cc-context-menu .cc-ctx-item:last-child { border-bottom: none; }
+.cc-context-menu .cc-ctx-item:active { background: var(--parchment); }
+.cc-context-menu .cc-ctx-item.danger { color: #E05555; }
+.cc-context-menu .cc-ctx-item .ctx-icon { font-size: 1rem; width: 22px; text-align: center; }
+.cc-context-overlay {
+  position: fixed; inset: 0; z-index: 199;
+  background: rgba(0,0,0,.2); backdrop-filter: blur(2px);
+  animation: fadeIn .15s ease both;
+}
+
+/* Scroll-to-bottom FAB */
+.cc-scroll-fab {
+  position: absolute; bottom: 12px; right: 16px;
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(0,0,0,.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .9rem; cursor: pointer; z-index: 40;
+  animation: ccFadeScale .2s ease both;
+  transition: background .15s ease;
+}
+.cc-scroll-fab:active { background: var(--parchment); }
+.cc-scroll-fab .fab-badge {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  background: var(--terra); color: #fff;
+  font-size: .55rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+}
+
+/* Typing indicator */
+.cc-typing {
+  padding: 6px 12px; align-self: flex-start;
+  font-size: .72rem; color: var(--muted); font-style: italic;
+  display: flex; align-items: center; gap: 4px;
+}
+.cc-typing .dots { display: inline-flex; gap: 3px; margin-left: 4px; }
+.cc-typing .dots span {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--muted); animation: chatDot 1.4s infinite ease-in-out;
+}
+.cc-typing .dots span:nth-child(2) { animation-delay: .2s; }
+.cc-typing .dots span:nth-child(3) { animation-delay: .4s; }
+
+/* Input area */
 .cc-input-area {
   position: sticky; bottom: 0; z-index: 50;
-  padding: 8px 12px; padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding: 6px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom));
   background: var(--cream);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+}
+.cc-reply-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; margin-bottom: 4px;
+  background: var(--parchment); border-radius: 10px;
+  border-left: 3px solid var(--terra);
+  animation: ccSlideIn .2s ease both;
+}
+.cc-reply-banner .reply-text {
+  flex: 1; font-size: .75rem; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cc-reply-banner .reply-name {
+  font-size: .65rem; font-weight: 700; color: var(--terra);
+}
+.cc-reply-banner .reply-close {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: none; border: none; font-size: .82rem;
+  color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.cc-edit-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; margin-bottom: 4px;
+  background: rgba(232,184,138,.15); border-radius: 10px;
+  border-left: 3px solid var(--amber);
+  animation: ccSlideIn .2s ease both;
+}
+.cc-edit-banner .edit-label {
+  flex: 1; font-size: .75rem; font-weight: 600; color: var(--amber);
+}
+.cc-edit-banner .edit-close {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: none; border: none; font-size: .82rem;
+  color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
 .cc-input-row {
   display: flex; gap: 8px; align-items: flex-end;
 }
 .cc-textarea {
-  flex: 1; border: 1px solid var(--border); border-radius: 22px;
+  flex: 1; border: 1.5px solid var(--border); border-radius: 22px;
   padding: 10px 16px; font-size: .88rem; line-height: 1.45;
-  resize: none; min-height: 42px; max-height: 120px;
+  resize: none; min-height: 42px; max-height: 140px;
   background: var(--surface); color: var(--espresso);
   font-family: var(--font-body);
-  outline: none; transition: border-color .2s ease;
+  outline: none; transition: border-color .2s ease, box-shadow .2s ease;
 }
-.cc-textarea:focus { border-color: var(--terra); }
+.cc-textarea:focus {
+  border-color: var(--terra);
+  box-shadow: 0 0 0 3px rgba(196,113,74,.1);
+}
 .cc-textarea::placeholder { color: var(--muted); }
 .cc-send-btn {
   width: 42px; height: 42px; border-radius: 50%;
@@ -1255,45 +1496,181 @@ select.input {
 }
 .cc-send-btn:active { transform: scale(0.9); }
 .cc-send-btn:disabled { background: var(--border); cursor: default; }
+.cc-send-btn.editing { background: var(--amber); }
+
+/* Quick actions tray */
 .cc-actions {
-  display: flex; gap: 4px; padding: 4px 0 0;
+  display: flex; gap: 4px; padding: 6px 0 2px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
 .cc-action-chip {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 10px; border-radius: var(--r-pill);
+  padding: 6px 12px; border-radius: var(--r-pill);
   background: var(--parchment); border: 1px solid var(--border);
-  font-size: .68rem; font-weight: 600; color: var(--muted);
+  font-size: .7rem; font-weight: 600; color: var(--muted);
   white-space: nowrap; cursor: pointer; flex-shrink: 0;
-  transition: background .15s ease;
+  transition: all .15s ease;
 }
-.cc-action-chip:active { background: var(--border); }
-.cc-typing {
-  padding: 6px 12px; align-self: flex-start;
-  font-size: .72rem; color: var(--muted); font-style: italic;
+.cc-action-chip:active { background: var(--terra); color: #fff; border-color: var(--terra); }
+
+/* Search bar */
+.cc-search-bar {
+  padding: 8px 16px; background: var(--parchment);
+  border-bottom: 1px solid var(--border);
+  animation: ccSlideIn .2s ease both;
 }
-.cc-typing .dots { display: inline-flex; gap: 3px; margin-left: 4px; }
-.cc-typing .dots span {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--muted); animation: chatDot 1.4s infinite ease-in-out;
+.cc-search-bar .search-row {
+  display: flex; gap: 8px; align-items: center;
 }
-.cc-typing .dots span:nth-child(2) { animation-delay: .2s; }
-.cc-typing .dots span:nth-child(3) { animation-delay: .4s; }
-/* AI insight banner inside chat */
-.cc-ai-insight {
-  margin: 8px 16px; padding: 8px 12px;
-  background: linear-gradient(135deg, rgba(122,106,155,.06), rgba(122,158,138,.04));
-  border: 1px solid rgba(122,106,155,.15);
-  border-radius: 12px;
+.cc-search-bar input {
+  flex: 1; border: 1px solid var(--border); border-radius: 20px;
+  padding: 8px 16px; font-size: .82rem; background: var(--surface);
+  outline: none; font-family: var(--font-body);
+}
+.cc-search-bar input:focus { border-color: var(--terra); }
+.cc-search-bar .search-nav {
+  display: flex; align-items: center; gap: 4px;
+  font-size: .68rem; color: var(--muted);
+}
+.cc-search-bar .search-nav button {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: .72rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.cc-search-bar .search-nav button:active { background: var(--border); }
+.cc-search-bar .search-close {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: none; border: none; font-size: 1rem;
+  color: var(--muted); cursor: pointer;
+}
+.cc-search-highlight {
+  background: rgba(232,184,138,.4); border-radius: 2px;
+  padding: 0 1px;
+}
+.cc-search-current {
+  background: rgba(196,113,74,.5); color: #fff;
+  border-radius: 2px; padding: 0 2px;
+}
+
+/* Pinned message banner */
+.cc-pinned-banner {
   display: flex; align-items: center; gap: 8px;
-  cursor: pointer;
+  padding: 8px 16px; background: rgba(232,184,138,.08);
+  border-bottom: 1px solid rgba(232,184,138,.2);
+  cursor: pointer; transition: background .15s ease;
 }
-.cc-ai-insight .cc-ai-icon {
-  font-size: 1rem; flex-shrink: 0;
+.cc-pinned-banner:active { background: rgba(232,184,138,.15); }
+.cc-pinned-banner .pin-icon { font-size: .82rem; }
+.cc-pinned-banner .pin-text {
+  flex: 1; font-size: .72rem; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.cc-ai-insight .cc-ai-text {
-  font-size: .72rem; line-height: 1.5; color: var(--muted);
+.cc-pinned-banner .pin-close {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: none; border: none; font-size: .72rem;
+  color: var(--muted); cursor: pointer;
 }
+
+/* Emoji picker compact */
+.cc-emoji-tray {
+  display: flex; gap: 2px; padding: 6px 4px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  background: var(--parchment); border-radius: 12px;
+  margin-bottom: 4px;
+  animation: ccSlideIn .15s ease both;
+}
+.cc-emoji-tray button {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: none; border: none; font-size: 1.2rem;
+  cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .1s ease;
+}
+.cc-emoji-tray button:active { background: var(--border); }
+
+/* Chat stats bar */
+.cc-stats-bar {
+  display: flex; justify-content: center; gap: 16px;
+  padding: 6px 16px; font-size: .6rem; color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--parchment);
+}
+.cc-stats-bar .stat-item {
+  display: flex; align-items: center; gap: 3px;
+}
+
+/* Deleted message placeholder */
+.cc-bubble.deleted {
+  background: transparent; border: 1px dashed var(--border);
+  color: var(--muted); font-style: italic; font-size: .78rem;
+}
+
+/* Edited indicator */
+.cc-edited-tag {
+  font-size: .55rem; color: var(--muted); font-style: italic;
+}
+
+/* Image / link preview in message */
+.cc-link-preview {
+  margin-top: 8px; padding: 8px; border-radius: 8px;
+  background: rgba(0,0,0,.04); border: 1px solid rgba(0,0,0,.06);
+  font-size: .72rem; line-height: 1.4; overflow: hidden;
+}
+.cc-link-preview .lp-domain {
+  font-size: .58rem; color: var(--muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px;
+}
+.cc-link-preview .lp-title {
+  font-weight: 600; color: var(--espresso);
+}
+.cc-bubble.me .cc-link-preview {
+  background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.2);
+}
+.cc-bubble.me .cc-link-preview .lp-domain { color: rgba(255,255,255,.6); }
+.cc-bubble.me .cc-link-preview .lp-title { color: #fff; }
+
+/* Chat info drawer */
+.cc-info-drawer {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; flex-direction: column;
+  background: var(--cream);
+  animation: ccDrawerSlide .25s ease both;
+}
+@keyframes ccDrawerSlide {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+.cc-info-drawer .info-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px; padding-top: max(16px, env(safe-area-inset-top));
+  background: var(--espresso); color: var(--cream);
+}
+.cc-info-drawer .info-body {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+}
+.cc-info-section {
+  margin-bottom: 20px;
+}
+.cc-info-section .section-title {
+  font-size: .68rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px;
+}
+.cc-info-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: .85rem; cursor: pointer;
+}
+.cc-info-item .ii-icon { font-size: 1rem; width: 28px; text-align: center; }
+
+/* Swipe-to-reply visual hint */
+.cc-swipe-hint {
+  position: absolute; left: -30px; top: 50%;
+  transform: translateY(-50%); opacity: 0;
+  font-size: .82rem; transition: opacity .15s ease;
+}
+.cc-bubble-wrap.me .cc-swipe-hint { left: auto; right: -30px; }
+.cc-bubble-wrap.swiping .cc-swipe-hint { opacity: 1; }
 
 /* ═══════════════════════════════════════════════
    CALENDAR
@@ -1596,8 +1973,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.1.0';
-const BUILD_DATE = '2026-03-11T22:30:00Z';
+const VERSION = '5.2.0';
+const BUILD_DATE = '2026-03-11T23:45:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -9005,17 +9382,61 @@ const DailyRitual = (() => {
 const CoupleChat = (() => {
   const KEY = 'parlay_couple_chat';
   const READ_KEY = 'parlay_chat_read_ts';
+  const PINS_KEY = 'parlay_chat_pins';
+  const DRAFTS_KEY = 'parlay_chat_drafts';
   let _messages = null;
+  let _pins = null;
+  let _listeners = [];
 
+  // ─── Core persistence ───────────────────────
   function _load() {
     if (_messages) return _messages;
     try { _messages = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { _messages = []; }
+    // Migrate older messages missing new fields
+    _messages.forEach(m => {
+      if (!m.reactions) m.reactions = [];
+      if (m.status === undefined && m.from === 'me') m.status = 'read';
+      if (m.editedAt === undefined) m.editedAt = null;
+      if (m.deleted === undefined) m.deleted = false;
+      if (m.pinned === undefined) m.pinned = false;
+    });
     return _messages;
   }
-  function _save() { localStorage.setItem(KEY, JSON.stringify(_messages || [])); }
 
+  function _save() {
+    localStorage.setItem(KEY, JSON.stringify(_messages || []));
+    _notify('change');
+  }
+
+  // ─── Event system for live updates ──────────
+  function on(event, fn) { _listeners.push({ event, fn }); }
+  function off(event, fn) { _listeners = _listeners.filter(l => !(l.event === event && l.fn === fn)); }
+  function _notify(event, data) { _listeners.forEach(l => { if (l.event === event) l.fn(data); }); }
+
+  // ─── Message retrieval ──────────────────────
   function messages() { return _load(); }
 
+  function getById(msgId) {
+    return _load().find(m => m.id === msgId) || null;
+  }
+
+  function recentMessages(n = 50) { return _load().slice(-n); }
+
+  function messagesByDate(dateStr) {
+    return _load().filter(m => m.timestamp.startsWith(dateStr));
+  }
+
+  function lastMessage() {
+    const msgs = _load();
+    return msgs.length > 0 ? msgs[msgs.length - 1] : null;
+  }
+
+  function todayMessageCount() {
+    const today = new Date().toISOString().split('T')[0];
+    return _load().filter(m => m.timestamp.startsWith(today) && !m.deleted).length;
+  }
+
+  // ─── Send a message ─────────────────────────
   function send(rawText, options = {}) {
     _load();
     const msg = {
@@ -9026,16 +9447,34 @@ const CoupleChat = (() => {
       type: options.type || 'text',
       timestamp: new Date().toISOString(),
       read: true,
+      status: 'sent', // sent → delivered → read
       replyTo: options.replyTo || null,
       reactions: [],
       metadata: options.metadata || null,
+      editedAt: null,
+      deleted: false,
+      pinned: false,
     };
     _messages.push(msg);
     _save();
     _updateReadTimestamp();
+
+    // Simulate delivery status progression
+    setTimeout(() => {
+      const m = _messages.find(x => x.id === msg.id);
+      if (m && m.status === 'sent') { m.status = 'delivered'; _save(); }
+    }, 800 + Math.random() * 600);
+    setTimeout(() => {
+      const m = _messages.find(x => x.id === msg.id);
+      if (m && m.status === 'delivered') { m.status = 'read'; _save(); }
+    }, 3000 + Math.random() * 2000);
+
+    // Clear draft after sending
+    _clearDraft();
     return msg;
   }
 
+  // ─── Receive partner message ────────────────
   function receivePartner(rawText, options = {}) {
     _load();
     const msg = {
@@ -9046,26 +9485,28 @@ const CoupleChat = (() => {
       type: options.type || 'text',
       timestamp: new Date().toISOString(),
       read: false,
+      status: null,
       replyTo: options.replyTo || null,
       reactions: [],
       metadata: options.metadata || null,
+      editedAt: null,
+      deleted: false,
+      pinned: false,
     };
     _messages.push(msg);
     _save();
+    _notify('newMessage', msg);
     return msg;
   }
 
+  // ─── System + AI messages ───────────────────
   function addSystemMessage(text, metadata = null) {
     _load();
     const msg = {
       id: 'cc_sys_' + Date.now(),
-      from: 'system',
-      raw: text,
-      filtered: text,
-      type: 'system',
-      timestamp: new Date().toISOString(),
-      read: true,
-      metadata,
+      from: 'system', raw: text, filtered: text,
+      type: 'system', timestamp: new Date().toISOString(),
+      read: true, metadata, deleted: false,
     };
     _messages.push(msg);
     _save();
@@ -9076,42 +9517,78 @@ const CoupleChat = (() => {
     _load();
     const msg = {
       id: 'cc_ai_' + Date.now(),
-      from: 'ai',
-      raw: text,
-      filtered: text,
-      type: 'ai-insight',
-      timestamp: new Date().toISOString(),
-      read: true,
-      metadata: { actionRoute },
+      from: 'ai', raw: text, filtered: text,
+      type: 'ai-insight', timestamp: new Date().toISOString(),
+      read: true, metadata: { actionRoute }, deleted: false,
     };
     _messages.push(msg);
     _save();
     return msg;
   }
 
-  function react(msgId, emoji) {
+  // ─── Edit a message ─────────────────────────
+  function editMessage(msgId, newText) {
     _load();
     const msg = _messages.find(m => m.id === msgId);
-    if (msg) {
-      if (!msg.reactions) msg.reactions = [];
-      const existing = msg.reactions.findIndex(r => r.from === 'me');
-      if (existing >= 0) {
-        if (msg.reactions[existing].emoji === emoji) {
-          msg.reactions.splice(existing, 1); // Toggle off
-        } else {
-          msg.reactions[existing].emoji = emoji;
-        }
-      } else {
-        msg.reactions.push({ from: 'me', emoji });
-      }
-      _save();
-    }
+    if (!msg || msg.from !== 'me' || msg.deleted) return null;
+    msg.raw = newText;
+    msg.filtered = newText;
+    msg.editedAt = new Date().toISOString();
+    _save();
     return msg;
   }
 
+  // ─── Delete a message ───────────────────────
+  function deleteMessage(msgId) {
+    _load();
+    const msg = _messages.find(m => m.id === msgId);
+    if (!msg) return false;
+    if (msg.from === 'me') {
+      msg.deleted = true;
+      msg.raw = '';
+      msg.filtered = '';
+      _save();
+      return true;
+    }
+    return false;
+  }
+
+  // ─── Reactions (multi-emoji) ────────────────
+  function react(msgId, emoji) {
+    _load();
+    const msg = _messages.find(m => m.id === msgId);
+    if (!msg || msg.deleted) return msg;
+    if (!msg.reactions) msg.reactions = [];
+    const existing = msg.reactions.findIndex(r => r.from === 'me' && r.emoji === emoji);
+    if (existing >= 0) {
+      msg.reactions.splice(existing, 1); // Toggle off same emoji
+    } else {
+      // Remove any other reaction from me, add new one
+      msg.reactions = msg.reactions.filter(r => r.from !== 'me');
+      msg.reactions.push({ from: 'me', emoji, ts: new Date().toISOString() });
+    }
+    _save();
+    return msg;
+  }
+
+  // ─── Pin / Unpin ────────────────────────────
+  function togglePin(msgId) {
+    _load();
+    const msg = _messages.find(m => m.id === msgId);
+    if (!msg || msg.deleted) return false;
+    msg.pinned = !msg.pinned;
+    _save();
+    return msg.pinned;
+  }
+
+  function pinnedMessages() {
+    return _load().filter(m => m.pinned && !m.deleted);
+  }
+
+  // ─── Read tracking ──────────────────────────
   function unreadCount() {
     const readTs = localStorage.getItem(READ_KEY) || '1970-01-01';
-    return _load().filter(m => m.from === 'them' && !m.read && m.timestamp > readTs).length;
+    return _load().filter(m => m.from === 'them' && !m.read && m.timestamp > readTs && !m.deleted).length;
   }
 
   function markAllRead() {
@@ -9125,36 +9602,80 @@ const CoupleChat = (() => {
     localStorage.setItem(READ_KEY, new Date().toISOString());
   }
 
-  function recentMessages(n = 50) {
-    return _load().slice(-n);
+  function firstUnreadIndex() {
+    const msgs = _load();
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].from === 'them' && !msgs[i].read) continue;
+      return i + 1 < msgs.length ? i + 1 : -1;
+    }
+    return 0;
   }
 
-  function messagesByDate(dateStr) {
-    return _load().filter(m => m.timestamp.startsWith(dateStr));
-  }
-
+  // ─── Search with result navigation ──────────
   function searchMessages(query) {
     const q = query.toLowerCase();
-    return _load().filter(m => (m.raw || '').toLowerCase().includes(q) || (m.filtered || '').toLowerCase().includes(q));
+    return _load().filter(m =>
+      !m.deleted &&
+      ((m.raw || '').toLowerCase().includes(q) ||
+       (m.filtered || '').toLowerCase().includes(q))
+    );
   }
 
-  function lastMessage() {
-    const msgs = _load();
-    return msgs.length > 0 ? msgs[msgs.length - 1] : null;
+  // ─── Draft persistence ─────────────────────
+  function saveDraft(text) {
+    if (text && text.trim()) {
+      localStorage.setItem(DRAFTS_KEY, text);
+    } else {
+      _clearDraft();
+    }
   }
 
-  function todayMessageCount() {
-    const today = new Date().toISOString().split('T')[0];
-    return _load().filter(m => m.timestamp.startsWith(today)).length;
+  function getDraft() {
+    return localStorage.getItem(DRAFTS_KEY) || '';
   }
 
-  // Generate contextual quick actions based on conversation state
+  function _clearDraft() {
+    localStorage.removeItem(DRAFTS_KEY);
+  }
+
+  // ─── Message grouping logic ─────────────────
+  // Returns messages annotated with grouping metadata
+  function groupedMessages(msgs) {
+    return msgs.map((m, i) => {
+      const prev = i > 0 ? msgs[i - 1] : null;
+      const next = i < msgs.length - 1 ? msgs[i + 1] : null;
+      const sameFromPrev = prev && prev.from === m.from && m.from !== 'system' && m.from !== 'ai';
+      const sameFromNext = next && next.from === m.from && m.from !== 'system' && m.from !== 'ai';
+
+      // Within 2 minutes = part of a group
+      const timeDiffPrev = prev ? (new Date(m.timestamp) - new Date(prev.timestamp)) / 60000 : Infinity;
+      const timeDiffNext = next ? (new Date(next.timestamp) - new Date(m.timestamp)) / 60000 : Infinity;
+      const groupedWithPrev = sameFromPrev && timeDiffPrev < 2;
+      const groupedWithNext = sameFromNext && timeDiffNext < 2;
+
+      let groupPos = 'single';
+      if (groupedWithPrev && groupedWithNext) groupPos = 'mid';
+      else if (groupedWithPrev && !groupedWithNext) groupPos = 'last';
+      else if (!groupedWithPrev && groupedWithNext) groupPos = 'first';
+
+      return { ...m, _groupPos: groupPos, _grouped: groupedWithPrev };
+    });
+  }
+
+  // ─── Quick actions (context-aware) ──────────
   function quickActions() {
     const actions = [];
-    const last = lastMessage();
     const mood = MoodStore.todayMood();
     const parlays = Store.activeParlays();
     const tasks = Store.myActionTasks();
+    const hour = new Date().getHours();
+
+    // Time-aware greeting option
+    if (todayMessageCount() === 0) {
+      if (hour < 12) actions.push({ icon: '☀️', label: 'Good morning!', command: '/greet-morning' });
+      else if (hour < 17) actions.push({ icon: '👋', label: 'Thinking of you', command: '/greet-afternoon' });
+      else actions.push({ icon: '🌙', label: 'How was your day?', command: '/greet-evening' });
+    }
 
     actions.push({ icon: '📅', label: 'Plan something', command: '/plan' });
     actions.push({ icon: '✅', label: 'Assign task', command: '/task' });
@@ -9172,43 +9693,99 @@ const CoupleChat = (() => {
       actions.push({ icon: '🧘', label: 'I need space', command: '/space' });
     }
 
+    actions.push({ icon: '😊', label: 'Emoji', command: '/emoji' });
     actions.push({ icon: '🤖', label: 'Ask AI', command: '/ai' });
+    actions.push({ icon: '📊', label: 'Chat stats', command: '/stats' });
 
     return actions;
   }
 
-  // AI-powered message enhancement hints
+  // ─── AI-powered message enhancement hints ───
   function getAIHint(rawText) {
     const coach = ToneCoach.analyze(rawText);
     if (coach) return { type: 'tone', ...coach };
 
-    // Check for scheduling language
-    if (/\b(tonight|tomorrow|this weekend|saturday|sunday|friday|next week)\b/i.test(rawText)) {
+    // Scheduling language
+    if (/\b(tonight|tomorrow|this weekend|saturday|sunday|friday|next week|let'?s go|dinner|lunch|movie|trip)\b/i.test(rawText)) {
       return { type: 'schedule', msg: '📅 Sounds like you\'re discussing plans — want to make it official?', action: 'compose-pick' };
     }
 
-    // Check for task language
-    if (/\b(can you|could you|please|pick up|grab|get|remember to|don't forget)\b/i.test(rawText)) {
+    // Task language
+    if (/\b(can you|could you|please|pick up|grab|get|remember to|don't forget|need you to|would you mind)\b/i.test(rawText)) {
       return { type: 'task', msg: '✅ This sounds like a task — want to track it so nothing falls through the cracks?', action: 'task-create' };
     }
 
-    // Check for appreciation language
-    if (/\b(thank|love that|appreciate|grateful|means a lot)\b/i.test(rawText)) {
+    // Appreciation language
+    if (/\b(thank|love that|appreciate|grateful|means a lot|you're the best|so proud)\b/i.test(rawText)) {
       return { type: 'appreciation', msg: '💛 Beautiful! Want to save this to your appreciation journal?', action: 'appreciation' };
+    }
+
+    // Conflict language — suggest mediator
+    if (/\b(frustrated|annoyed|upset|hurt|angry|disappointed|we need to talk)\b/i.test(rawText)) {
+      return { type: 'mediator', msg: '🤖 Would it help to talk this through with the AI mediator first?', action: 'mediator' };
+    }
+
+    // Budget/money language
+    if (/\b(cost|expensive|budget|afford|price|money|spend|buy)\b/i.test(rawText)) {
+      return { type: 'budget', msg: '💰 Talking about money? A Parlay proposal can help you both agree on the budget.', action: 'compose-pick' };
     }
 
     return null;
   }
 
-  // Invalidate cache for fresh load
+  // ─── Link detection ─────────────────────────
+  function detectLinks(text) {
+    const urlRegex = /(https?:\/\/[^\s<]+)/g;
+    const matches = text.match(urlRegex);
+    return matches || [];
+  }
+
+  // ─── Export chat history ────────────────────
+  function exportChat(format = 'text') {
+    const msgs = _load().filter(m => !m.deleted && m.from !== 'ai');
+    if (format === 'text') {
+      return msgs.map(m => {
+        const time = new Date(m.timestamp).toLocaleString();
+        const from = m.from === 'me' ? Auth.myName() : m.from === 'them' ? Auth.theirName() : 'System';
+        return `[${time}] ${from}: ${m.filtered || m.raw}`;
+      }).join('\n');
+    }
+    return JSON.stringify(msgs, null, 2);
+  }
+
+  // ─── Chat statistics ───────────────────────
+  function stats() {
+    const msgs = _load().filter(m => !m.deleted && m.from !== 'system' && m.from !== 'ai');
+    const myMsgs = msgs.filter(m => m.from === 'me');
+    const theirMsgs = msgs.filter(m => m.from === 'them');
+    const today = new Date().toISOString().split('T')[0];
+    const todayMsgs = msgs.filter(m => m.timestamp.startsWith(today));
+    const filteredCount = myMsgs.filter(m => m.filtered && m.filtered !== m.raw).length;
+
+    return {
+      total: msgs.length,
+      mine: myMsgs.length,
+      theirs: theirMsgs.length,
+      today: todayMsgs.length,
+      filtered: filteredCount,
+      pinned: pinnedMessages().length,
+      reactions: msgs.reduce((sum, m) => sum + (m.reactions?.length || 0), 0),
+    };
+  }
+
+  // ─── Cache invalidation ─────────────────────
   function invalidate() { _messages = null; }
 
-  // Toggle helpers for inline onclick handlers
+  // ─── Toggle helpers (for inline onclick) ────
   function _toggleSearch() {
     const bar = document.querySelector('#cc-search-bar');
     if (!bar) return;
-    bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
-    if (bar.style.display === 'block') bar.querySelector('#cc-search-input')?.focus();
+    const isHidden = bar.style.display === 'none';
+    bar.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      const input = bar.querySelector('#cc-search-input');
+      if (input) { input.value = ''; input.focus(); }
+    }
   }
 
   function _toggleActions() {
@@ -9223,10 +9800,15 @@ const CoupleChat = (() => {
   }
 
   return {
-    messages, send, receivePartner, addSystemMessage, addAIInsight,
-    react, unreadCount, markAllRead, recentMessages, messagesByDate,
-    searchMessages, lastMessage, todayMessageCount, quickActions,
-    getAIHint, invalidate, _toggleSearch, _toggleActions,
+    messages, getById, send, receivePartner, addSystemMessage, addAIInsight,
+    editMessage, deleteMessage, react, togglePin, pinnedMessages,
+    unreadCount, markAllRead, firstUnreadIndex,
+    recentMessages, messagesByDate, searchMessages, lastMessage,
+    todayMessageCount, groupedMessages, quickActions, getAIHint,
+    detectLinks, exportChat, stats,
+    saveDraft, getDraft,
+    invalidate, on, off,
+    _toggleSearch, _toggleActions,
   };
 })();
 
@@ -9239,64 +9821,219 @@ const CoupleChat = (() => {
   const _origUnread = CoupleChat.unreadCount;
   const _origToday = CoupleChat.todayMessageCount;
   const _origSend = CoupleChat.send;
+  const _origGetById = CoupleChat.getById;
+  const _origSearch = CoupleChat.searchMessages;
+  const _origPinned = CoupleChat.pinnedMessages;
+  const _origGrouped = CoupleChat.groupedMessages;
+  const _origFirstUnread = CoupleChat.firstUnreadIndex;
+  const _origStats = CoupleChat.stats;
+  const _origEditMsg = CoupleChat.editMessage;
+  const _origDeleteMsg = CoupleChat.deleteMessage;
+  const _origTogglePin = CoupleChat.togglePin;
+  const _origReact = CoupleChat.react;
+  const _origExport = CoupleChat.exportChat;
+  const _origDetectLinks = CoupleChat.detectLinks;
+  const _origSaveDraft = CoupleChat.saveDraft;
+  const _origGetDraft = CoupleChat.getDraft;
+
+  function _demoMsg(id, from, raw, ts, extra = {}) {
+    return {
+      id, from, raw, filtered: raw, type: extra.type || 'text',
+      timestamp: ts, read: extra.read !== undefined ? extra.read : true,
+      status: from === 'me' ? 'read' : null,
+      replyTo: extra.replyTo || null, reactions: extra.reactions || [],
+      metadata: extra.metadata || null,
+      editedAt: null, deleted: false, pinned: extra.pinned || false,
+    };
+  }
 
   const _mockChatMsgs = [
-    { id: 'cc_d1', from: 'system', raw: 'Chat started', filtered: 'Chat started', type: 'system', timestamp: new Date(Date.now() - 86400000 * 3).toISOString(), read: true },
-    { id: 'cc_1', from: 'them', raw: 'Hey, what do you think about dinner plans for Saturday?', filtered: 'Hey, what do you think about dinner plans for Saturday?', type: 'text', timestamp: new Date(Date.now() - 86400000 * 2 - 3600000).toISOString(), read: true, reactions: [{ from: 'me', emoji: '👍' }] },
-    { id: 'cc_2', from: 'me', raw: "That sounds great! I was thinking Italian — there's that new place on Main St.", filtered: "That sounds great! I was thinking Italian — there's that new place on Main St.", type: 'text', timestamp: new Date(Date.now() - 86400000 * 2 - 3000000).toISOString(), read: true, reactions: [] },
-    { id: 'cc_ai1', from: 'ai', raw: '📅 You\'re discussing dinner plans — want to create a Parlay proposal to lock in the details?', filtered: '📅 You\'re discussing dinner plans — want to create a Parlay proposal to lock in the details?', type: 'ai-insight', timestamp: new Date(Date.now() - 86400000 * 2 - 2900000).toISOString(), read: true, metadata: { actionRoute: 'compose-pick' } },
-    { id: 'cc_3', from: 'them', raw: 'Perfect! I love Italian. Can you check if they take reservations?', filtered: 'Perfect! I love Italian. Can you check if they take reservations?', type: 'text', timestamp: new Date(Date.now() - 86400000 * 2 - 2400000).toISOString(), read: true, reactions: [] },
-    { id: 'cc_4', from: 'me', raw: "I'll call them after work. Want to invite the Johnsons too or just us?", filtered: "I'll call them after work. Want to invite the Johnsons too or just us?", type: 'text', timestamp: new Date(Date.now() - 86400000 * 2 - 1800000).toISOString(), read: true, reactions: [] },
-    { id: 'cc_5', from: 'them', raw: 'Just us this time — it\'s been a while since we had a proper date night ❤️', filtered: 'Just us this time — it\'s been a while since we had a proper date night ❤️', type: 'text', timestamp: new Date(Date.now() - 86400000 * 2 - 1200000).toISOString(), read: true, reactions: [{ from: 'me', emoji: '❤️' }] },
-    { id: 'cc_d2', from: 'system', raw: 'Yesterday', filtered: 'Yesterday', type: 'system', timestamp: new Date(Date.now() - 86400000 - 7200000).toISOString(), read: true },
-    { id: 'cc_6', from: 'me', raw: "Good morning! Don't forget the kids have soccer at 4 today", filtered: "Good morning! Don't forget the kids have soccer at 4 today", type: 'text', timestamp: new Date(Date.now() - 86400000 - 7200000).toISOString(), read: true, reactions: [] },
-    { id: 'cc_7', from: 'them', raw: 'Thanks for the reminder! Can you handle pickup? I have a meeting until 4:30', filtered: 'Thanks for the reminder! Can you handle pickup? I have a meeting until 4:30', type: 'text', timestamp: new Date(Date.now() - 86400000 - 6000000).toISOString(), read: true, reactions: [] },
-    { id: 'cc_8', from: 'me', raw: 'Of course, I got it. See you at home around 5?', filtered: 'Of course, I got it. See you at home around 5?', type: 'text', timestamp: new Date(Date.now() - 86400000 - 5400000).toISOString(), read: true, reactions: [{ from: 'them', emoji: '😊' }] },
-    { id: 'cc_d3', from: 'system', raw: 'Today', filtered: 'Today', type: 'system', timestamp: new Date(Date.now() - 3600000).toISOString(), read: true },
-    { id: 'cc_9', from: 'them', raw: "I was thinking about the weekend — should we do something fun with the kids?", filtered: "I was thinking about the weekend — should we do something fun with the kids?", type: 'text', timestamp: new Date(Date.now() - 2400000).toISOString(), read: false, reactions: [] },
-    { id: 'cc_10', from: 'them', raw: "Maybe the botanical garden? The weather is supposed to be nice 🌸", filtered: "Maybe the botanical garden? The weather is supposed to be nice 🌸", type: 'text', timestamp: new Date(Date.now() - 1800000).toISOString(), read: false, reactions: [] },
+    _demoMsg('cc_d1', 'system', 'Chat started', new Date(Date.now() - 86400000 * 3).toISOString(), { type: 'system' }),
+    _demoMsg('cc_1', 'them', 'Hey, what do you think about dinner plans for Saturday?', new Date(Date.now() - 86400000 * 2 - 3600000).toISOString(), { reactions: [{ from: 'me', emoji: '👍', ts: new Date().toISOString() }] }),
+    _demoMsg('cc_2', 'me', "That sounds great! I was thinking Italian — there's that new place on Main St.", new Date(Date.now() - 86400000 * 2 - 3000000).toISOString()),
+    _demoMsg('cc_ai1', 'ai', '📅 You\'re discussing dinner plans — want to create a Parlay proposal to lock in the details?', new Date(Date.now() - 86400000 * 2 - 2900000).toISOString(), { type: 'ai-insight', metadata: { actionRoute: 'compose-pick' } }),
+    _demoMsg('cc_3', 'them', 'Perfect! I love Italian. Can you check if they take reservations?', new Date(Date.now() - 86400000 * 2 - 2400000).toISOString()),
+    _demoMsg('cc_4', 'me', "I'll call them after work. Want to invite the Johnsons too or just us?", new Date(Date.now() - 86400000 * 2 - 1800000).toISOString()),
+    _demoMsg('cc_5', 'them', 'Just us this time — it\'s been a while since we had a proper date night ❤️', new Date(Date.now() - 86400000 * 2 - 1200000).toISOString(), { reactions: [{ from: 'me', emoji: '❤️', ts: new Date().toISOString() }], pinned: true }),
+    _demoMsg('cc_d2', 'system', 'Yesterday', new Date(Date.now() - 86400000 - 7200000).toISOString(), { type: 'system' }),
+    _demoMsg('cc_6', 'me', "Good morning! Don't forget the kids have soccer at 4 today", new Date(Date.now() - 86400000 - 7200000).toISOString()),
+    _demoMsg('cc_7', 'them', 'Thanks for the reminder! Can you handle pickup? I have a meeting until 4:30', new Date(Date.now() - 86400000 - 6000000).toISOString()),
+    _demoMsg('cc_8', 'me', 'Of course, I got it. See you at home around 5?', new Date(Date.now() - 86400000 - 5400000).toISOString(), { reactions: [{ from: 'them', emoji: '😊', ts: new Date().toISOString() }] }),
+    _demoMsg('cc_d3', 'system', 'Today', new Date(Date.now() - 3600000).toISOString(), { type: 'system' }),
+    _demoMsg('cc_9', 'them', "I was thinking about the weekend — should we do something fun with the kids?", new Date(Date.now() - 2400000).toISOString(), { read: false }),
+    _demoMsg('cc_10', 'them', "Maybe the botanical garden? The weather is supposed to be nice 🌸", new Date(Date.now() - 1800000).toISOString(), { read: false }),
   ];
 
   CoupleChat.messages = function() { return DEMO.active ? _mockChatMsgs : _origMessages(); };
   CoupleChat.recentMessages = function(n = 50) { return DEMO.active ? _mockChatMsgs.slice(-n) : _origRecent(n); };
   CoupleChat.lastMessage = function() { return DEMO.active ? _mockChatMsgs[_mockChatMsgs.length - 1] : _origLast(); };
   CoupleChat.unreadCount = function() { return DEMO.active ? _mockChatMsgs.filter(m => !m.read && m.from === 'them').length : _origUnread(); };
+  CoupleChat.getById = function(msgId) {
+    if (DEMO.active) return _mockChatMsgs.find(m => m.id === msgId) || null;
+    return _origGetById(msgId);
+  };
+  CoupleChat.searchMessages = function(query) {
+    if (DEMO.active) {
+      const q = query.toLowerCase();
+      return _mockChatMsgs.filter(m => !m.deleted && ((m.raw || '').toLowerCase().includes(q) || (m.filtered || '').toLowerCase().includes(q)));
+    }
+    return _origSearch(query);
+  };
+  CoupleChat.pinnedMessages = function() {
+    if (DEMO.active) return _mockChatMsgs.filter(m => m.pinned && !m.deleted);
+    return _origPinned();
+  };
+  CoupleChat.groupedMessages = function(msgs) {
+    // Grouping logic works the same for demo
+    return _origGrouped(msgs);
+  };
+  CoupleChat.firstUnreadIndex = function() {
+    if (DEMO.active) {
+      for (let i = _mockChatMsgs.length - 1; i >= 0; i--) {
+        if (_mockChatMsgs[i].from === 'them' && !_mockChatMsgs[i].read) continue;
+        return i + 1 < _mockChatMsgs.length ? i + 1 : -1;
+      }
+      return 0;
+    }
+    return _origFirstUnread();
+  };
+  CoupleChat.stats = function() {
+    if (DEMO.active) {
+      const msgs = _mockChatMsgs.filter(m => !m.deleted && m.from !== 'system' && m.from !== 'ai');
+      return {
+        total: msgs.length, mine: msgs.filter(m => m.from === 'me').length,
+        theirs: msgs.filter(m => m.from === 'them').length,
+        today: msgs.filter(m => m.timestamp.startsWith(new Date().toISOString().split('T')[0])).length,
+        filtered: 0, pinned: _mockChatMsgs.filter(m => m.pinned).length,
+        reactions: msgs.reduce((s, m) => s + (m.reactions?.length || 0), 0),
+      };
+    }
+    return _origStats();
+  };
+  CoupleChat.editMessage = function(msgId, newText) {
+    if (DEMO.active) {
+      const msg = _mockChatMsgs.find(m => m.id === msgId);
+      if (msg && msg.from === 'me' && !msg.deleted) {
+        msg.raw = newText; msg.filtered = newText;
+        msg.editedAt = new Date().toISOString();
+        return msg;
+      }
+      return null;
+    }
+    return _origEditMsg(msgId, newText);
+  };
+  CoupleChat.deleteMessage = function(msgId) {
+    if (DEMO.active) {
+      const msg = _mockChatMsgs.find(m => m.id === msgId);
+      if (msg && msg.from === 'me') {
+        msg.deleted = true; msg.raw = ''; msg.filtered = '';
+        return true;
+      }
+      return false;
+    }
+    return _origDeleteMsg(msgId);
+  };
+  CoupleChat.togglePin = function(msgId) {
+    if (DEMO.active) {
+      const msg = _mockChatMsgs.find(m => m.id === msgId);
+      if (msg && !msg.deleted) { msg.pinned = !msg.pinned; return msg.pinned; }
+      return false;
+    }
+    return _origTogglePin(msgId);
+  };
+  CoupleChat.react = function(msgId, emoji) {
+    if (DEMO.active) {
+      const msg = _mockChatMsgs.find(m => m.id === msgId);
+      if (msg && !msg.deleted) {
+        if (!msg.reactions) msg.reactions = [];
+        const existing = msg.reactions.findIndex(r => r.from === 'me' && r.emoji === emoji);
+        if (existing >= 0) msg.reactions.splice(existing, 1);
+        else {
+          msg.reactions = msg.reactions.filter(r => r.from !== 'me');
+          msg.reactions.push({ from: 'me', emoji, ts: new Date().toISOString() });
+        }
+      }
+      return msg;
+    }
+    return _origReact(msgId, emoji);
+  };
   CoupleChat.todayMessageCount = function() {
     if (!DEMO.active) return _origToday();
     const today = new Date().toISOString().split('T')[0];
-    return _mockChatMsgs.filter(m => m.timestamp.startsWith(today)).length;
+    return _mockChatMsgs.filter(m => m.timestamp.startsWith(today) && !m.deleted).length;
   };
+  CoupleChat.exportChat = function(format) {
+    if (DEMO.active) {
+      return _mockChatMsgs.filter(m => !m.deleted && m.from !== 'ai').map(m => {
+        const time = new Date(m.timestamp).toLocaleString();
+        const from = m.from === 'me' ? 'You' : m.from === 'them' ? 'Partner' : 'System';
+        return `[${time}] ${from}: ${m.filtered || m.raw}`;
+      }).join('\n');
+    }
+    return _origExport(format);
+  };
+  CoupleChat.saveDraft = function(text) { if (!DEMO.active) _origSaveDraft(text); };
+  CoupleChat.getDraft = function() { return DEMO.active ? '' : _origGetDraft(); };
+
   CoupleChat.send = function(rawText, options) {
     if (DEMO.active) {
       const msg = {
         id: 'cc_' + Date.now(), from: 'me', raw: rawText,
         filtered: options?.filtered || rawText, type: options?.type || 'text',
         timestamp: new Date().toISOString(), read: true,
+        status: 'sent',
         replyTo: options?.replyTo || null, reactions: [],
         metadata: options?.metadata || null,
+        editedAt: null, deleted: false, pinned: false,
       };
       _mockChatMsgs.push(msg);
 
-      // Simulate partner response after delay
+      // Simulate delivery status
+      setTimeout(() => { msg.status = 'delivered'; }, 600);
+      setTimeout(() => { msg.status = 'read'; }, 2500);
+
+      // Simulate contextual partner response after delay
       setTimeout(() => {
-        const responses = [
-          "That's a great idea!",
-          "Let me think about that and get back to you.",
-          "Sounds good to me 😊",
-          "I was thinking the same thing!",
-          "Sure, let's do it!",
-          "Can we discuss this tonight?",
-          "I love that plan ❤️",
-        ];
-        const resp = responses[Math.floor(Math.random() * responses.length)];
+        const text = rawText.toLowerCase();
+        let resp;
+
+        // Contextual responses based on what was said
+        if (text.includes('dinner') || text.includes('eat') || text.includes('food') || text.includes('restaurant')) {
+          const options = ["Mmm, I've been craving sushi!", "Let's cook together tonight!", "How about that Thai place we love?", "I'll pick something up on the way home 😊"];
+          resp = options[Math.floor(Math.random() * options.length)];
+        } else if (text.includes('love') || text.includes('miss') || text.includes('❤️') || text.includes('appreciate')) {
+          const options = ["Love you too! ❤️", "You make everything better 🥰", "That means the world to me 💛", "Always and forever ❤️"];
+          resp = options[Math.floor(Math.random() * options.length)];
+        } else if (text.includes('kids') || text.includes('school') || text.includes('soccer') || text.includes('pickup')) {
+          const options = ["I'll handle it, don't worry!", "Thanks for coordinating — you're the best!", "I've got it covered 💪", "Let me adjust my schedule"];
+          resp = options[Math.floor(Math.random() * options.length)];
+        } else if (text.includes('weekend') || text.includes('saturday') || text.includes('sunday') || text.includes('plan')) {
+          const options = ["That sounds amazing! Let's do it!", "I was hoping you'd say that 😊", "Yes! Let's make it happen", "Perfect — I'll block off the time"];
+          resp = options[Math.floor(Math.random() * options.length)];
+        } else if (text.includes('sorry') || text.includes('apologize') || text.includes('my bad')) {
+          const options = ["It's okay, we're good ❤️", "I appreciate you saying that", "Already forgiven. Let's move forward together 💛", "Thank you — that means a lot"];
+          resp = options[Math.floor(Math.random() * options.length)];
+        } else if (text.includes('?')) {
+          const options = ["Let me think about that!", "Good question — how about we figure it out together?", "I'm open to anything 😊", "What do you think is best?"];
+          resp = options[Math.floor(Math.random() * options.length)];
+        } else {
+          const options = [
+            "That's a great idea!", "Let me think about that and get back to you.",
+            "Sounds good to me 😊", "I was thinking the same thing!",
+            "Sure, let's do it!", "Can we discuss this tonight?",
+            "I love that plan ❤️", "You always have the best ideas!",
+          ];
+          resp = options[Math.floor(Math.random() * options.length)];
+        }
+
         _mockChatMsgs.push({
           id: 'cc_' + Date.now() + '_r', from: 'them', raw: resp, filtered: resp,
           type: 'text', timestamp: new Date().toISOString(), read: false,
-          reactions: [],
+          status: null, replyTo: null, reactions: [],
+          editedAt: null, deleted: false, pinned: false,
         });
-        // Re-render if on chat screen
         if (Router.current() === 'couple-chat') Router.reload();
-      }, 2000 + Math.random() * 3000);
+      }, 1500 + Math.random() * 2500);
 
       return msg;
     }
@@ -10948,18 +11685,22 @@ Router.register('partner-profile', () => {
 // QUICK ACTIONS HUB — Central navigation for all features
 // ──────────────────────────────────────────────
 /* ═══════════════════════════════════════════════════════════════
-   COUPLE CHAT SCREEN — Full two-way messaging
+   COUPLE CHAT SCREEN — Enhanced Two-Way Messaging
    ═══════════════════════════════════════════════════════════════ */
 
 Router.register('couple-chat', () => {
   const myN = Auth.myName();
   const theirN = Auth.theirName();
-  const msgs = CoupleChat.recentMessages(100);
+  const rawMsgs = CoupleChat.recentMessages(150);
+  const msgs = CoupleChat.groupedMessages(rawMsgs);
   const score = Insights.communicationScore();
-  const scoreColor = score.score >= 60 ? 'var(--sage)' : 'var(--amber)';
+  const pinnedMsgs = CoupleChat.pinnedMessages();
+  const chatStats = CoupleChat.stats();
+  const draft = CoupleChat.getDraft();
+  const unreadIdx = CoupleChat.firstUnreadIndex();
   CoupleChat.markAllRead();
 
-  // Group messages by date
+  // ─── Date formatting ───────────────────────
   function formatDate(ts) {
     const d = new Date(ts);
     const today = new Date();
@@ -10969,84 +11710,199 @@ Router.register('couple-chat', () => {
     return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   }
 
+  // ─── Status icon for sent messages ─────────
+  function statusIcon(msg) {
+    if (msg.from !== 'me') return '';
+    const s = msg.status || 'read';
+    if (s === 'sent') return '<span class="cc-status sent">●</span>';
+    if (s === 'delivered') return '<span class="cc-status delivered">✓</span>';
+    return '<span class="cc-status read">✓✓</span>';
+  }
+
+  // ─── Bubble class for grouping ─────────────
+  function groupClass(msg) {
+    if (msg._groupPos === 'first') return 'grouped-top';
+    if (msg._groupPos === 'mid') return 'grouped-mid';
+    if (msg._groupPos === 'last') return 'grouped-bot';
+    return '';
+  }
+
+  // ─── Render link previews ──────────────────
+  function renderLinkPreview(text) {
+    const links = CoupleChat.detectLinks(text);
+    if (links.length === 0) return '';
+    try {
+      const url = new URL(links[0]);
+      return `<div class="cc-link-preview">
+        <div class="lp-domain">${U.esc(url.hostname)}</div>
+        <div class="lp-title">${U.esc(links[0].length > 50 ? links[0].slice(0, 50) + '...' : links[0])}</div>
+      </div>`;
+    } catch { return ''; }
+  }
+
+  // ─── Render reply-to preview ───────────────
+  function renderReplyTo(msg) {
+    if (!msg.replyTo) return '';
+    const orig = CoupleChat.getById(msg.replyTo);
+    if (!orig) return '';
+    const name = orig.from === 'me' ? 'You' : U.esc(theirN);
+    const preview = (orig.filtered || orig.raw || '').slice(0, 60);
+    return `<div class="cc-reply-preview" data-scroll-to="${orig.id}">
+      <div style="font-size:.6rem;font-weight:700;margin-bottom:1px;">${name}</div>
+      ${U.esc(preview)}${preview.length >= 60 ? '...' : ''}
+    </div>`;
+  }
+
+  // ─── Render reactions ──────────────────────
+  function renderReactions(msg) {
+    if (!msg.reactions || msg.reactions.length === 0) return '';
+    const grouped = {};
+    msg.reactions.forEach(r => {
+      if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, mine: false };
+      grouped[r.emoji].count++;
+      if (r.from === 'me') grouped[r.emoji].mine = true;
+    });
+    return `<div class="cc-reactions">${Object.entries(grouped).map(([emoji, data]) =>
+      `<span class="cc-reaction-badge${data.mine ? ' mine' : ''}" data-msg-id="${msg.id}" data-emoji="${emoji}">${emoji}${data.count > 1 ? ' ' + data.count : ''}</span>`
+    ).join('')}</div>`;
+  }
+
+  // ─── Render each message ───────────────────
   let lastDateLabel = '';
-  const rendered = msgs.map(m => {
+  let insertedNewDivider = false;
+  const rendered = msgs.map((m, idx) => {
     let dateDiv = '';
     const dateLabel = formatDate(m.timestamp);
+
+    // Date divider
     if (m.type !== 'system' && dateLabel !== lastDateLabel) {
       lastDateLabel = dateLabel;
       dateDiv = `<div class="cc-date-divider">${dateLabel}</div>`;
     }
 
-    if (m.type === 'system') {
-      lastDateLabel = m.raw || '';
-      return `<div class="cc-date-divider">${U.esc(m.filtered || m.raw)}</div>`;
+    // New messages divider
+    let newMsgDiv = '';
+    if (!insertedNewDivider && unreadIdx >= 0 && idx === unreadIdx) {
+      insertedNewDivider = true;
+      newMsgDiv = `<div class="cc-new-msgs-divider" id="cc-new-msgs">New messages</div>`;
     }
 
+    // System messages
+    if (m.type === 'system') {
+      lastDateLabel = m.raw || '';
+      return `${newMsgDiv}<div class="cc-date-divider">${U.esc(m.filtered || m.raw)}</div>`;
+    }
+
+    // AI insight messages
     if (m.type === 'ai-insight') {
-      return `${dateDiv}
-        <div class="cc-ai-insight" ${m.metadata?.actionRoute ? `onclick="Router.go('${m.metadata.actionRoute}')"` : ''}>
+      return `${dateDiv}${newMsgDiv}
+        <div class="cc-ai-insight" ${m.metadata?.actionRoute ? `onclick="Router.go('${U.esc(m.metadata.actionRoute)}')"` : ''}>
           <div class="cc-ai-icon">🤖</div>
           <div class="cc-ai-text">${U.esc(m.filtered || m.raw)}</div>
+        </div>`;
+    }
+
+    // Deleted message placeholder
+    if (m.deleted) {
+      return `${dateDiv}${newMsgDiv}
+        <div class="cc-bubble-wrap ${m.from === 'me' ? 'me' : 'them'}" data-msg-id="${m.id}">
+          <div><div class="cc-bubble deleted">This message was deleted</div></div>
         </div>`;
     }
 
     const isMe = m.from === 'me';
     const time = new Date(m.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     const wasFiltered = m.filtered && m.filtered !== m.raw && m.from === 'me';
-    const reactions = (m.reactions || []).map(r => `<span style="font-size:.72rem;">${r.emoji}</span>`).join('');
+    const showMeta = m._groupPos === 'single' || m._groupPos === 'last';
+    const gClass = groupClass(m);
+    const bubbleContent = U.esc(m.filtered || m.raw);
+    const linkPreview = renderLinkPreview(m.filtered || m.raw);
+    const replyTo = renderReplyTo(m);
+    const reactions = renderReactions(m);
+    const pinIcon = m.pinned ? '<span style="font-size:.55rem;margin-left:2px;">📌</span>' : '';
 
-    return `${dateDiv}
-      <div class="cc-bubble-wrap ${isMe ? 'me' : 'them'}" data-msg-id="${m.id}">
+    return `${dateDiv}${newMsgDiv}
+      <div class="cc-bubble-wrap ${isMe ? 'me' : 'them'}${m._grouped ? ' grouped' : ''}" data-msg-id="${m.id}">
+        <div class="cc-swipe-hint">↩</div>
         <div>
-          <div class="cc-bubble ${isMe ? 'me' : 'them'}">${U.esc(m.filtered || m.raw)}${reactions ? `<div style="margin-top:4px;">${reactions}</div>` : ''}</div>
-          <div class="cc-meta">${time}${wasFiltered ? ' · <span class="cc-filtered-tag">✓ Filtered</span>' : ''}</div>
+          ${replyTo}
+          <div class="cc-bubble ${isMe ? 'me' : 'them'} ${gClass}">${bubbleContent}${linkPreview}</div>
+          ${reactions}
+          ${showMeta ? `<div class="cc-meta">${time}${wasFiltered ? ' · <span class="cc-filtered-tag">✓ Filtered</span>' : ''}${m.editedAt ? ' · <span class="cc-edited-tag">edited</span>' : ''}${pinIcon}${isMe ? ' ' + statusIcon(m) : ''}</div>` : ''}
         </div>
       </div>`;
   }).join('');
 
   const actions = CoupleChat.quickActions();
+  const hasRealMessages = msgs.filter(m => m.from !== 'system' && m.from !== 'ai' && !m.deleted).length > 0;
 
   return `
   <div class="cc-wrapper">
     <!-- Header -->
     <div class="cc-header">
-      <div style="width:36px;height:36px;border-radius:50%;background:#1a2d24;color:var(--sage);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.72rem;flex-shrink:0;">${U.initials(theirN)}</div>
-      <div style="flex:1;min-width:0;">
-        <div class="partner-name">${U.esc(theirN)}</div>
-        <div class="partner-status">${Auth.hasPartner() ? '🟢 Connected' : '⏳ Awaiting partner'}${score.score > 0 ? ` · Health: ${score.score}` : ''}</div>
+      <div class="partner-avatar" onclick="CoupleChat._showInfo()">
+        ${U.initials(theirN)}
+        ${Auth.hasPartner() ? '<div class="online-dot"></div>' : ''}
       </div>
-      <div style="display:flex;gap:4px;">
-        <button class="cal-nav-btn" style="background:rgba(250,246,241,.08);" onclick="Router.go('mediator')" title="AI Mediator">🤖</button>
-        <button class="cal-nav-btn" style="background:rgba(250,246,241,.08);" onclick="Router.go('calendar')" title="Calendar">📅</button>
-        <button class="cal-nav-btn" style="background:rgba(250,246,241,.08);" id="cc-search-btn" title="Search" onclick="CoupleChat._toggleSearch()">🔍</button>
+      <div style="flex:1;min-width:0;" onclick="CoupleChat._showInfo()">
+        <div class="partner-name">${U.esc(theirN)}</div>
+        <div class="partner-status">
+          ${Auth.hasPartner() ? 'Connected' : '⏳ Awaiting partner'}${score.score > 0 ? ` · Health: <span style="color:${score.score >= 60 ? 'var(--sage)' : 'var(--amber)'};font-weight:700;">${score.score}</span>` : ''}
+        </div>
+      </div>
+      <div class="cc-header-actions">
+        <button class="cc-header-btn" onclick="Router.go('mediator')" title="AI Mediator">🤖</button>
+        <button class="cc-header-btn" id="cc-search-btn" title="Search messages">🔍</button>
+        <button class="cc-header-btn" id="cc-info-btn" title="Chat info">ℹ️</button>
       </div>
     </div>
+
+    <!-- Pinned message banner -->
+    ${pinnedMsgs.length > 0 ? `
+    <div class="cc-pinned-banner" id="cc-pinned" data-msg-id="${pinnedMsgs[pinnedMsgs.length - 1].id}">
+      <span class="pin-icon">📌</span>
+      <span class="pin-text">${U.esc((pinnedMsgs[pinnedMsgs.length - 1].filtered || pinnedMsgs[pinnedMsgs.length - 1].raw).slice(0, 80))}</span>
+      <span style="font-size:.58rem;color:var(--muted);">${pinnedMsgs.length > 1 ? pinnedMsgs.length + ' pinned' : ''}</span>
+    </div>` : ''}
 
     <!-- Search bar (hidden by default) -->
-    <div id="cc-search-bar" style="display:none;padding:8px 16px;background:var(--parchment);border-bottom:1px solid var(--border);">
-      <input type="text" id="cc-search-input" class="input" placeholder="Search messages..." style="font-size:.82rem;border-radius:20px;padding:8px 16px;">
+    <div id="cc-search-bar" class="cc-search-bar" style="display:none;">
+      <div class="search-row">
+        <input type="text" id="cc-search-input" placeholder="Search messages..." autocomplete="off">
+        <div class="search-nav" id="cc-search-nav" style="display:none;">
+          <span id="cc-search-count">0/0</span>
+          <button id="cc-search-prev" title="Previous">▲</button>
+          <button id="cc-search-next" title="Next">▼</button>
+        </div>
+        <button class="search-close" id="cc-search-close">✕</button>
+      </div>
     </div>
 
-    <!-- Messages -->
-    <div class="cc-msgs" id="cc-messages">
-      ${msgs.length > 0 ? rendered : `
-        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;">
-          <div style="font-size:2.4rem;margin-bottom:12px;">💬</div>
-          <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:4px;">Start chatting</div>
-          <div style="font-size:.78rem;color:var(--muted);line-height:1.6;max-width:260px;">
-            This is your private conversation with ${U.esc(theirN)}. Messages are AI-enhanced for better communication.
+    <!-- Messages area (with scroll container for FAB) -->
+    <div style="flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="cc-msgs" id="cc-messages">
+        ${hasRealMessages ? rendered : `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;">
+            <div style="font-size:2.4rem;margin-bottom:12px;">💬</div>
+            <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:4px;">Start chatting</div>
+            <div style="font-size:.78rem;color:var(--muted);line-height:1.6;max-width:260px;">
+              This is your private conversation with ${U.esc(theirN)}. Messages are AI-enhanced for better communication.
+            </div>
           </div>
-        </div>
-      `}
+        `}
+      </div>
+      <!-- Scroll to bottom FAB (hidden by default) -->
+      <div class="cc-scroll-fab" id="cc-scroll-fab" style="display:none;">
+        ↓
+      </div>
     </div>
 
     <!-- Smart Replies -->
-    <div id="cc-smart-replies" style="display:none;padding:6px 16px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;"></div>
+    <div id="cc-smart-replies" style="display:none;padding:6px 16px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;border-top:1px solid var(--border);background:var(--cream);"></div>
 
-    <!-- Conversation Starters (shown when no messages) -->
-    ${msgs.filter(m => m.from !== 'system' && m.from !== 'ai').length === 0 ? `
-    <div style="padding:8px 16px;">
+    <!-- Conversation Starters (shown when no real messages) -->
+    ${!hasRealMessages ? `
+    <div id="cc-starters" style="padding:8px 16px;">
       <div style="font-size:.72rem;font-weight:600;color:var(--muted);margin-bottom:6px;">Start the conversation</div>
       ${SmartReplies.conversationStarters().map(s => `<div class="starter-chip" data-starter="${U.esc(s)}">${U.esc(s)}</div>`).join('')}
     </div>` : ''}
@@ -11057,10 +11913,14 @@ Router.register('couple-chat', () => {
     <!-- Input Area -->
     <div class="cc-input-area">
       <div class="tone-coach tone-coach-hidden" id="cc-coach" style="margin-bottom:4px;"></div>
+      <!-- Reply / Edit banner (injected dynamically) -->
+      <div id="cc-reply-banner-slot"></div>
+      <!-- Emoji tray (hidden by default) -->
+      <div id="cc-emoji-slot"></div>
       <div class="cc-input-row">
-        <button class="cc-send-btn" style="background:var(--parchment);color:var(--muted);font-size:.82rem;" id="cc-plus-btn" onclick="CoupleChat._toggleActions()">+</button>
-        <textarea class="cc-textarea" id="cc-input" rows="1" placeholder="Message ${U.esc(theirN)}..." oninput="var s=document.querySelector('#cc-send');if(s)s.disabled=!this.value.trim();this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';"></textarea>
-        <button class="cc-send-btn" id="cc-send" disabled>↑</button>
+        <button class="cc-send-btn" style="background:var(--parchment);color:var(--muted);font-size:.82rem;" id="cc-plus-btn">+</button>
+        <textarea class="cc-textarea" id="cc-input" rows="1" placeholder="Message ${U.esc(theirN)}...">${U.esc(draft)}</textarea>
+        <button class="cc-send-btn" id="cc-send" ${draft ? '' : 'disabled'}>↑</button>
       </div>
       <div class="cc-actions" id="cc-quick-actions" style="display:none;">
         ${actions.map(a => `<div class="cc-action-chip" data-cmd="${a.command}"><span>${a.icon}</span> ${a.label}</div>`).join('')}
@@ -11068,22 +11928,57 @@ Router.register('couple-chat', () => {
     </div>
   </div>`;
 }, (el) => {
+  // ─── DOM references ─────────────────────────
   const input = el.querySelector('#cc-input');
   const sendBtn = el.querySelector('#cc-send');
   const msgContainer = el.querySelector('#cc-messages');
   const coach = el.querySelector('#cc-coach');
   const hintArea = el.querySelector('#cc-ai-hint');
   const plusBtn = el.querySelector('#cc-plus-btn');
-  const quickActions = el.querySelector('#cc-quick-actions');
+  const quickActionsEl = el.querySelector('#cc-quick-actions');
+  const scrollFab = el.querySelector('#cc-scroll-fab');
+  const replySlot = el.querySelector('#cc-reply-banner-slot');
+  const emojiSlot = el.querySelector('#cc-emoji-slot');
 
-  // Auto-scroll to bottom
+  // ─── State ──────────────────────────────────
+  let _actionsOpen = false;
+  let _emojiOpen = false;
+  let _replyingTo = null; // message id
+  let _editingMsg = null; // message id
+  let _aiHintTimer = null;
+  let _searchTimer = null;
+  let _searchResults = [];
+  let _searchIdx = -1;
+  let _contextMenuMsgId = null;
+  let _draftTimer = null;
+
+  // ─── Auto-scroll to bottom or to new messages ─
   if (msgContainer) {
-    requestAnimationFrame(() => { msgContainer.scrollTop = msgContainer.scrollHeight; });
+    requestAnimationFrame(() => {
+      const newMsgsDivider = el.querySelector('#cc-new-msgs');
+      if (newMsgsDivider) {
+        newMsgsDivider.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+      }
+    });
   }
 
-  // Smart replies
+  // ─── Scroll FAB logic ──────────────────────
+  if (msgContainer && scrollFab) {
+    msgContainer.addEventListener('scroll', () => {
+      const distFromBottom = msgContainer.scrollHeight - msgContainer.scrollTop - msgContainer.clientHeight;
+      scrollFab.style.display = distFromBottom > 200 ? 'flex' : 'none';
+    });
+    scrollFab.addEventListener('click', () => {
+      msgContainer.scrollTo({ top: msgContainer.scrollHeight, behavior: 'smooth' });
+      scrollFab.style.display = 'none';
+    });
+  }
+
+  // ─── Smart replies ─────────────────────────
   const smartRepliesEl = el.querySelector('#cc-smart-replies');
-  const lastTheirMsg = CoupleChat.messages().filter(m => m.from === 'them').slice(-1)[0];
+  const lastTheirMsg = CoupleChat.messages().filter(m => m.from === 'them' && !m.deleted).slice(-1)[0];
   if (lastTheirMsg && smartRepliesEl) {
     const replies = SmartReplies.forMessage(lastTheirMsg);
     if (replies.length > 0) {
@@ -11102,7 +11997,7 @@ Router.register('couple-chat', () => {
     }
   }
 
-  // Conversation starters
+  // ─── Conversation starters ─────────────────
   el.querySelectorAll('.starter-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       input.value = chip.dataset.starter;
@@ -11111,26 +12006,36 @@ Router.register('couple-chat', () => {
     });
   });
 
-  // ToneCoach on input
+  // ─── ToneCoach on input ────────────────────
   if (input && coach) ToneCoach.attachToTextarea(input, coach);
 
-  // Input handling
-  let _aiHintTimer = null;
+  // ─── Input handling ────────────────────────
   input?.addEventListener('input', () => {
     sendBtn.disabled = !input.value.trim();
     // Auto-resize
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+
+    // Update send button appearance for edit mode
+    if (_editingMsg) {
+      sendBtn.classList.toggle('editing', !!input.value.trim());
+    }
+
+    // Draft saving (debounced)
+    clearTimeout(_draftTimer);
+    _draftTimer = setTimeout(() => {
+      if (!_editingMsg) CoupleChat.saveDraft(input.value);
+    }, 500);
 
     // AI hint (debounced)
     clearTimeout(_aiHintTimer);
-    if (input.value.length > 15) {
+    if (input.value.length > 15 && !_editingMsg) {
       _aiHintTimer = setTimeout(() => {
         const hint = CoupleChat.getAIHint(input.value);
         if (hint && hint.type !== 'tone' && hintArea) {
           hintArea.style.display = 'block';
           hintArea.innerHTML = `
-            <div class="cc-ai-insight" style="margin:0 12px 4px;" ${hint.action ? `onclick="Router.go('${hint.action}')"` : ''}>
+            <div class="cc-ai-insight" style="margin:0 12px 4px;" ${hint.action ? `onclick="Router.go('${U.esc(hint.action)}')"` : ''}>
               <div class="cc-ai-icon">🤖</div>
               <div class="cc-ai-text">${hint.msg}</div>
             </div>`;
@@ -11143,20 +12048,33 @@ Router.register('couple-chat', () => {
     }
   });
 
-  // Plus button toggles quick actions
-  let _actionsOpen = false;
+  // ─── Restore draft ─────────────────────────
+  if (input && input.value) {
+    sendBtn.disabled = false;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  }
+
+  // ─── Plus button / quick actions ───────────
   plusBtn?.addEventListener('click', () => {
     _actionsOpen = !_actionsOpen;
-    quickActions.style.display = _actionsOpen ? 'flex' : 'none';
+    // Close emoji tray if open
+    if (_emojiOpen) { _emojiOpen = false; emojiSlot.innerHTML = ''; }
+    quickActionsEl.style.display = _actionsOpen ? 'flex' : 'none';
     plusBtn.textContent = _actionsOpen ? '×' : '+';
     plusBtn.style.background = _actionsOpen ? 'var(--terra)' : 'var(--parchment)';
     plusBtn.style.color = _actionsOpen ? '#fff' : 'var(--muted)';
   });
 
-  // Quick action commands
+  // ─── Quick action commands ─────────────────
   el.querySelectorAll('.cc-action-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const cmd = chip.dataset.cmd;
+      _actionsOpen = false;
+      quickActionsEl.style.display = 'none';
+      plusBtn.textContent = '+';
+      plusBtn.style.background = 'var(--parchment)';
+      plusBtn.style.color = 'var(--muted)';
       switch (cmd) {
         case '/plan': Router.go('compose-pick'); break;
         case '/task': Router.go('task-create'); break;
@@ -11164,6 +12082,23 @@ Router.register('couple-chat', () => {
         case '/plans': Router.go('plan'); break;
         case '/mytasks': Router.go('tasks'); break;
         case '/ai': Router.go('mediator'); break;
+        case '/emoji': toggleEmojiTray(); break;
+        case '/stats': showChatStats(); break;
+        case '/greet-morning':
+          input.value = 'Good morning! Hope you slept well ☀️';
+          input.dispatchEvent(new Event('input'));
+          input.focus();
+          break;
+        case '/greet-afternoon':
+          input.value = 'Hey, just thinking of you 💛';
+          input.dispatchEvent(new Event('input'));
+          input.focus();
+          break;
+        case '/greet-evening':
+          input.value = 'Hey! How was your day?';
+          input.dispatchEvent(new Event('input'));
+          input.focus();
+          break;
         case '/space':
           CoupleChat.send("I need a little space right now. I'll come back when I'm ready to talk. 🙏", {
             filtered: "I need a little space right now. I'll come back when I'm ready to talk. 🙏"
@@ -11177,42 +12112,474 @@ Router.register('couple-chat', () => {
     });
   });
 
-  // Search toggle
-  el.querySelector('#cc-search-btn')?.addEventListener('click', () => {
-    const bar = el.querySelector('#cc-search-bar');
-    bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
-    if (bar.style.display === 'block') el.querySelector('#cc-search-input')?.focus();
+  // ─── Emoji tray ────────────────────────────
+  const COMMON_EMOJIS = ['❤️','😊','😂','👍','🙏','😘','🥰','💛','😍','🎉','✨','🔥','💪','😢','🤔','👏','💯','😎','🤗','😴'];
+  function toggleEmojiTray() {
+    _emojiOpen = !_emojiOpen;
+    if (_emojiOpen) {
+      emojiSlot.innerHTML = `<div class="cc-emoji-tray">${COMMON_EMOJIS.map(e =>
+        `<button data-emoji="${e}">${e}</button>`
+      ).join('')}</div>`;
+      emojiSlot.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pos = input.selectionStart || input.value.length;
+          input.value = input.value.slice(0, pos) + btn.dataset.emoji + input.value.slice(pos);
+          input.dispatchEvent(new Event('input'));
+          input.focus();
+        });
+      });
+    } else {
+      emojiSlot.innerHTML = '';
+    }
+  }
+
+  // ─── Chat stats modal ─────────────────────
+  function showChatStats() {
+    const stats = ChatAnalytics.summary(30);
+    const digest = ChatAnalytics.weeklyDigest();
+    const overlay = document.createElement('div');
+    overlay.className = 'cc-context-overlay';
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:201;background:var(--surface);border-radius:18px;padding:24px;min-width:280px;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2);animation:ccFadeScale .2s ease both;';
+    modal.innerHTML = `
+      <div style="font-size:1rem;font-weight:700;margin-bottom:12px;">📊 Chat Statistics</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="background:var(--parchment);padding:10px;border-radius:10px;text-align:center;">
+          <div style="font-size:1.3rem;font-weight:700;color:var(--terra);">${stats.totalMessages}</div>
+          <div style="font-size:.6rem;color:var(--muted);">Messages (30d)</div>
+        </div>
+        <div style="background:var(--parchment);padding:10px;border-radius:10px;text-align:center;">
+          <div style="font-size:1.3rem;font-weight:700;color:var(--sage);">${stats.daysActive}</div>
+          <div style="font-size:.6rem;color:var(--muted);">Days Active</div>
+        </div>
+        <div style="background:var(--parchment);padding:10px;border-radius:10px;text-align:center;">
+          <div style="font-size:1.3rem;font-weight:700;color:var(--amber);">${stats.avgResponseTime > 0 ? stats.avgResponseTime + 'min' : '—'}</div>
+          <div style="font-size:.6rem;color:var(--muted);">Avg Reply Time</div>
+        </div>
+        <div style="background:var(--parchment);padding:10px;border-radius:10px;text-align:center;">
+          <div style="font-size:1.3rem;font-weight:700;color:var(--purple);">${stats.myMessages}/${stats.theirMessages}</div>
+          <div style="font-size:.6rem;color:var(--muted);">You / Them</div>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);line-height:1.6;">
+        ${digest.map(d => '<div>• ' + d + '</div>').join('')}
+      </div>
+      <button class="btn btn-outline btn-sm" style="width:100%;margin-top:12px;" id="cc-stats-close">Close</button>
+    `;
+    document.body.appendChild(overlay);
+    document.body.appendChild(modal);
+    overlay.addEventListener('click', () => { overlay.remove(); modal.remove(); });
+    modal.querySelector('#cc-stats-close').addEventListener('click', () => { overlay.remove(); modal.remove(); });
+  }
+
+  // ─── Reply-to functionality ────────────────
+  function startReply(msgId) {
+    const msg = CoupleChat.getById(msgId);
+    if (!msg || msg.deleted) return;
+    _replyingTo = msgId;
+    _editingMsg = null;
+    const name = msg.from === 'me' ? 'yourself' : Auth.theirName();
+    const preview = (msg.filtered || msg.raw || '').slice(0, 60);
+    replySlot.innerHTML = `
+      <div class="cc-reply-banner">
+        <div style="flex:1;min-width:0;">
+          <div class="reply-name">Replying to ${U.esc(name)}</div>
+          <div class="reply-text">${U.esc(preview)}</div>
+        </div>
+        <button class="reply-close" id="cc-reply-close">✕</button>
+      </div>`;
+    replySlot.querySelector('#cc-reply-close').addEventListener('click', cancelReply);
+    input.focus();
+  }
+
+  function cancelReply() {
+    _replyingTo = null;
+    replySlot.innerHTML = '';
+  }
+
+  // ─── Edit functionality ────────────────────
+  function startEdit(msgId) {
+    const msg = CoupleChat.getById(msgId);
+    if (!msg || msg.from !== 'me' || msg.deleted) return;
+    _editingMsg = msgId;
+    _replyingTo = null;
+    input.value = msg.raw;
+    input.dispatchEvent(new Event('input'));
+    sendBtn.classList.add('editing');
+    sendBtn.textContent = '✓';
+    replySlot.innerHTML = `
+      <div class="cc-edit-banner">
+        <div class="edit-label">✏️ Editing message</div>
+        <button class="edit-close" id="cc-edit-close">✕</button>
+      </div>`;
+    replySlot.querySelector('#cc-edit-close').addEventListener('click', cancelEdit);
+    input.focus();
+  }
+
+  function cancelEdit() {
+    _editingMsg = null;
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    sendBtn.classList.remove('editing');
+    sendBtn.textContent = '↑';
+    replySlot.innerHTML = '';
+  }
+
+  // ─── Context menu (long-press / right-click) ─
+  const REACTION_EMOJIS = ['❤️', '👍', '😂', '😢', '🙏', '🔥'];
+
+  function showContextMenu(msgId, x, y) {
+    dismissContextMenu();
+    _contextMenuMsgId = msgId;
+    const msg = CoupleChat.getById(msgId);
+    if (!msg || msg.deleted) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'cc-context-overlay';
+    overlay.id = 'cc-ctx-overlay';
+
+    const menu = document.createElement('div');
+    menu.className = 'cc-context-menu';
+    menu.id = 'cc-ctx-menu';
+
+    // Reaction bar at top
+    const reactionBar = document.createElement('div');
+    reactionBar.style.cssText = 'display:flex;justify-content:center;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);';
+    REACTION_EMOJIS.forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.style.cssText = 'width:36px;height:36px;border-radius:50%;background:none;border:none;font-size:1.2rem;cursor:pointer;transition:transform .1s ease;display:flex;align-items:center;justify-content:center;';
+      btn.textContent = emoji;
+      btn.addEventListener('click', () => {
+        CoupleChat.react(msgId, emoji);
+        dismissContextMenu();
+        Router.reload();
+      });
+      reactionBar.appendChild(btn);
+    });
+    menu.appendChild(reactionBar);
+
+    // Menu items
+    const items = [
+      { icon: '↩', label: 'Reply', action: () => { startReply(msgId); } },
+      { icon: '📋', label: 'Copy text', action: () => {
+        navigator.clipboard?.writeText(msg.filtered || msg.raw).then(() => U.toast('Copied!'));
+      }},
+      { icon: '📌', label: msg.pinned ? 'Unpin' : 'Pin', action: () => {
+        CoupleChat.togglePin(msgId);
+        Router.reload();
+      }},
+    ];
+
+    // Only allow edit/delete on own messages
+    if (msg.from === 'me') {
+      items.push({ icon: '✏️', label: 'Edit', action: () => { startEdit(msgId); } });
+      items.push({ icon: '🗑', label: 'Delete', danger: true, action: () => {
+        CoupleChat.deleteMessage(msgId);
+        Router.reload();
+      }});
+    }
+
+    items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'cc-ctx-item' + (item.danger ? ' danger' : '');
+      div.innerHTML = `<span class="ctx-icon">${item.icon}</span> ${item.label}`;
+      div.addEventListener('click', () => {
+        dismissContextMenu();
+        item.action();
+      });
+      menu.appendChild(div);
+    });
+
+    // Position menu
+    const viewW = window.innerWidth;
+    const viewH = window.innerHeight;
+    let left = Math.min(x, viewW - 200);
+    let top = Math.min(y, viewH - 300);
+    if (left < 10) left = 10;
+    if (top < 10) top = 10;
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+
+    overlay.addEventListener('click', dismissContextMenu);
+    document.body.appendChild(overlay);
+    document.body.appendChild(menu);
+  }
+
+  function dismissContextMenu() {
+    document.querySelector('#cc-ctx-overlay')?.remove();
+    document.querySelector('#cc-ctx-menu')?.remove();
+    _contextMenuMsgId = null;
+  }
+
+  // ─── Bubble interactions ───────────────────
+  el.querySelectorAll('.cc-bubble-wrap').forEach(wrap => {
+    const msgId = wrap.dataset.msgId;
+    if (!msgId) return;
+
+    // Double-tap for quick heart react
+    let _tapCount = 0;
+    let _tapTimer = null;
+    wrap.addEventListener('click', (e) => {
+      if (e.target.closest('.cc-reaction-badge') || e.target.closest('.cc-reply-preview')) return;
+      _tapCount++;
+      if (_tapCount === 2) {
+        clearTimeout(_tapTimer);
+        _tapCount = 0;
+        CoupleChat.react(msgId, '❤️');
+        Router.reload();
+      } else {
+        _tapTimer = setTimeout(() => { _tapCount = 0; }, 350);
+      }
+    });
+
+    // Long-press for context menu
+    let _longPressTimer = null;
+    let _longPressed = false;
+    wrap.addEventListener('touchstart', (e) => {
+      _longPressed = false;
+      const touch = e.touches[0];
+      _longPressTimer = setTimeout(() => {
+        _longPressed = true;
+        if (navigator.vibrate) navigator.vibrate(30);
+        showContextMenu(msgId, touch.clientX, touch.clientY);
+      }, 500);
+    }, { passive: true });
+    wrap.addEventListener('touchend', () => {
+      clearTimeout(_longPressTimer);
+    });
+    wrap.addEventListener('touchmove', () => {
+      clearTimeout(_longPressTimer);
+    });
+
+    // Right-click for context menu (desktop)
+    wrap.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showContextMenu(msgId, e.clientX, e.clientY);
+    });
   });
 
-  // Search functionality
-  let _searchTimer = null;
-  el.querySelector('#cc-search-input')?.addEventListener('input', (e) => {
+  // ─── Tap on reaction badges to toggle ──────
+  el.querySelectorAll('.cc-reaction-badge').forEach(badge => {
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const msgId = badge.dataset.msgId;
+      const emoji = badge.dataset.emoji;
+      if (msgId && emoji) {
+        CoupleChat.react(msgId, emoji);
+        Router.reload();
+      }
+    });
+  });
+
+  // ─── Tap on reply previews to scroll to original ─
+  el.querySelectorAll('.cc-reply-preview').forEach(rp => {
+    rp.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const targetId = rp.dataset.scrollTo;
+      if (!targetId) return;
+      const target = el.querySelector(`.cc-bubble-wrap[data-msg-id="${targetId}"]`);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('selected');
+        setTimeout(() => target.classList.remove('selected'), 1500);
+      }
+    });
+  });
+
+  // ─── Pinned banner tap to scroll ───────────
+  el.querySelector('#cc-pinned')?.addEventListener('click', () => {
+    const msgId = el.querySelector('#cc-pinned').dataset.msgId;
+    if (!msgId) return;
+    const target = el.querySelector(`.cc-bubble-wrap[data-msg-id="${msgId}"]`);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.add('selected');
+      setTimeout(() => target.classList.remove('selected'), 1500);
+    }
+  });
+
+  // ─── Search functionality ──────────────────
+  const searchBar = el.querySelector('#cc-search-bar');
+  const searchInput = el.querySelector('#cc-search-input');
+  const searchNav = el.querySelector('#cc-search-nav');
+  const searchCount = el.querySelector('#cc-search-count');
+
+  el.querySelector('#cc-search-btn')?.addEventListener('click', () => {
+    const isHidden = searchBar.style.display === 'none';
+    searchBar.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) { searchInput.value = ''; searchInput.focus(); }
+    else { clearSearch(); }
+  });
+
+  el.querySelector('#cc-search-close')?.addEventListener('click', () => {
+    searchBar.style.display = 'none';
+    clearSearch();
+  });
+
+  function clearSearch() {
+    _searchResults = [];
+    _searchIdx = -1;
+    searchNav.style.display = 'none';
+    el.querySelectorAll('.cc-bubble-wrap, .cc-date-divider, .cc-ai-insight').forEach(n => {
+      n.style.opacity = '1';
+    });
+    // Remove highlights
+    el.querySelectorAll('.cc-search-highlight, .cc-search-current').forEach(h => {
+      h.outerHTML = h.textContent;
+    });
+  }
+
+  function navigateSearch(direction) {
+    if (_searchResults.length === 0) return;
+    _searchIdx = (_searchIdx + direction + _searchResults.length) % _searchResults.length;
+    searchCount.textContent = `${_searchIdx + 1}/${_searchResults.length}`;
+    const targetId = _searchResults[_searchIdx].id;
+    const target = el.querySelector(`.cc-bubble-wrap[data-msg-id="${targetId}"]`);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.add('selected');
+      setTimeout(() => target.classList.remove('selected'), 1000);
+    }
+  }
+
+  searchInput?.addEventListener('input', (e) => {
     clearTimeout(_searchTimer);
     _searchTimer = setTimeout(() => {
       const query = e.target.value.trim();
-      if (query.length < 2) {
-        // Show all messages
-        el.querySelectorAll('.cc-bubble-wrap, .cc-date-divider, .cc-ai-insight').forEach(el => {
-          el.style.opacity = '1';
-        });
-        return;
-      }
-      const results = CoupleChat.searchMessages(query);
-      const matchIds = new Set(results.map(r => r.id));
+      if (query.length < 2) { clearSearch(); return; }
+      _searchResults = CoupleChat.searchMessages(query);
+      const matchIds = new Set(_searchResults.map(r => r.id));
       el.querySelectorAll('.cc-bubble-wrap').forEach(wrap => {
-        const msgId = wrap.dataset.msgId;
-        wrap.style.opacity = matchIds.has(msgId) ? '1' : '0.2';
+        wrap.style.opacity = matchIds.has(wrap.dataset.msgId) ? '1' : '0.15';
       });
-    }, 300);
+      if (_searchResults.length > 0) {
+        searchNav.style.display = 'flex';
+        _searchIdx = _searchResults.length - 1; // Start from most recent
+        searchCount.textContent = `${_searchIdx + 1}/${_searchResults.length}`;
+        navigateSearch(0);
+      } else {
+        searchNav.style.display = 'none';
+      }
+    }, 250);
   });
 
-  // Dismiss any open toxicity review prompt
+  el.querySelector('#cc-search-prev')?.addEventListener('click', () => navigateSearch(-1));
+  el.querySelector('#cc-search-next')?.addEventListener('click', () => navigateSearch(1));
+
+  // ─── Info panel ────────────────────────────
+  CoupleChat._showInfo = function() {
+    const stats = CoupleChat.stats();
+    const pinned = CoupleChat.pinnedMessages();
+    const theirN = Auth.theirName();
+    const drawer = document.createElement('div');
+    drawer.className = 'cc-info-drawer';
+    drawer.id = 'cc-info-drawer';
+    drawer.innerHTML = `
+      <div class="info-header">
+        <button style="background:none;border:none;color:var(--cream);font-size:1.1rem;cursor:pointer;" id="cc-info-back">‹</button>
+        <div style="flex:1;font-size:.92rem;font-weight:600;">Chat with ${U.esc(theirN)}</div>
+      </div>
+      <div class="info-body">
+        <div style="text-align:center;padding:20px 0;">
+          <div style="width:64px;height:64px;border-radius:50%;background:#1a2d24;color:var(--sage);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.2rem;margin:0 auto 8px;">${U.initials(theirN)}</div>
+          <div style="font-size:1.1rem;font-weight:700;">${U.esc(theirN)}</div>
+          <div style="font-size:.68rem;color:var(--muted);">${Auth.hasPartner() ? 'Connected partner' : 'Awaiting connection'}</div>
+        </div>
+
+        <div class="cc-info-section">
+          <div class="section-title">Chat Summary</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div style="text-align:center;padding:10px;background:var(--parchment);border-radius:10px;">
+              <div style="font-size:1.1rem;font-weight:700;color:var(--terra);">${stats.total}</div>
+              <div style="font-size:.58rem;color:var(--muted);">Messages</div>
+            </div>
+            <div style="text-align:center;padding:10px;background:var(--parchment);border-radius:10px;">
+              <div style="font-size:1.1rem;font-weight:700;color:var(--sage);">${stats.filtered}</div>
+              <div style="font-size:.58rem;color:var(--muted);">Filtered</div>
+            </div>
+            <div style="text-align:center;padding:10px;background:var(--parchment);border-radius:10px;">
+              <div style="font-size:1.1rem;font-weight:700;color:var(--amber);">${stats.pinned}</div>
+              <div style="font-size:.58rem;color:var(--muted);">Pinned</div>
+            </div>
+          </div>
+        </div>
+
+        ${pinned.length > 0 ? `
+        <div class="cc-info-section">
+          <div class="section-title">Pinned Messages (${pinned.length})</div>
+          ${pinned.map(m => `
+            <div class="cc-info-item" data-pin-msg="${m.id}">
+              <span class="ii-icon">📌</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc((m.filtered || m.raw).slice(0, 60))}</div>
+                <div style="font-size:.58rem;color:var(--muted);">${new Date(m.timestamp).toLocaleDateString()}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>` : ''}
+
+        <div class="cc-info-section">
+          <div class="section-title">Actions</div>
+          <div class="cc-info-item" id="cc-export-chat">
+            <span class="ii-icon">📤</span> Export chat history
+          </div>
+          <div class="cc-info-item" id="cc-clear-chat" style="color:#E05555;">
+            <span class="ii-icon">🗑</span> Clear all messages
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(drawer);
+
+    drawer.querySelector('#cc-info-back').addEventListener('click', () => drawer.remove());
+
+    // Pinned message taps
+    drawer.querySelectorAll('[data-pin-msg]').forEach(item => {
+      item.addEventListener('click', () => {
+        drawer.remove();
+        const target = el.querySelector(`.cc-bubble-wrap[data-msg-id="${item.dataset.pinMsg}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.classList.add('selected');
+          setTimeout(() => target.classList.remove('selected'), 1500);
+        }
+      });
+    });
+
+    // Export chat
+    drawer.querySelector('#cc-export-chat')?.addEventListener('click', () => {
+      const text = CoupleChat.exportChat('text');
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `parlay-chat-${new Date().toISOString().split('T')[0]}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      U.toast('Chat exported!');
+    });
+
+    // Clear chat
+    drawer.querySelector('#cc-clear-chat')?.addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear all messages? This cannot be undone.')) {
+        localStorage.removeItem('parlay_couple_chat');
+        CoupleChat.invalidate();
+        drawer.remove();
+        Router.reload();
+        U.toast('Chat cleared');
+      }
+    });
+  };
+
+  el.querySelector('#cc-info-btn')?.addEventListener('click', () => CoupleChat._showInfo());
+
+  // ─── Dismiss any open toxicity review prompt ─
   function dismissToxicityPrompt() {
     const prompt = document.querySelector('#cc-toxicity-prompt');
     if (prompt) prompt.remove();
   }
 
-  // Show toxicity filtering prompt with filtered version
+  // ─── Show toxicity filtering prompt ────────
   function showToxicityPrompt(rawText, filteredText) {
     dismissToxicityPrompt();
     const inputArea = el.querySelector('.cc-input-area');
@@ -11222,38 +12589,52 @@ Router.register('couple-chat', () => {
     promptDiv.style.cssText = 'padding:12px 16px;background:linear-gradient(135deg,rgba(122,158,138,.12),rgba(196,113,74,.08));border-top:1px solid var(--border);';
     promptDiv.innerHTML = `
       <div style="font-size:.72rem;font-weight:600;color:var(--sage);margin-bottom:6px;">✨ Parlay refined your message</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:4px;text-decoration:line-through;opacity:.6;">${U.esc(rawText)}</div>
       <div style="font-size:.88rem;line-height:1.5;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;color:var(--espresso);">${U.esc(filteredText)}</div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-accent btn-sm" id="cc-send-filtered" style="flex:1;font-size:.82rem;padding:8px 12px;">Send refined message ✓</button>
+        <button class="btn btn-accent btn-sm" id="cc-send-filtered" style="flex:1;font-size:.82rem;padding:8px 12px;">Send refined ✓</button>
         <button class="btn btn-outline btn-sm" id="cc-send-original" style="font-size:.72rem;padding:8px 10px;color:var(--muted);">Send original</button>
+        <button class="btn btn-outline btn-sm" id="cc-send-cancel" style="font-size:.72rem;padding:8px 10px;color:var(--muted);">Cancel</button>
       </div>
     `;
     inputArea.insertBefore(promptDiv, inputArea.firstChild);
-    promptDiv.querySelector('#cc-send-filtered').addEventListener('click', () => {
-      finishSend(rawText, filteredText);
-    });
-    promptDiv.querySelector('#cc-send-original').addEventListener('click', () => {
-      finishSend(rawText, rawText);
+    promptDiv.querySelector('#cc-send-filtered').addEventListener('click', () => finishSend(rawText, filteredText));
+    promptDiv.querySelector('#cc-send-original').addEventListener('click', () => finishSend(rawText, rawText));
+    promptDiv.querySelector('#cc-send-cancel').addEventListener('click', () => {
+      dismissToxicityPrompt();
+      input.value = rawText;
+      input.dispatchEvent(new Event('input'));
+      input.focus();
     });
   }
 
-  // Send message flow: filter through AI, then show prompt if changed
+  // ─── Send message flow ─────────────────────
   async function doSend() {
     const text = input.value.trim();
     if (!text) return;
 
+    // Handle edit mode
+    if (_editingMsg) {
+      CoupleChat.editMessage(_editingMsg, text);
+      cancelEdit();
+      Router.reload();
+      return;
+    }
+
     dismissToxicityPrompt();
     sendBtn.disabled = true;
     sendBtn.textContent = '…';
+    const savedReplyTo = _replyingTo;
     input.value = '';
     input.style.height = 'auto';
+    cancelReply();
 
     // Hide hints and actions
     if (hintArea) hintArea.style.display = 'none';
-    const qa = document.querySelector('#cc-quick-actions');
-    const pb = document.querySelector('#cc-plus-btn');
-    if (qa) { qa.style.display = 'none'; }
-    if (pb) { pb.textContent = '+'; pb.style.background = 'var(--parchment)'; pb.style.color = 'var(--muted)'; }
+    if (quickActionsEl) quickActionsEl.style.display = 'none';
+    if (plusBtn) { plusBtn.textContent = '+'; plusBtn.style.background = 'var(--parchment)'; plusBtn.style.color = 'var(--muted)'; }
+    _actionsOpen = false;
+    if (_emojiOpen) { _emojiOpen = false; emojiSlot.innerHTML = ''; }
 
     // Filter through AI
     let filtered = text;
@@ -11271,13 +12652,16 @@ Router.register('couple-chat', () => {
     }
 
     // Message wasn't changed — send directly
-    finishSend(text, filtered);
+    finishSend(text, filtered, savedReplyTo);
   }
 
-  // Send message (with optional pre-filtered text)
-  function finishSend(text, filtered) {
+  // ─── Finish sending ────────────────────────
+  function finishSend(text, filtered, replyTo) {
     dismissToxicityPrompt();
-    const msg = CoupleChat.send(text, { filtered });
+    const opts = { filtered };
+    if (replyTo || _replyingTo) opts.replyTo = replyTo || _replyingTo;
+    const msg = CoupleChat.send(text, opts);
+    _replyingTo = null;
 
     // Check if AI insight should be injected
     const hint = CoupleChat.getAIHint(text);
@@ -11294,31 +12678,51 @@ Router.register('couple-chat', () => {
     Router.reload();
   }
 
+  // ─── Send button + Enter key ───────────────
   sendBtn?.addEventListener('click', doSend);
   input?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       doSend();
     }
+    // Escape cancels reply/edit
+    if (e.key === 'Escape') {
+      if (_editingMsg) cancelEdit();
+      else if (_replyingTo) cancelReply();
+    }
   });
 
-  // Reaction on long-press (simplified: double-tap)
+  // ─── Swipe-to-reply (touch) ────────────────
   el.querySelectorAll('.cc-bubble-wrap').forEach(wrap => {
-    let _tapCount = 0;
-    let _tapTimer = null;
-    wrap.addEventListener('click', () => {
-      _tapCount++;
-      if (_tapCount === 2) {
-        clearTimeout(_tapTimer);
-        _tapCount = 0;
-        const msgId = wrap.dataset.msgId;
-        if (msgId) {
-          CoupleChat.react(msgId, '❤️');
-          Router.reload();
-        }
-      } else {
-        _tapTimer = setTimeout(() => { _tapCount = 0; }, 400);
+    const msgId = wrap.dataset.msgId;
+    if (!msgId) return;
+
+    let _startX = 0, _startY = 0, _swiping = false;
+    wrap.addEventListener('touchstart', (e) => {
+      _startX = e.touches[0].clientX;
+      _startY = e.touches[0].clientY;
+      _swiping = false;
+    }, { passive: true });
+
+    wrap.addEventListener('touchmove', (e) => {
+      const dx = e.touches[0].clientX - _startX;
+      const dy = Math.abs(e.touches[0].clientY - _startY);
+      // Only trigger horizontal swipe
+      if (dy > 30) return;
+      const isMe = wrap.classList.contains('me');
+      const swipeDir = isMe ? dx < -30 : dx > 30;
+      if (swipeDir && !_swiping) {
+        _swiping = true;
+        wrap.classList.add('swiping');
       }
+    }, { passive: true });
+
+    wrap.addEventListener('touchend', () => {
+      if (_swiping) {
+        wrap.classList.remove('swiping');
+        startReply(msgId);
+      }
+      _swiping = false;
     });
   });
 });
@@ -12399,28 +13803,72 @@ const SmartReplies = (() => {
     const text = (msg.filtered || msg.raw || '').toLowerCase();
     const replies = [];
 
+    // ─── Question handling (context-specific) ─
     if (text.includes('?')) {
-      if (text.includes('what do you think') || text.includes('what should we')) {
-        replies.push("Good idea, let's do it!", 'I need to think about it', 'Can we discuss tonight?');
-      } else if (text.includes('want to') || text.includes('wanna')) {
-        replies.push('Yes, sounds fun!', 'Maybe another time', 'What time?');
-      } else if (text.includes('can you') || text.includes('could you')) {
-        replies.push('Sure, no problem!', "I'll try my best", 'When do you need it by?');
+      if (text.includes('what do you think') || text.includes('what should we') || text.includes('your thoughts')) {
+        replies.push("Good idea, let's do it!", 'I need to think about it', 'Can we discuss tonight?', "I'm open to anything");
+      } else if (text.includes('want to') || text.includes('wanna') || text.includes('shall we')) {
+        replies.push('Yes, sounds fun!', 'Maybe another time', 'What time?', "I'd love that!");
+      } else if (text.includes('can you') || text.includes('could you') || text.includes('would you mind')) {
+        replies.push('Sure, no problem!', "I'll try my best", 'When do you need it by?', 'Already on it!');
       } else if (text.includes('when') || text.includes('what time')) {
-        replies.push('How about this evening?', 'This weekend works', 'Let me check my calendar');
+        replies.push('How about this evening?', 'This weekend works', 'Let me check my calendar', "I'm flexible, you pick!");
+      } else if (text.includes('where') || text.includes('which place') || text.includes('restaurant')) {
+        replies.push("You choose, I'm easy!", 'How about that new place?', "Let's look at options together", 'Somewhere close to home?');
+      } else if (text.includes('how are') || text.includes('how was') || text.includes('how did')) {
+        replies.push("Great, thanks for asking!", "It was good!", "A bit tired, but okay", "I'll tell you all about it later");
+      } else if (text.includes('do you want') || text.includes('should i') || text.includes('should we')) {
+        replies.push('Yes please!', "That'd be great", "I'm good either way", "Let's figure it out together");
       } else {
-        replies.push('Yes!', 'Let me think about it', 'Can we talk later?');
+        replies.push('Yes!', 'Let me think about it', 'Can we talk later?', 'Tell me more');
       }
     }
 
+    // ─── Emotional messages ────────────────────
     if (text.includes('thank') || text.includes('appreciate') || text.includes('love you')) {
-      replies.push("You're the best!", 'Always here for you', 'That means so much');
+      replies.push("You're the best!", 'Always here for you', 'That means so much', 'Love you too ❤️');
     }
+    if (text.includes('miss') && (text.includes('you') || text.includes('home'))) {
+      replies.push('Miss you too!', 'Coming home soon ❤️', "Can't wait to see you");
+    }
+    if (text.includes('sorry') || text.includes('apologize') || text.includes('my fault')) {
+      replies.push("It's okay, I understand", "Let's move past it together", 'I appreciate you saying that', "We're good ❤️");
+    }
+    if (text.includes('stressed') || text.includes('tough day') || text.includes('exhausted') || text.includes('tired')) {
+      replies.push("I'm here for you ❤️", 'What can I do to help?', "Let's have a relaxing evening", 'Want to talk about it?');
+    }
+    if (text.includes('good news') || text.includes('exciting') || text.includes('guess what') || text.includes('amazing')) {
+      replies.push('Tell me everything!', "That's amazing! 🎉", "I'm so happy for you!", "Can't wait to hear!");
+    }
+
+    // ─── Logistics / coordination ──────────────
     if (text.includes('need to') || text.includes("don't forget") || text.includes('remember to')) {
-      replies.push('On it!', 'Added to my list', "I'll take care of it");
+      replies.push('On it!', 'Added to my list', "I'll take care of it", "Thanks for the reminder!");
     }
-    if (text.includes('kids') || text.includes('school') || text.includes('pickup')) {
-      replies.push('I got it covered', "I'll handle it", 'Can we split this?');
+    if (text.includes('kids') || text.includes('school') || text.includes('pickup') || text.includes('daycare')) {
+      replies.push('I got it covered', "I'll handle it", 'Can we split this?', "What time?");
+    }
+    if (text.includes('dinner') || text.includes('lunch') || text.includes('eat') || text.includes('food') || text.includes('cook')) {
+      replies.push('Sounds delicious!', "I'll cook tonight", 'Want to order in?', "Let's try something new!");
+    }
+    if (text.includes('grocery') || text.includes('shopping') || text.includes('store') || text.includes('buy')) {
+      replies.push("I'll add it to the list", 'Want me to grab it?', 'After work?', "I'll stop on the way home");
+    }
+
+    // ─── Plans / events ────────────────────────
+    if (text.includes('weekend') || text.includes('saturday') || text.includes('sunday')) {
+      replies.push("Let's make plans!", "That sounds perfect!", 'Check the calendar?', "I'm in!");
+    }
+    if (text.includes('tonight') || text.includes('this evening')) {
+      replies.push("Can't wait!", "I'm free!", 'What time?', "Sounds like a plan!");
+    }
+
+    // ─── Fallback: add greetings if no replies yet ─
+    if (replies.length === 0) {
+      const hour = new Date().getHours();
+      if (hour < 12) replies.push('Good morning! ☀️', 'Hope you slept well');
+      else if (hour < 17) replies.push("How's your day?", 'Thinking of you 💛');
+      else replies.push('How was your day?', 'Love you ❤️');
     }
 
     return [...new Set(replies)].slice(0, 4);
@@ -12428,25 +13876,61 @@ const SmartReplies = (() => {
 
   function greetings() {
     const hour = new Date().getHours();
-    if (hour < 12) return ['Good morning!', 'Hope you slept well', 'Ready for the day?'];
-    if (hour < 17) return ["How's your day going?", 'Thinking of you', 'Need anything?'];
-    return ['How was your day?', 'What should we do tonight?', 'I missed you today'];
+    if (hour < 12) return ['Good morning! ☀️', 'Hope you slept well', 'Ready for the day?', "Can't wait to see you"];
+    if (hour < 17) return ["How's your day going?", 'Thinking of you', 'Need anything?', 'Just checking in 💛'];
+    return ['How was your day?', 'What should we do tonight?', 'I missed you today', 'Want to watch something?'];
   }
 
   function conversationStarters() {
-    const starters = [
+    const mood = MoodStore.todayMood();
+    const parlays = Store.activeParlays();
+    const tasks = Store.myActionTasks();
+    const hour = new Date().getHours();
+
+    const starters = [];
+
+    // Context-aware starters
+    if (parlays.length > 0) {
+      starters.push(`We have ${parlays.length} open plan${parlays.length > 1 ? 's' : ''} — want to go through them?`);
+    }
+    if (tasks.length > 0) {
+      starters.push(`I noticed we have some tasks to coordinate — want to tackle them?`);
+    }
+    if (mood?.moodId === 'happy' || mood?.moodId === 'grateful') {
+      starters.push("I'm feeling great today — let's plan something fun!");
+    }
+    if (mood?.moodId === 'stressed') {
+      starters.push("I've had a stressful day and could use your support");
+    }
+
+    // Time-aware
+    if (hour >= 17 && hour <= 21) {
+      starters.push('What should we have for dinner tonight?');
+      starters.push('Want to do something fun this evening?');
+    }
+    if (hour >= 6 && hour < 10) {
+      starters.push("Good morning! What's your schedule like today?");
+    }
+
+    // Evergreen starters
+    const evergreen = [
       'What was the best part of your day?',
       "I've been thinking about us...",
       'Can we plan something fun this weekend?',
       'I want to tell you something nice',
-      'What should we have for dinner?',
       'I need your opinion on something',
       "Let's plan a date night soon",
       'How are you really doing today?',
       'I had an idea I want to run by you',
       'What are you looking forward to this week?',
+      "There's something I want to appreciate you for",
+      'Remember when we... 💭',
+      "What's one thing I can do for you today?",
     ];
-    return starters.sort(() => Math.random() - 0.5).slice(0, 4);
+
+    // Combine and deduplicate
+    starters.push(...evergreen);
+    return [...new Set(starters)].sort(() => Math.random() - 0.5).slice(0, 5);
   }
 
   return { forMessage, greetings, conversationStarters };
@@ -12460,7 +13944,7 @@ const ChatAnalytics = (() => {
   function summary(days) {
     const messages = CoupleChat.messages();
     const cutoff = new Date(Date.now() - (days || 30) * 86400000).toISOString();
-    const recent = messages.filter(m => m.timestamp > cutoff && m.from !== 'system' && m.from !== 'ai');
+    const recent = messages.filter(m => m.timestamp > cutoff && m.from !== 'system' && m.from !== 'ai' && !m.deleted);
     const myMsgs = recent.filter(m => m.from === 'me');
     const theirMsgs = recent.filter(m => m.from === 'them');
     const myAvgLen = myMsgs.length > 0 ? Math.round(myMsgs.reduce((sum, m) => sum + (m.raw || '').length, 0) / myMsgs.length) : 0;
@@ -12478,12 +13962,56 @@ const ChatAnalytics = (() => {
     recent.forEach(m => { const h = new Date(m.timestamp).getHours(); hourCounts[h] = (hourCounts[h] || 0) + 1; });
     const peakHour = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0];
 
+    // Conversation streaks (consecutive days with messages)
+    const daySet = new Set(recent.map(m => m.timestamp.split('T')[0]));
+    const days_sorted = [...daySet].sort();
+    let maxStreak = 0, currentStreak = 0;
+    for (let i = 0; i < days_sorted.length; i++) {
+      if (i === 0) { currentStreak = 1; }
+      else {
+        const prev = new Date(days_sorted[i - 1]);
+        const curr = new Date(days_sorted[i]);
+        const diffDays = (curr - prev) / 86400000;
+        currentStreak = diffDays <= 1 ? currentStreak + 1 : 1;
+      }
+      maxStreak = Math.max(maxStreak, currentStreak);
+    }
+
+    // Filtered message count
+    const filteredCount = myMsgs.filter(m => m.filtered && m.filtered !== m.raw).length;
+
+    // Reaction stats
+    const totalReactions = recent.reduce((sum, m) => sum + (m.reactions?.length || 0), 0);
+
+    // Emoji usage
+    const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+    let topEmoji = null;
+    const emojiCounts = {};
+    recent.forEach(m => {
+      const emojis = (m.raw || '').match(emojiRegex) || [];
+      emojis.forEach(e => { emojiCounts[e] = (emojiCounts[e] || 0) + 1; });
+    });
+    const topEmojiEntry = Object.entries(emojiCounts).sort((a, b) => b[1] - a[1])[0];
+    if (topEmojiEntry) topEmoji = { emoji: topEmojiEntry[0], count: topEmojiEntry[1] };
+
+    // Longest conversation (most messages in one day)
+    const dayCounts = {};
+    recent.forEach(m => {
+      const day = m.timestamp.split('T')[0];
+      dayCounts[day] = (dayCounts[day] || 0) + 1;
+    });
+    const busiestDay = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0];
+
     return {
       totalMessages: recent.length, myMessages: myMsgs.length, theirMessages: theirMsgs.length,
       myAvgLen, theirAvgLen,
       avgResponseTime: responseCount > 0 ? Math.round(totalResponseTime / responseCount / 60000) : 0,
       peakHour: peakHour ? parseInt(peakHour[0]) : 12,
-      daysActive: new Set(recent.map(m => m.timestamp.split('T')[0])).size,
+      daysActive: daySet.size,
+      conversationStreak: maxStreak,
+      filteredCount, totalReactions,
+      topEmoji,
+      busiestDay: busiestDay ? { date: busiestDay[0], count: busiestDay[1] } : null,
     };
   }
 
@@ -12492,20 +14020,71 @@ const ChatAnalytics = (() => {
     const parts = [];
     if (stats.totalMessages > 0) {
       parts.push(stats.totalMessages + ' messages exchanged this week');
-      if (stats.avgResponseTime > 0) parts.push('Average reply time: ' + stats.avgResponseTime + ' min');
+
+      // Balance insight
+      const total = stats.myMessages + stats.theirMessages;
+      if (total > 0) {
+        const myPct = Math.round(stats.myMessages / total * 100);
+        if (myPct > 65) parts.push('You\'re doing most of the talking (' + myPct + '%) — try asking more questions');
+        else if (myPct < 35) parts.push(Auth.theirName() + ' is more active — try initiating more');
+        else parts.push('Great balance! You\'re both contributing equally');
+      }
+
+      if (stats.avgResponseTime > 0) {
+        if (stats.avgResponseTime < 5) parts.push('⚡ Average reply time: ' + stats.avgResponseTime + ' min — super responsive!');
+        else if (stats.avgResponseTime < 30) parts.push('Average reply time: ' + stats.avgResponseTime + ' min');
+        else parts.push('Average reply time: ' + stats.avgResponseTime + ' min — try replying sooner');
+      }
+
       if (stats.peakHour) {
         const h = stats.peakHour;
         const period = h >= 12 ? 'PM' : 'AM';
         const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
         parts.push('Most chatty around ' + display + ' ' + period);
       }
+
+      if (stats.conversationStreak > 1) {
+        parts.push('🔥 ' + stats.conversationStreak + '-day conversation streak!');
+      }
+
+      if (stats.filteredCount > 0) {
+        parts.push('✨ ' + stats.filteredCount + ' message' + (stats.filteredCount > 1 ? 's' : '') + ' improved by tone filter');
+      }
+
+      if (stats.topEmoji) {
+        parts.push('Most used emoji: ' + stats.topEmoji.emoji + ' (' + stats.topEmoji.count + ' times)');
+      }
+
+      if (stats.totalReactions > 0) {
+        parts.push(stats.totalReactions + ' reactions shared');
+      }
     } else {
-      parts.push('No messages this week');
+      parts.push('No messages this week — time to start a conversation!');
     }
     return parts;
   }
 
-  return { summary, weeklyDigest };
+  // Daily engagement score (0-100)
+  function engagementScore() {
+    const stats = summary(7);
+    let score = 0;
+    if (stats.totalMessages >= 5) score += 20;
+    else if (stats.totalMessages >= 1) score += 10;
+    if (stats.daysActive >= 5) score += 25;
+    else if (stats.daysActive >= 3) score += 15;
+    else if (stats.daysActive >= 1) score += 5;
+    if (stats.avgResponseTime > 0 && stats.avgResponseTime < 15) score += 20;
+    else if (stats.avgResponseTime > 0 && stats.avgResponseTime < 60) score += 10;
+    const balance = stats.myMessages + stats.theirMessages > 0
+      ? Math.min(stats.myMessages, stats.theirMessages) / Math.max(stats.myMessages, stats.theirMessages)
+      : 0;
+    score += Math.round(balance * 20);
+    if (stats.totalReactions > 0) score += 10;
+    if (stats.filteredCount > 0) score += 5;
+    return Math.min(100, score);
+  }
+
+  return { summary, weeklyDigest, engagementScore };
 })();
 
 
