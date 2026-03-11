@@ -460,6 +460,190 @@ select.input {
 }
 
 /* ═══════════════════════════════════════════════
+   PILL SELECTORS
+   ═══════════════════════════════════════════════ */
+.pill-group {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: 1.5px solid var(--border);
+  border-radius: var(--r-pill); cursor: pointer;
+  font-size: .82rem; font-weight: 500; color: var(--espresso);
+  background: var(--surface); transition: all .15s;
+  white-space: nowrap; min-height: 40px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.pill:hover { border-color: var(--amber); }
+.pill:active { border-color: var(--terra); }
+.pill.selected {
+  border-color: var(--terra); background: #FDF5F0; color: var(--terra); font-weight: 600;
+}
+.pill .pill-icon { font-size: 1rem; }
+.pill-sm { padding: 6px 10px; font-size: .75rem; min-height: 32px; }
+
+/* ═══════════════════════════════════════════════
+   MESSAGE THREAD
+   ═══════════════════════════════════════════════ */
+.msg-thread { display: flex; flex-direction: column; gap: 12px; }
+.msg-bubble {
+  padding: 12px 14px; border-radius: 14px;
+  font-size: .85rem; line-height: 1.6; max-width: 92%;
+}
+.msg-bubble.mine {
+  background: var(--espresso); color: var(--cream);
+  align-self: flex-end; border-bottom-right-radius: 4px;
+}
+.msg-bubble.theirs {
+  background: var(--surface); border: 1px solid var(--border);
+  align-self: flex-start; border-bottom-left-radius: 4px;
+}
+.msg-bubble.system {
+  background: var(--parchment); color: var(--muted);
+  align-self: center; font-size: .75rem; text-align: center;
+  border-radius: var(--r-pill); padding: 6px 14px;
+}
+.msg-meta {
+  font-size: .65rem; color: var(--muted); margin-top: 4px;
+}
+.msg-meta.right { text-align: right; }
+.msg-filtered-tag {
+  font-size: .6rem; color: var(--sage); font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════
+   STRUCTURED SUMMARY CARD
+   ═══════════════════════════════════════════════ */
+.summary-card {
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface); overflow: hidden;
+}
+.summary-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-size: .82rem;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-label {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); min-width: 60px;
+  padding-top: 1px;
+}
+.summary-value { color: var(--espresso); flex: 1; line-height: 1.5; }
+
+/* ═══════════════════════════════════════════════
+   FAMILY MEMBER CARDS
+   ═══════════════════════════════════════════════ */
+.family-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  transition: border-color .15s;
+}
+.family-card .family-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.family-card .family-info { flex: 1; min-width: 0; }
+.family-card .family-name {
+  font-size: .88rem; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.family-card .family-role { font-size: .72rem; color: var(--muted); }
+.family-card .family-actions {
+  display: flex; gap: 4px;
+}
+
+/* ═══════════════════════════════════════════════
+   DATE OPTION CARDS (enhanced)
+   ═══════════════════════════════════════════════ */
+.date-opt-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: 12px; background: var(--surface);
+  cursor: pointer; transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.date-opt-card:active, .date-opt-card.selected {
+  border-color: var(--sage); background: #EDF4F0;
+}
+.date-opt-card .date-label { font-size: .88rem; font-weight: 600; }
+.date-opt-card .date-time { font-size: .72rem; color: var(--muted); }
+.date-opt-card .date-check {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--border); display: flex;
+  align-items: center; justify-content: center;
+  font-size: .7rem; transition: all .15s;
+}
+.date-opt-card.selected .date-check {
+  border-color: var(--sage); background: rgba(122,158,138,.4); color: var(--sage);
+}
+
+/* ═══════════════════════════════════════════════
+   FILTER BAR
+   ═══════════════════════════════════════════════ */
+.filter-bar {
+  display: flex; gap: 6px; padding: 8px 20px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.filter-bar::-webkit-scrollbar { display: none; }
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px; border-radius: var(--r-pill);
+  font-size: .72rem; font-weight: 600; white-space: nowrap;
+  cursor: pointer; transition: all .15s;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted);
+  -webkit-tap-highlight-color: transparent;
+}
+.filter-chip.active {
+  border-color: var(--terra); background: #FDF5F0; color: var(--terra);
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION COLLAPSE
+   ═══════════════════════════════════════════════ */
+.section-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px; cursor: pointer; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.section-toggle .section-label { margin-bottom: 0; padding: 0; }
+.section-toggle .toggle-arrow {
+  font-size: .7rem; color: var(--muted); transition: transform .2s;
+}
+.section-toggle.collapsed .toggle-arrow { transform: rotate(-90deg); }
+.section-body { overflow: hidden; }
+.section-body.collapsed { display: none; }
+
+/* ═══════════════════════════════════════════════
+   ADD-ROW BUTTON
+   ═══════════════════════════════════════════════ */
+.add-row {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px; border: 1.5px dashed var(--border); border-radius: var(--r-md);
+  color: var(--muted); font-size: .82rem; font-weight: 500; cursor: pointer;
+  transition: all .15s; background: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.add-row:hover { border-color: var(--terra); color: var(--terra); }
+
+/* ═══════════════════════════════════════════════
+   COMPOSE STEP INDICATOR
+   ═══════════════════════════════════════════════ */
+.step-indicator {
+  display: flex; align-items: center; gap: 6px; padding: 12px 0;
+}
+.step-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border); transition: all .2s;
+}
+.step-dot.active { background: var(--terra); width: 20px; border-radius: 4px; }
+.step-dot.done { background: var(--sage); }
+
+/* ═══════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════ */
 @media (min-width: 600px) {
@@ -549,6 +733,8 @@ const DEMO = {
   // Pre-built sample parlays and tasks
   _mockParlays: null,
   _mockTasks: null,
+  _mockFamily: null,
+  _mockMessages: null,
 
   /** Build mock data (called once on demo start) */
   buildMockData() {
@@ -564,42 +750,47 @@ const DEMO = {
         id: 'demo-p1', topicId: 'date', title: 'Anniversary dinner this Friday',
         date: shortDate(ago(1)), rawInput: "I'd love to do something special for our anniversary — maybe that Italian place downtown?",
         filteredInput: "I'd really love to celebrate our anniversary this Friday. Would the Italian restaurant downtown work for you?",
-        intentContext: JSON.stringify({ who: 'just-us', vibe: 'romantic' }),
+        intentContext: 'Occasion: Anniversary\nVibe: Romantic\n',
+        structuredSelections: { Occasion: 'Anniversary', Vibe: 'Romantic', 'Kids situation': 'Need a sitter' },
         dateOptions: [
-          { date: '2026-03-13', time: '19:00', label: 'Friday 7pm' },
-          { date: '2026-03-14', time: '18:30', label: 'Saturday 6:30pm' },
+          { id: 'opt_1', date: '2026-03-13', timeLabel: 'Evening' },
+          { id: 'opt_2', date: '2026-03-14', timeLabel: 'Evening' },
         ],
         status: 'pending_partner',
         createdByUid: 'demo-uid-a', isMine: true,
         partnerRawReply: null, partnerFilteredReply: null, partnerDateResponse: null,
         counterDates: [], confirmedDate: null,
         proposal: null, resolution: null, archived: false,
+        messageCount: 0, lastActivityBy: 'demo-uid-a',
       },
       {
         id: 'demo-p2', topicId: 'inlaw', title: "Mom wants to visit next weekend",
         date: shortDate(ago(3)), rawInput: "My mom asked if she can come stay Saturday to Monday. She wants to see the kids.",
         filteredInput: "My mom mentioned she'd love to visit next weekend, Saturday through Monday, to spend time with the kids. How does that feel?",
-        intentContext: JSON.stringify({ who: 'in-laws', hosting: 'our-place' }),
+        intentContext: 'Whose family: Mine\nVisit type: They come to us\n',
+        structuredSelections: { 'Whose family': 'Mine', 'Visit type': 'They come to us', 'Duration': 'Overnight' },
         dateOptions: [
-          { date: '2026-03-21', time: '10:00', label: 'Sat morning' },
+          { id: 'opt_1', date: '2026-03-21', timeLabel: 'Morning' },
         ],
         status: 'partner_replied',
         createdByUid: 'demo-uid-b', isMine: false,
         partnerRawReply: "That works but can we do just Saturday daytime? I have a work thing Sunday.",
         partnerFilteredReply: "Saturday daytime would work great for me. I have a commitment on Sunday — could we plan for a Saturday visit instead?",
         partnerDateResponse: 'counter',
-        counterDates: [{ date: '2026-03-21', time: '10:00', label: 'Sat 10am–6pm' }],
+        counterDates: [{ id: 'counter_1', date: '2026-03-21', timeLabel: 'Morning to Evening' }],
         confirmedDate: null,
         proposal: null, resolution: null, archived: false,
+        messageCount: 1, lastActivityBy: 'demo-uid-a',
       },
       {
         id: 'demo-p3', topicId: 'trip', title: 'Spring break trip planning',
         date: shortDate(ago(7)), rawInput: "Can we figure out spring break? I was thinking a beach trip.",
         filteredInput: "I'd love for us to plan something for spring break — maybe a beach getaway? What do you think?",
-        intentContext: JSON.stringify({ who: 'family', vibe: 'relaxing' }),
+        intentContext: 'Who: Whole family\nTrip type: Beach / relaxation\n',
+        structuredSelections: { 'Who': 'Whole family', 'Trip type': 'Beach / relaxation', 'Duration': '4-5 days' },
         dateOptions: [
-          { date: '2026-04-06', time: '08:00', label: 'Apr 6–10' },
-          { date: '2026-04-13', time: '08:00', label: 'Apr 13–17' },
+          { id: 'opt_1', date: '2026-04-06', timeLabel: 'All day' },
+          { id: 'opt_2', date: '2026-04-13', timeLabel: 'All day' },
         ],
         status: 'active',
         createdByUid: 'demo-uid-a', isMine: true,
@@ -607,24 +798,27 @@ const DEMO = {
         partnerFilteredReply: "A beach trip sounds wonderful! The second week (Apr 13–17) would work better for me so I can wrap up a work project first.",
         partnerDateResponse: 'selected',
         counterDates: [],
-        confirmedDate: { date: '2026-04-13', time: '08:00', label: 'Apr 13–17' },
-        proposal: "**Proposal: Spring Break Beach Trip**\n\nBased on both your preferences, here's a fair plan:\n\n- **Dates:** April 13–17 (Mon–Fri)\n- **Destination:** Beach location TBD — suggest researching together this weekend\n- **Budget:** Discuss a shared budget cap before booking\n- **Logistics:** Alex handles flights/transport, Jordan handles accommodation research\n\nThis gives Jordan time to finish their project while still getting a full week of vacation.",
+        confirmedDate: { id: 'opt_2', date: '2026-04-13', timeLabel: 'All day' },
+        proposal: { proposal: "Based on both your preferences, here is a fair plan:\n\n- Dates: April 13-17 (Mon-Fri)\n- Destination: Beach location TBD - suggest researching together this weekend\n- Budget: Discuss a shared budget cap before booking\n- Logistics: Alex handles flights/transport, Jordan handles accommodation research", reasoning: "This gives Jordan time to finish their project while still getting a full week of vacation." },
         resolution: null, archived: false,
+        messageCount: 3, lastActivityBy: 'demo-uid-b',
       },
       {
         id: 'demo-p4', topicId: 'boys', title: "Poker night with the guys",
         date: shortDate(ago(14)), rawInput: "The guys want to do poker night this Thursday.",
         filteredInput: "The guys are getting together for poker this Thursday evening. I'd love to go — does that work with our schedule?",
-        intentContext: JSON.stringify({ who: 'my-friends', vibe: 'casual' }),
-        dateOptions: [{ date: '2026-02-26', time: '19:00', label: 'Thu 7pm' }],
+        intentContext: 'Who: Just me and friends\nPartner role: Covering the kids\n',
+        structuredSelections: { 'Who': 'Just me and friends', 'Partner role': 'Covering the kids' },
+        dateOptions: [{ id: 'opt_1', date: '2026-02-26', timeLabel: 'Evening' }],
         status: 'resolved',
         createdByUid: 'demo-uid-a', isMine: true,
         partnerRawReply: "Have fun! I'll do bedtime solo.",
         partnerFilteredReply: "Sounds fun! I'm happy to handle bedtime on my own that night.",
         partnerDateResponse: 'accepted',
         counterDates: [],
-        confirmedDate: { date: '2026-02-26', time: '19:00', label: 'Thu 7pm' },
+        confirmedDate: { id: 'opt_1', date: '2026-02-26', timeLabel: 'Evening' },
         proposal: null, resolution: 'date_accepted', archived: false,
+        messageCount: 0, lastActivityBy: 'demo-uid-b',
       },
     ];
 
@@ -662,6 +856,23 @@ const DEMO = {
         counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
       },
     ];
+
+    this._mockFamily = [
+      { id: 'demo-fm-1', name: 'Emma', role: 'child', relation: 'daughter', belongsTo: 'both', birthDate: '2022-05-15', notes: null, sortOrder: 0 },
+      { id: 'demo-fm-2', name: 'Liam', role: 'child', relation: 'son', belongsTo: 'both', birthDate: '2019-09-22', notes: null, sortOrder: 1 },
+      { id: 'demo-fm-3', name: 'Grandma Sue', role: 'extended', relation: 'grandmother', belongsTo: 'demo-uid-a', notes: "Alex's mom", sortOrder: 2 },
+      { id: 'demo-fm-4', name: 'Grandpa Joe', role: 'extended', relation: 'grandfather', belongsTo: 'demo-uid-a', notes: "Alex's dad", sortOrder: 3 },
+      { id: 'demo-fm-5', name: 'Aunt Maria', role: 'extended', relation: 'aunt', belongsTo: 'demo-uid-b', notes: "Jordan's sister", sortOrder: 4 },
+      { id: 'demo-fm-6', name: 'Sarah', role: 'contact', relation: 'babysitter', belongsTo: 'both', notes: 'Available weekends', sortOrder: 5 },
+    ];
+
+    this._mockMessages = {
+      'demo-p3': [
+        { id: 'msg-1', eventId: 'demo-p3', senderUid: 'demo-uid-a', isMine: true, type: 'text', rawContent: '', filteredContent: "I'd love for us to plan something for spring break — maybe a beach getaway?", structuredData: null, createdAt: ago(7) },
+        { id: 'msg-2', eventId: 'demo-p3', senderUid: 'demo-uid-b', isMine: false, type: 'text', rawContent: '', filteredContent: "A beach trip sounds wonderful! The second week would work better for me.", structuredData: null, createdAt: ago(6) },
+        { id: 'msg-3', eventId: 'demo-p3', senderUid: 'demo-uid-a', isMine: true, type: 'text', rawContent: '', filteredContent: "The second week works for me too. Should we start looking at places?", structuredData: null, createdAt: ago(5) },
+      ],
+    };
   },
 
   /** Activate demo mode — monkey-patches Auth & Store */
@@ -715,6 +926,12 @@ const DEMO = {
       mt.createdBy = orig.createdByUid === me.uid ? 'me' : 'them';
       mt.pendingResponseFrom = orig.pendingUid === me.uid ? 'me' : orig.pendingUid === them.uid ? 'them' : null;
     });
+    // Re-derive message isMine from perspective
+    if (this._mockMessages) {
+      for (const msgs of Object.values(this._mockMessages)) {
+        msgs.forEach(msg => { msg.isMine = (msg.senderUid === me.uid); });
+      }
+    }
 
     // Patch Store data methods
     Store._demoOverride = {
@@ -997,6 +1214,7 @@ const Auth = (() => {
           Store.loadParlays(),
           Store.loadTasks(),
           Store.loadCommPrefs(),
+          FamilyStore.load(),
         ]);
         _subscribeRealtime();
       }
@@ -1147,7 +1365,7 @@ const Auth = (() => {
 
     // Reload shared data
     if (_couple) {
-      await Promise.all([Store.loadParlays(), Store.loadTasks(), Store.loadCommPrefs()]);
+      await Promise.all([Store.loadParlays(), Store.loadTasks(), Store.loadCommPrefs(), FamilyStore.load()]);
       if (!_realtime) _subscribeRealtime();
     }
 
@@ -1314,6 +1532,7 @@ const Store = (() => {
       (p.status === 'pending_partner' && !p.isMine) ||
       (p.status === 'partner_replied' && p.isMine) ||
       (p.status === 'counter_proposed' && p.isMine) ||
+      (p.status === 'in_discussion' && p.lastActivityBy && p.lastActivityBy !== Auth.myUid()) ||
       (p.status === 'active')
     ).length;
   }
@@ -1438,6 +1657,8 @@ const Store = (() => {
   // ── Clear ─────────────────────────────────────
   function clear() {
     _parlays = []; _tasks = []; _commPrefs = { me: null, them: null }; _kv = {};
+    try { FamilyStore.clear(); } catch(e) {}
+    try { EventMessages.clear(); } catch(e) {}
   }
 
   return {
@@ -1542,6 +1763,221 @@ const Store = (() => {
   Store.loadTasks = async function() { if (DEMO.active) return; return _origLoadT.apply(this, arguments); };
   const _origLoadC = Store.loadCommPrefs;
   Store.loadCommPrefs = async function() { if (DEMO.active) return; return _origLoadC.apply(this, arguments); };
+})();
+
+// ──────────────────────────────────────────────
+// FAMILY STORE — Household members for contextual planning
+// ──────────────────────────────────────────────
+const FamilyStore = (() => {
+  let _members = [];
+
+  function _rowToMember(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      role: row.role,           // 'child', 'extended', 'contact'
+      relation: row.relation,   // 'son', 'daughter', 'grandparent', 'babysitter', etc.
+      belongsTo: row.belongs_to, // 'both', or a specific uid
+      birthDate: row.birth_date,
+      notes: row.notes,
+      sortOrder: row.sort_order || 0,
+    };
+  }
+
+  function _memberToRow(m) {
+    return {
+      id: m.id,
+      couple_id: Auth.couple()?.id,
+      name: m.name,
+      role: m.role,
+      relation: m.relation || null,
+      belongs_to: m.belongsTo || 'both',
+      birth_date: m.birthDate || null,
+      notes: m.notes || null,
+      sort_order: m.sortOrder || 0,
+    };
+  }
+
+  async function load() {
+    if (!Auth.isReady()) return;
+    const { data, error } = await Auth.sb().from('family_members')
+      .select('*').eq('couple_id', Auth.couple().id)
+      .is('deleted_at', null).order('sort_order', { ascending: true });
+    if (error) { console.warn('[FamilyStore] load error:', error.message); return; }
+    _members = (data || []).map(_rowToMember);
+  }
+
+  function members()  { return _members; }
+  function children() { return _members.filter(m => m.role === 'child'); }
+  function extended() { return _members.filter(m => m.role === 'extended'); }
+  function contacts() { return _members.filter(m => m.role === 'contact'); }
+  function find(id)   { return _members.find(m => m.id === id) || null; }
+  function hasKids()  { return _members.some(m => m.role === 'child'); }
+
+  function childAge(m) {
+    if (!m.birthDate) return null;
+    const diff = Date.now() - new Date(m.birthDate).getTime();
+    return Math.floor(diff / (365.25 * 86400000));
+  }
+
+  async function add(member) {
+    _members.push(member);
+    try {
+      await Auth.sb().from('family_members').upsert(_memberToRow(member), { onConflict: 'id' });
+    } catch(e) { console.error('[FamilyStore] add error:', e); U.toast('Failed to save'); }
+  }
+
+  async function update(id, patch) {
+    const i = _members.findIndex(m => m.id === id);
+    if (i > -1) {
+      _members[i] = { ..._members[i], ...patch };
+      const rowPatch = {};
+      const map = { name:'name', role:'role', relation:'relation', belongsTo:'belongs_to', birthDate:'birth_date', notes:'notes', sortOrder:'sort_order' };
+      for (const [k,v] of Object.entries(patch)) { if (map[k]) rowPatch[map[k]] = v; }
+      try {
+        await Auth.sb().from('family_members').update(rowPatch).eq('id', id);
+      } catch(e) { console.error('[FamilyStore] update error:', e); }
+    }
+  }
+
+  async function remove(id) {
+    _members = _members.filter(m => m.id !== id);
+    try {
+      await Auth.sb().from('family_members')
+        .update({ deleted_at: new Date().toISOString() }).eq('id', id);
+    } catch(e) { console.error('[FamilyStore] remove error:', e); }
+  }
+
+  function clear() { _members = []; }
+
+  return { load, members, children, extended, contacts, find, hasKids, childAge, add, update, remove, clear };
+})();
+
+// Demo proxy for FamilyStore
+(function() {
+  const _origLoad = FamilyStore.load;
+  FamilyStore.load = async function() { if (DEMO.active) return; return _origLoad.apply(this, arguments); };
+  const _origMembers = FamilyStore.members;
+  FamilyStore.members = function() { return (DEMO.active && DEMO._mockFamily) ? DEMO._mockFamily : _origMembers(); };
+  const _origChildren = FamilyStore.children;
+  FamilyStore.children = function() { return (DEMO.active && DEMO._mockFamily) ? DEMO._mockFamily.filter(m => m.role === 'child') : _origChildren(); };
+  const _origExtended = FamilyStore.extended;
+  FamilyStore.extended = function() { return (DEMO.active && DEMO._mockFamily) ? DEMO._mockFamily.filter(m => m.role === 'extended') : _origExtended(); };
+  const _origContacts = FamilyStore.contacts;
+  FamilyStore.contacts = function() { return (DEMO.active && DEMO._mockFamily) ? DEMO._mockFamily.filter(m => m.role === 'contact') : _origContacts(); };
+  const _origHasKids = FamilyStore.hasKids;
+  FamilyStore.hasKids = function() { return (DEMO.active && DEMO._mockFamily) ? DEMO._mockFamily.some(m => m.role === 'child') : _origHasKids(); };
+  const _origFind = FamilyStore.find;
+  FamilyStore.find = function(id) { return (DEMO.active && DEMO._mockFamily) ? DEMO._mockFamily.find(m => m.id === id) || null : _origFind(id); };
+  const _origAdd = FamilyStore.add;
+  FamilyStore.add = async function(m) { if (DEMO.active) { DEMO._mockFamily.push(m); return; } return _origAdd.apply(this, arguments); };
+  const _origUpdate = FamilyStore.update;
+  FamilyStore.update = async function(id, patch) { if (DEMO.active) { const i = DEMO._mockFamily.findIndex(m => m.id === id); if (i > -1) DEMO._mockFamily[i] = { ...DEMO._mockFamily[i], ...patch }; return; } return _origUpdate.apply(this, arguments); };
+  const _origRemove = FamilyStore.remove;
+  FamilyStore.remove = async function(id) { if (DEMO.active) { DEMO._mockFamily = DEMO._mockFamily.filter(m => m.id !== id); return; } return _origRemove.apply(this, arguments); };
+})();
+
+// ──────────────────────────────────────────────
+// EVENT MESSAGES — Thread messages for event proposals
+// ──────────────────────────────────────────────
+const EventMessages = (() => {
+  let _cache = {}; // eventId → [messages]
+
+  function _rowToMsg(row) {
+    return {
+      id: row.id,
+      eventId: row.event_id,
+      senderUid: row.sender_uid,
+      isMine: row.sender_uid === Auth.myUid(),
+      type: row.message_type || 'text',
+      rawContent: row.raw_content,
+      filteredContent: row.filtered_content,
+      structuredData: typeof row.structured_data === 'string'
+        ? (() => { try { return JSON.parse(row.structured_data); } catch { return null; } })()
+        : (row.structured_data || null),
+      createdAt: row.created_at,
+    };
+  }
+
+  async function loadForEvent(eventId) {
+    if (!Auth.isReady()) return [];
+    const { data, error } = await Auth.sb().from('event_messages')
+      .select('*').eq('event_id', eventId)
+      .is('deleted_at', null).order('created_at', { ascending: true });
+    if (error) { console.warn('[EventMessages] load error:', error.message); return []; }
+    _cache[eventId] = (data || []).map(_rowToMsg);
+    return _cache[eventId];
+  }
+
+  function getForEvent(eventId) { return _cache[eventId] || []; }
+
+  async function send(eventId, { type = 'text', rawContent = '', filteredContent = '', structuredData = null } = {}) {
+    const msg = {
+      id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      eventId,
+      senderUid: Auth.myUid(),
+      isMine: true,
+      type,
+      rawContent,
+      filteredContent: filteredContent || rawContent,
+      structuredData,
+      createdAt: new Date().toISOString(),
+    };
+    if (!_cache[eventId]) _cache[eventId] = [];
+    _cache[eventId].push(msg);
+
+    try {
+      await Auth.sb().from('event_messages').insert({
+        id: msg.id,
+        event_id: eventId,
+        couple_id: Auth.couple()?.id,
+        sender_uid: Auth.myUid(),
+        message_type: type,
+        raw_content: rawContent,
+        filtered_content: filteredContent || rawContent,
+        structured_data: structuredData,
+      });
+    } catch(e) { console.error('[EventMessages] send error:', e); U.toast('Message may not have synced'); }
+    return msg;
+  }
+
+  function clear() { _cache = {}; }
+
+  return { loadForEvent, getForEvent, send, clear };
+})();
+
+// Demo proxy for EventMessages
+(function() {
+  const _origLoad = EventMessages.loadForEvent;
+  EventMessages.loadForEvent = async function(eventId) {
+    if (DEMO.active) {
+      if (!DEMO._mockMessages) DEMO._mockMessages = {};
+      return DEMO._mockMessages[eventId] || [];
+    }
+    return _origLoad.apply(this, arguments);
+  };
+  const _origGet = EventMessages.getForEvent;
+  EventMessages.getForEvent = function(eventId) {
+    if (DEMO.active) return (DEMO._mockMessages || {})[eventId] || [];
+    return _origGet(eventId);
+  };
+  const _origSend = EventMessages.send;
+  EventMessages.send = async function(eventId, opts) {
+    if (DEMO.active) {
+      if (!DEMO._mockMessages) DEMO._mockMessages = {};
+      if (!DEMO._mockMessages[eventId]) DEMO._mockMessages[eventId] = [];
+      const msg = {
+        id: 'msg_' + Date.now(), eventId, senderUid: Auth.myUid(), isMine: true,
+        type: opts.type || 'text', rawContent: opts.rawContent || '',
+        filteredContent: opts.filteredContent || opts.rawContent || '',
+        structuredData: opts.structuredData || null,
+        createdAt: new Date().toISOString(),
+      };
+      DEMO._mockMessages[eventId].push(msg);
+      return msg;
+    }
+    return _origSend.apply(this, arguments);
+  };
 })();
 
 // ──────────────────────────────────────────────
@@ -1834,6 +2270,327 @@ const TASK_CATEGORIES = [
   { id: 'pets',      icon: '🐾', label: 'Pets' },
   { id: 'other',     icon: '📌', label: 'Other' },
 ];
+
+// ──────────────────────────────────────────────
+// EVENT FIELD CONFIGS — Dynamic structured fields per event type
+// ──────────────────────────────────────────────
+const EVENT_FIELDS = {
+  date: [
+    { id: 'who', label: 'What kind of date?', type: 'select-one',
+      options: [
+        { val: 'just-us', label: 'Just us two', icon: '💑' },
+        { val: 'double', label: 'Double date', icon: '👫' },
+        { val: 'family-outing', label: 'Family outing', icon: '👨‍👩‍👧‍👦' },
+      ]},
+    { id: 'where', label: 'Where?', type: 'select-one',
+      options: [
+        { val: 'restaurant', label: 'Restaurant', icon: '🍽' },
+        { val: 'home', label: 'Home', icon: '🏠' },
+        { val: 'activity', label: 'Activity', icon: '🎯' },
+        { val: 'surprise', label: 'Surprise me', icon: '🎁' },
+      ]},
+    { id: 'babysitter', label: 'Need a babysitter?', type: 'select-one', showIf: () => FamilyStore.hasKids(),
+      options: [
+        { val: 'yes', label: 'Yes' },
+        { val: 'no', label: 'No' },
+        { val: 'already-arranged', label: 'Already arranged' },
+      ]},
+  ],
+  boys: [
+    { id: 'partner-role', label: 'Partner involvement', type: 'select-one',
+      options: [
+        { val: 'home', label: 'Staying home', icon: '🏠' },
+        { val: 'covering-kids', label: 'Covering kids', icon: '👶', showIf: () => FamilyStore.hasKids() },
+        { val: 'also-out', label: 'Also going out', icon: '🎉' },
+        { val: 'just-know', label: 'Just needs to know', icon: '📋' },
+      ]},
+    { id: 'where', label: 'General location', type: 'select-one',
+      options: [
+        { val: 'bar', label: 'Bar / Pub', icon: '🍺' },
+        { val: 'someones-place', label: "Someone's place", icon: '🏠' },
+        { val: 'activity', label: 'Activity', icon: '🎯' },
+        { val: 'other', label: 'Other', icon: '📍' },
+      ]},
+    { id: 'babysitter', label: 'Need a babysitter?', type: 'select-one', showIf: () => FamilyStore.hasKids(),
+      options: [
+        { val: 'yes', label: 'Yes' }, { val: 'no', label: 'No' }, { val: 'partner-covers', label: 'Partner covers' },
+      ]},
+  ],
+  girls: [
+    { id: 'partner-role', label: 'Partner involvement', type: 'select-one',
+      options: [
+        { val: 'home', label: 'Staying home', icon: '🏠' },
+        { val: 'covering-kids', label: 'Covering kids', icon: '👶', showIf: () => FamilyStore.hasKids() },
+        { val: 'also-out', label: 'Also going out', icon: '🎉' },
+        { val: 'just-know', label: 'Just needs to know', icon: '📋' },
+      ]},
+    { id: 'where', label: 'General location', type: 'select-one',
+      options: [
+        { val: 'restaurant', label: 'Restaurant', icon: '🍷' },
+        { val: 'someones-place', label: "Someone's place", icon: '🏠' },
+        { val: 'activity', label: 'Activity', icon: '🎯' },
+        { val: 'other', label: 'Other', icon: '📍' },
+      ]},
+    { id: 'babysitter', label: 'Need a babysitter?', type: 'select-one', showIf: () => FamilyStore.hasKids(),
+      options: [
+        { val: 'yes', label: 'Yes' }, { val: 'no', label: 'No' }, { val: 'partner-covers', label: 'Partner covers' },
+      ]},
+  ],
+  inlaw: [
+    { id: 'whose', label: 'Whose family?', type: 'select-one',
+      options: [
+        { val: 'mine', label: 'My side', icon: '👨‍👩‍👧' },
+        { val: 'theirs', label: "Partner's side", icon: '👨‍👩‍👧' },
+        { val: 'both', label: 'Both families', icon: '👨‍👩‍👧‍👦' },
+      ]},
+    { id: 'direction', label: 'Where?', type: 'select-one',
+      options: [
+        { val: 'they-come', label: 'They come to us', icon: '🏠' },
+        { val: 'we-go', label: 'We go to them', icon: '🚗' },
+        { val: 'meet', label: 'Meet somewhere', icon: '📍' },
+      ]},
+    { id: 'who-goes', label: 'Who from our household?', type: 'select-many', familyAware: true,
+      options: [
+        { val: 'both-of-us', label: 'Both of us', icon: '💑' },
+        { val: 'just-me', label: 'Just me', icon: '🙋' },
+      ]},
+    { id: 'duration', label: 'Duration', type: 'select-one',
+      options: [
+        { val: 'few-hours', label: 'Few hours', icon: '⏱' },
+        { val: 'day', label: 'Full day', icon: '☀️' },
+        { val: 'overnight', label: 'Overnight', icon: '🌙' },
+        { val: 'multi-day', label: 'Multi-day', icon: '📅' },
+      ]},
+  ],
+  trip: [
+    { id: 'who-goes', label: 'Who is going?', type: 'select-many', familyAware: true,
+      options: [
+        { val: 'just-us', label: 'Just us two', icon: '💑' },
+        { val: 'whole-family', label: 'Whole family', icon: '👨‍👩‍👧‍👦' },
+        { val: 'just-me', label: 'Just me', icon: '🙋' },
+      ]},
+    { id: 'trip-type', label: 'Trip type', type: 'select-one',
+      options: [
+        { val: 'weekend', label: 'Weekend', icon: '📅' },
+        { val: 'week', label: 'Full week', icon: '🗓' },
+        { val: 'day-trip', label: 'Day trip', icon: '🚗' },
+        { val: 'extended', label: 'Extended', icon: '✈️' },
+      ]},
+    { id: 'destination', label: 'Destination type', type: 'select-one',
+      options: [
+        { val: 'beach', label: 'Beach', icon: '🏖' },
+        { val: 'city', label: 'City', icon: '🏙' },
+        { val: 'nature', label: 'Nature', icon: '🏔' },
+        { val: 'visiting', label: 'Visiting someone', icon: '🏠' },
+        { val: 'undecided', label: 'Undecided', icon: '🤔' },
+      ]},
+    { id: 'budget', label: 'Budget comfort', type: 'select-one',
+      options: [
+        { val: 'budget', label: 'Budget', icon: '💵' },
+        { val: 'moderate', label: 'Moderate', icon: '💰' },
+        { val: 'splurge', label: 'Splurge', icon: '💎' },
+      ]},
+  ],
+  host: [
+    { id: 'format', label: 'Event format', type: 'select-one',
+      options: [
+        { val: 'dinner', label: 'Dinner party', icon: '🍽' },
+        { val: 'drinks', label: 'Drinks', icon: '🍸' },
+        { val: 'bbq', label: 'BBQ', icon: '🔥' },
+        { val: 'game', label: 'Game night', icon: '🎲' },
+        { val: 'party', label: 'Party', icon: '🎉' },
+      ]},
+    { id: 'guests', label: 'Guest size', type: 'select-one',
+      options: [
+        { val: 'small', label: '2-4 people', icon: '👥' },
+        { val: 'medium', label: '5-10 people', icon: '👥' },
+        { val: 'large', label: '10+ people', icon: '🎊' },
+      ]},
+    { id: 'prep', label: 'Prep split', type: 'select-one',
+      options: [
+        { val: 'share', label: 'Share equally', icon: '🤝' },
+        { val: 'i-handle', label: 'I handle it', icon: '🙋' },
+        { val: 'plan-together', label: 'Plan together', icon: '📋' },
+      ]},
+    { id: 'kids-included', label: 'Kids included?', type: 'select-one', showIf: () => FamilyStore.hasKids(),
+      options: [
+        { val: 'yes', label: 'Yes' }, { val: 'no', label: 'No (adults only)' }, { val: 'early-bedtime', label: 'Yes, early bedtime' },
+      ]},
+  ],
+  playdate: [
+    { id: 'which-kids', label: 'Which kids?', type: 'select-many', familyAware: true, kidsOnly: true,
+      options: [] },
+    { id: 'supervising', label: 'Who supervises?', type: 'select-one',
+      options: [
+        { val: 'me', label: 'Me', icon: '🙋' },
+        { val: 'partner', label: 'Partner', icon: '🙋‍♂️' },
+        { val: 'both', label: 'Both of us', icon: '💑' },
+        { val: 'other-parent', label: 'Other parent', icon: '👤' },
+      ]},
+    { id: 'where', label: 'Where?', type: 'select-one',
+      options: [
+        { val: 'our-place', label: 'Our place', icon: '🏠' },
+        { val: 'their-place', label: 'Their place', icon: '🏡' },
+        { val: 'park', label: 'Park', icon: '🌳' },
+        { val: 'activity', label: 'Activity venue', icon: '🎯' },
+      ]},
+  ],
+  activity: [
+    { id: 'which-kids', label: 'Which kids?', type: 'select-many', familyAware: true, kidsOnly: true,
+      options: [] },
+    { id: 'activity-type', label: 'Activity type', type: 'select-one',
+      options: [
+        { val: 'sports', label: 'Sports', icon: '⚽' },
+        { val: 'lessons', label: 'Lessons', icon: '🎵' },
+        { val: 'school', label: 'School event', icon: '🏫' },
+        { val: 'birthday', label: 'Birthday party', icon: '🎂' },
+        { val: 'other', label: 'Other', icon: '📋' },
+      ]},
+    { id: 'who-takes', label: 'Who takes them?', type: 'select-one',
+      options: [
+        { val: 'me', label: 'Me', icon: '🙋' },
+        { val: 'partner', label: 'Partner', icon: '🙋‍♂️' },
+        { val: 'either', label: 'Either of us', icon: '🤷' },
+        { val: 'carpool', label: 'Carpool', icon: '🚗' },
+      ]},
+  ],
+  household: [
+    { id: 'type', label: 'What type?', type: 'select-one',
+      options: [
+        { val: 'repair', label: 'Repair', icon: '🔧' },
+        { val: 'service', label: 'Service visit', icon: '👷' },
+        { val: 'delivery', label: 'Delivery', icon: '📦' },
+        { val: 'project', label: 'Home project', icon: '🏠' },
+      ]},
+    { id: 'who-home', label: 'Who needs to be home?', type: 'select-one',
+      options: [
+        { val: 'me', label: 'Me', icon: '🙋' },
+        { val: 'partner', label: 'Partner', icon: '🙋‍♂️' },
+        { val: 'either', label: 'Either of us', icon: '🤷' },
+        { val: 'nobody', label: 'Nobody', icon: '🔑' },
+      ]},
+  ],
+  other: [],
+};
+
+// Updated TOPICS with new types
+const TOPICS_V2 = [
+  { id: 'date',      icon: '🌹', label: 'Date Night',     color: '#C4714A' },
+  { id: 'boys',      icon: '🍺', label: "Boys' Night",    color: '#7A9E8A' },
+  { id: 'girls',     icon: '🍷', label: "Girls' Night",   color: '#9B6B8A' },
+  { id: 'inlaw',     icon: '👨‍👩‍👧', label: 'Family Visit',   color: '#9B8880' },
+  { id: 'trip',      icon: '✈️', label: 'Trip / Vacation', color: '#6A8CAA' },
+  { id: 'host',      icon: '🏡', label: 'Hosting',         color: '#7A9E8A' },
+  { id: 'playdate',  icon: '👧', label: 'Playdate',        color: '#E8B88A' },
+  { id: 'activity',  icon: '🎒', label: "Kids' Activity",  color: '#7A6A9B' },
+  { id: 'household', icon: '🔧', label: 'Household',       color: '#9B8880' },
+  { id: 'other',     icon: '💬', label: 'Something Else',  color: '#9B8880' },
+];
+
+/** Render structured fields for a given topic as HTML */
+function renderStructuredFields(topicId) {
+  const fields = EVENT_FIELDS[topicId] || [];
+  if (fields.length === 0 && topicId !== 'other') return '';
+
+  return fields.map(field => {
+    // Check showIf condition
+    if (field.showIf && !field.showIf()) return '';
+
+    // Build options, including family-aware dynamic options
+    let opts = [...field.options];
+
+    // Filter options with showIf
+    opts = opts.filter(o => !o.showIf || o.showIf());
+
+    // Add kids as options for family-aware fields
+    if (field.familyAware) {
+      const kids = FamilyStore.children();
+      if (field.kidsOnly) {
+        // Replace options entirely with kid names
+        opts = kids.map(k => ({ val: k.id, label: k.name, icon: '👧' }));
+        if (opts.length === 0) opts = [{ val: 'kids', label: 'Kids', icon: '👧' }];
+      } else {
+        // Append kid names to existing options
+        kids.forEach(k => opts.push({ val: k.id, label: k.name, icon: '👧' }));
+      }
+    }
+
+    const isMulti = field.type === 'select-many';
+
+    return `
+    <div style="margin-bottom:14px;" data-field-id="${field.id}">
+      <div class="input-label">${field.label}</div>
+      <div class="pill-group" data-field="${field.id}" data-multi="${isMulti}">
+        ${opts.map(o => `
+          <div class="pill" data-val="${o.val}">
+            ${o.icon ? `<span class="pill-icon">${o.icon}</span>` : ''}
+            ${U.esc(o.label)}
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/** Collect structured field selections from the compose form */
+function collectStructuredSelections(el) {
+  const selections = {};
+  el.querySelectorAll('.pill-group').forEach(group => {
+    const fieldId = group.dataset.field;
+    const isMulti = group.dataset.multi === 'true';
+    const selected = [...group.querySelectorAll('.pill.selected')].map(p => p.dataset.val);
+    if (selected.length > 0) {
+      selections[fieldId] = isMulti ? selected : selected[0];
+    }
+  });
+  return selections;
+}
+
+/** Generate a human-readable title from structured selections */
+function autoTitle(topicId, selections, dateOptions) {
+  const topic = TOPICS_V2.find(t => t.id === topicId) || TOPICS_V2[9];
+  let title = topic.label;
+
+  // Add date if available
+  if (dateOptions?.length > 0) {
+    const d = new Date(dateOptions[0].date + 'T12:00:00');
+    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    title += ` — ${dayLabel}`;
+    if (dateOptions[0].timeLabel && dateOptions[0].timeLabel !== 'Any time') {
+      title += `, ${dateOptions[0].timeLabel}`;
+    }
+  }
+
+  return title;
+}
+
+/** Generate a structured summary HTML from selections */
+function renderStructuredSummary(topicId, selections) {
+  if (!selections || Object.keys(selections).length === 0) return '';
+  const fields = EVENT_FIELDS[topicId] || [];
+
+  const rows = [];
+  for (const field of fields) {
+    const val = selections[field.id];
+    if (!val) continue;
+    const vals = Array.isArray(val) ? val : [val];
+    const labels = vals.map(v => {
+      // Check field options
+      const opt = field.options.find(o => o.val === v);
+      if (opt) return opt.label;
+      // Check family members
+      const fm = FamilyStore.find(v);
+      if (fm) return fm.name;
+      return v;
+    });
+    rows.push(`<div class="summary-row">
+      <div class="summary-label">${U.esc(field.label.replace('?',''))}</div>
+      <div class="summary-value">${labels.map(l => U.esc(l)).join(', ')}</div>
+    </div>`);
+  }
+  if (rows.length === 0) return '';
+  return `<div class="summary-card">${rows.join('')}</div>`;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    AI INTELLIGENCE LAYER
@@ -2366,11 +3123,12 @@ Router.register('home', () => {
         </div>
         <div style="background:var(--terra);color:#fff;font-size:.7rem;font-weight:800;min-width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:0 7px;">${totalPending}</div>
       </div>
-      ${activeParlays.filter(p => (p.status === 'pending_partner' && !p.isMine) || (p.status === 'partner_replied' && p.isMine) || (p.status === 'counter_proposed' && p.isMine) || p.status === 'active').slice(0,3).map(p => {
-        const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
+      ${activeParlays.filter(p => (p.status === 'pending_partner' && !p.isMine) || (p.status === 'partner_replied' && p.isMine) || (p.status === 'counter_proposed' && p.isMine) || (p.status === 'in_discussion' && p.lastActivityBy && p.lastActivityBy !== Auth.myUid()) || p.status === 'active').slice(0,3).map(p => {
+        const topic = TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9];
         const label = (p.status === 'pending_partner' && !p.isMine) ? 'Reply needed'
           : (p.status === 'partner_replied' && p.isMine) ? 'Reply received'
           : (p.status === 'counter_proposed' && p.isMine) ? 'New times suggested'
+          : p.status === 'in_discussion' ? 'New message'
           : 'Proposal ready';
         return `<div onclick="Router.go('parlay-detail',{id:'${p.id}'})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;cursor:pointer;margin-bottom:6px;">
           <span style="font-size:1.1rem;">${topic.icon}</span>
@@ -2437,83 +3195,123 @@ Router.register('home', () => {
 
 
 // ──────────────────────────────────────────────
-// PLAN — Topic grid + active parlays
+// PLAN — Smart sections + filters + topic grid
 // ──────────────────────────────────────────────
 Router.register('plan', () => {
-  const active   = Store.activeParlays();
-  const resolved = Store.resolvedParlays();
+  const all = Store.parlays().filter(p => !p.archived);
+  const myN = Auth.myName();
+  const theirN = Auth.theirName();
 
-  const negLabel = (p) => {
-    if (p.status === 'pending_partner' && !p.isMine) return ['Your turn ↩', '#C4714A', '#C4714A18'];
-    if (p.status === 'pending_partner' && p.isMine)  return ['Sent — awaiting reply', '#E8B88A', '#E8B88A18'];
-    if (p.status === 'partner_replied' && p.isMine)   return ['Reply received ↩', '#7A6A9B', '#7A6A9B18'];
-    if (p.status === 'partner_replied' && !p.isMine)  return ['Sent — awaiting proposal', '#7A6A9B', '#7A6A9B18'];
-    if (p.status === 'counter_proposed' && p.isMine)   return ['New times ↩', '#6A8CAA', '#6A8CAA18'];
+  // Smart sections
+  const needsMe = all.filter(p => p.status !== 'resolved' && p.status !== 'declined' && (
+    (p.status === 'pending_partner' && !p.isMine) ||
+    (p.status === 'partner_replied' && p.isMine) ||
+    (p.status === 'counter_proposed' && p.isMine) ||
+    (p.status === 'in_discussion' && p.lastActivityBy && p.lastActivityBy !== Auth.myUid()) ||
+    (p.status === 'active')
+  ));
+  const active = all.filter(p => !['resolved','declined'].includes(p.status) && !needsMe.includes(p));
+  const upcoming = all.filter(p => p.status === 'resolved' && p.resolution === 'date_accepted');
+  const past = all.filter(p => p.status === 'resolved' && p.resolution !== 'date_accepted');
+  const declined = all.filter(p => p.status === 'declined');
+
+  const topicForP = (p) => TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9];
+
+  const statusLabel = (p) => {
+    if (p.status === 'pending_partner' && !p.isMine) return ['Your turn', '#C4714A', '#C4714A18'];
+    if (p.status === 'pending_partner' && p.isMine)  return ['Sent', '#E8B88A', '#E8B88A18'];
+    if (p.status === 'partner_replied' && p.isMine)   return ['Reply received', '#7A6A9B', '#7A6A9B18'];
+    if (p.status === 'partner_replied' && !p.isMine)  return ['Awaiting proposal', '#7A6A9B', '#7A6A9B18'];
+    if (p.status === 'in_discussion')                  return ['In discussion', '#6A8CAA', '#6A8CAA18'];
+    if (p.status === 'counter_proposed' && p.isMine)   return ['New times', '#6A8CAA', '#6A8CAA18'];
     if (p.status === 'counter_proposed' && !p.isMine)  return ['Counter sent', '#6A8CAA', '#6A8CAA18'];
     if (p.status === 'active')                         return ['Proposal ready', '#C4714A', '#C4714A18'];
+    if (p.status === 'resolved' && p.resolution === 'date_accepted') return ['Confirmed', '#7A9E8A', '#7A9E8A18'];
+    if (p.status === 'resolved')                       return ['Resolved', '#7A9E8A', '#7A9E8A18'];
+    if (p.status === 'declined')                       return ['Declined', '#9B8880', '#9B888018'];
     return [p.status, '#9B8880', '#9B888018'];
+  };
+
+  const cardHtml = (p) => {
+    const topic = topicForP(p);
+    const [label, color, bg] = statusLabel(p);
+    return `<div class="parlay-card" onclick="Router.go('parlay-detail',{id:'${p.id}'})">
+      <div style="width:38px;height:38px;border-radius:10px;background:${topic.color}18;display:flex;align-items:center;justify-content:center;font-size:1.15rem;">${topic.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.88rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc(p.title)}</div>
+        <div style="font-size:.68rem;color:var(--muted);">${p.date}${p.isMine ? '' : ' · from ' + U.esc(theirN)}</div>
+      </div>
+      <div class="status-chip" style="background:${bg};color:${color};">${label}</div>
+    </div>`;
+  };
+
+  const sectionHtml = (title, items, opts = {}) => {
+    if (items.length === 0) return '';
+    const collapsed = opts.collapsed ? ' collapsed' : '';
+    return `
+    <div style="padding:8px 0;">
+      <div class="section-toggle${collapsed}" onclick="this.classList.toggle('collapsed');this.nextElementSibling.classList.toggle('collapsed');">
+        <div class="section-label">${title} (${items.length})</div>
+        <div class="toggle-arrow">▾</div>
+      </div>
+      <div class="section-body${collapsed}">
+        <div style="display:flex;flex-direction:column;gap:8px;padding:0 20px;">
+          ${items.map(cardHtml).join('')}
+        </div>
+      </div>
+    </div>`;
   };
 
   return `
   <div style="padding-bottom:calc(var(--nav-h) + 20px);">
     <div style="background:var(--espresso);padding:0 24px 24px;padding-top:max(52px,env(safe-area-inset-top));">
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:var(--cream);" class="a1">Plan an <em style="color:var(--amber)">Event</em></div>
+        <div style="font-family:var(--font-display);font-size:2.4rem;font-weight:300;color:var(--cream);" class="a1">Plan <em style="color:var(--amber)">Events</em></div>
         <button class="btn-ghost" style="color:rgba(250,246,241,.65);font-size:1.1rem;" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
       </div>
-      <div style="font-size:.72rem;color:rgba(250,246,241,.65);" class="a1">Pick a topic — Parlay handles the negotiation.</div>
+      <div style="font-size:.72rem;color:rgba(250,246,241,.65);" class="a1">Propose, discuss, decide — together.</div>
     </div>
 
-    <div style="padding:16px 0;">
-      <div class="section-label">What are you planning?</div>
-      <div class="topic-grid a2">
-        ${TOPICS.map(t => `
-          <div class="topic-card" data-topic="${t.id}">
-            <div class="topic-icon">${t.icon}</div>
-            <div class="topic-label">${t.label}</div>
-          </div>
-        `).join('')}
-      </div>
+    <div style="padding:16px 20px 8px;" class="a2">
+      <button class="btn btn-accent" onclick="Router.go('compose-pick')">+ New Event Proposal</button>
     </div>
 
-    ${active.length > 0 ? `
+    ${needsMe.length > 0 ? `
     <div style="padding:8px 0;">
-      <div class="section-label">Active (${active.length})</div>
+      <div class="section-label" style="color:var(--terra);">⚡ NEEDS YOUR RESPONSE (${needsMe.length})</div>
       <div style="display:flex;flex-direction:column;gap:8px;padding:0 20px;">
-        ${active.map(p => {
-          const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
-          const [label, color, bg] = negLabel(p);
-          return `<div class="parlay-card" onclick="Router.go('parlay-detail',{id:'${p.id}'})">
-            <div style="width:38px;height:38px;border-radius:10px;background:${topic.color}18;display:flex;align-items:center;justify-content:center;font-size:1.15rem;">${topic.icon}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:.88rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc(p.title)}</div>
-              <div style="font-size:.68rem;color:var(--muted);">${p.date}</div>
-            </div>
-            <div class="status-chip" style="background:${bg};color:${color};">${label}</div>
-          </div>`;
-        }).join('')}
+        ${needsMe.map(cardHtml).join('')}
       </div>
     </div>` : ''}
 
-    ${resolved.length > 0 ? `
-    <div style="padding:8px 0;">
-      <div class="section-label">Resolved (${resolved.length})</div>
-      <div style="display:flex;flex-direction:column;gap:8px;padding:0 20px;">
-        ${resolved.slice(0,5).map(p => {
-          const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
-          return `<div class="parlay-card" style="opacity:.6;" onclick="Router.go('parlay-detail',{id:'${p.id}'})">
-            <div style="width:38px;height:38px;border-radius:10px;background:${topic.color}18;display:flex;align-items:center;justify-content:center;font-size:1.15rem;">${topic.icon}</div>
-            <div style="flex:1;"><div style="font-size:.88rem;font-weight:600;">${U.esc(p.title)}</div><div style="font-size:.68rem;color:var(--muted);">${p.date}</div></div>
-            <div class="status-chip" style="background:rgba(122,158,138,.12);color:var(--sage);">Resolved ✓</div>
-          </div>`;
-        }).join('')}
-      </div>
+    ${sectionHtml('Active', active)}
+    ${sectionHtml('Upcoming', upcoming)}
+    ${sectionHtml('Resolved', past, { collapsed: true })}
+    ${sectionHtml('Declined', declined, { collapsed: true })}
+
+    ${all.length === 0 ? `
+    <div style="padding:52px 24px;text-align:center;" class="a3">
+      <div style="font-size:2.8rem;margin-bottom:16px;">📅</div>
+      <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">No events yet</div>
+      <div style="font-size:.82rem;color:var(--muted);max-width:240px;margin:0 auto;">Propose a date night, family visit, trip, or anything else.</div>
+    </div>` : ''}
+
+    ${all.length >= 10 ? `
+    <div class="filter-bar a3">
+      <div class="filter-chip active" data-filter="all">All</div>
+      <div class="filter-chip" data-filter="needs-me">⚡ Needs me</div>
+      <div class="filter-chip" data-filter="active">Active</div>
+      <div class="filter-chip" data-filter="accepted">Accepted</div>
+      <div class="filter-chip" data-filter="declined">Declined</div>
     </div>` : ''}
   </div>`;
 }, (el) => {
-  el.querySelectorAll('.topic-card').forEach(card => {
-    card.addEventListener('click', () => {
-      Router.go('compose', { topicId: card.dataset.topic });
+  // Filter chip logic
+  el.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      el.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      // TODO: implement client-side filtering
     });
   });
   Badges.update();
@@ -2521,12 +3319,42 @@ Router.register('plan', () => {
 
 
 // ──────────────────────────────────────────────
-// COMPOSE — Write your position
+// COMPOSE PICK — Pick event type (topic grid)
+// ──────────────────────────────────────────────
+Router.register('compose-pick', () => `
+  <div style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
+      <button class="btn btn-outline btn-sm" onclick="Router.go('plan')">‹ Back</button>
+      <span style="font-family:var(--font-display);font-size:1.1rem;">New Event</span>
+    </div>
+    <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;" class="a1">What are you <em style="color:var(--terra)">planning?</em></div>
+    <div style="font-size:.82rem;color:var(--muted);margin-bottom:24px;line-height:1.6;" class="a2">Pick a type — Parlay handles the rest.</div>
+    <div class="topic-grid a3">
+      ${TOPICS_V2.map(t => `
+        <div class="topic-card" data-topic="${t.id}">
+          <div class="topic-icon">${t.icon}</div>
+          <div class="topic-label">${t.label}</div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+`, (el) => {
+  el.querySelectorAll('.topic-card').forEach(card => {
+    card.addEventListener('click', () => {
+      Router.go('compose', { topicId: card.dataset.topic });
+    });
+  });
+});
+
+
+// ──────────────────────────────────────────────
+// COMPOSE — Structured fields + optional note + dates
 // ──────────────────────────────────────────────
 Router.register('compose', ({ topicId } = {}) => {
-  const topic = TOPICS.find(t => t.id === topicId) || TOPICS[7];
+  const topic = TOPICS_V2.find(t => t.id === topicId) || TOPICS_V2[9];
   const theirN = Auth.theirName();
-  const needsIntent = INTENT_TOPICS.includes(topicId);
+  const structuredHtml = renderStructuredFields(topicId);
+  const hasStructured = structuredHtml.trim().length > 0;
 
   if (!Auth.hasPartner()) {
     return `
@@ -2534,33 +3362,53 @@ Router.register('compose', ({ topicId } = {}) => {
       <div style="font-size:2.8rem;margin-bottom:16px;">👫</div>
       <div style="font-family:var(--font-display);font-size:1.3rem;margin-bottom:8px;">Partner needed</div>
       <div style="font-size:.85rem;color:var(--muted);max-width:280px;margin:0 auto 24px;line-height:1.5;">
-        You need a connected partner before you can create a parlay. Share your invite code to get started.
+        You need a connected partner before you can create a proposal.
       </div>
       <button class="btn btn-primary" style="max-width:240px;" onclick="Router.go('setup')">Go to Setup</button>
-      <button class="btn btn-outline" style="max-width:240px;margin-top:10px;" onclick="Router.go('plan')">‹ Back</button>
+      <button class="btn btn-outline" style="max-width:240px;margin-top:10px;" onclick="Router.go('compose-pick')">‹ Back</button>
     </div>`;
   }
 
   return `
   <div data-topic="${topicId}" style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
-      <button class="btn btn-outline btn-sm" onclick="Router.go('plan')">‹ Back</button>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" class="a1">
+      <button class="btn btn-outline btn-sm" onclick="Router.go('compose-pick')">‹ Back</button>
       <span style="font-size:1.2rem;">${topic.icon}</span>
       <span style="font-family:var(--font-display);font-size:1.1rem;">${topic.label}</span>
     </div>
 
-    <div class="a2" style="margin-bottom:20px;">
-      <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;">Your <em style="color:var(--terra)">position</em></div>
-      <div style="font-size:.82rem;color:var(--muted);line-height:1.6;">
-        ${needsIntent
-          ? 'First clarify the basics &mdash; then tell Parlay exactly what you want. It filters everything before your partner sees it.'
-          : `Say exactly what you want. Don't filter yourself &mdash; Parlay does that before ${U.esc(theirN)} sees it.`}
-      </div>
+    <div class="a2" style="margin-bottom:16px;">
+      <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:4px;">Quick <em style="color:var(--terra)">setup</em></div>
+      <div style="font-size:.78rem;color:var(--muted);line-height:1.6;">Tap your selections — ${U.esc(theirN)} sees the summary, not your raw words.</div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:16px;" class="a3">
-      <!-- Intent questions (topic-specific) -->
-      <div id="intent-section">${needsIntent ? renderIntentQuestions(topicId) : ''}</div>
+    <div style="display:flex;flex-direction:column;gap:12px;" class="a3">
+      <!-- Structured fields -->
+      ${hasStructured ? `<div id="structured-fields">${structuredHtml}</div>` : ''}
+
+      <!-- Date options -->
+      <div style="margin-top:4px;">
+        <div class="input-label">📅 When? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(up to 4 options)</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;" id="date-slots">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="slot-num">1</div>
+            <input type="date" class="input" style="flex:2;" data-slot="1" data-type="date">
+            ${U.timeSelectHtml(1)}
+          </div>
+        </div>
+        <div class="add-row" id="add-date-slot" style="margin-top:8px;">+ Add another date option</div>
+      </div>
+
+      <!-- Optional note -->
+      <div>
+        <div id="note-toggle" style="display:flex;align-items:center;gap:8px;padding:10px 0;cursor:pointer;color:var(--terra);font-size:.82rem;font-weight:600;">
+          <span>💬</span> Add a personal note
+        </div>
+        <div id="note-area" style="display:none;">
+          <textarea id="compose-text" class="input" rows="3" placeholder="Optional — add context, feelings, or details..." style="resize:none;line-height:1.6;"></textarea>
+          <div style="font-size:.68rem;color:var(--muted);margin-top:4px;">🔒 Filtered by Parlay before ${U.esc(theirN)} sees it</div>
+        </div>
+      </div>
 
       <!-- Tone warning -->
       <div id="tone-warn" style="display:none;padding:12px 14px;background:#FFF5E0;border:1px solid #E8B88A;border-radius:var(--r-md);font-size:.78rem;color:#8A6A2A;line-height:1.5;">
@@ -2568,80 +3416,73 @@ Router.register('compose', ({ topicId } = {}) => {
         <div id="warn-body">That's okay — Parlay will cool it down before sending.</div>
       </div>
 
-      <div>
-        <div class="input-label">What do you want or need? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">speak freely</span></div>
-        <textarea id="compose-text" class="input" rows="5" placeholder="e.g. I really want to see my parents this month. I miss them and feel like we haven't visited in a while." style="resize:none;line-height:1.6;"></textarea>
-      </div>
-
-      <!-- Dates or constraints -->
-      <div>
-        <div class="input-label">Dates or constraints? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
-        <input type="text" id="compose-constraints" class="input" placeholder="e.g. Not the weekend of the 22nd, prefer a Saturday&hellip;">
-      </div>
-
-      <!-- Date options card -->
-      <div class="fieldset-card">
-        <div class="fieldset-badge">📅 Propose date options</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <div class="input-label" style="margin-bottom:0;">Propose date options</div>
-          <span style="font-size:.68rem;color:var(--muted);background:var(--parchment);padding:2px 8px;border-radius:10px;">up to 4</span>
-        </div>
-        <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px;line-height:1.5;">Give your partner real options to choose from &mdash; no guessing games.</div>
-        <div style="display:flex;flex-direction:column;gap:10px;" id="date-slots">
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div class="slot-num">1</div>
-            <input type="date" class="input" style="flex:2;" data-slot="1" data-type="date">
-            ${U.timeSelectHtml(1)}
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div class="slot-num">2</div>
-            <input type="date" class="input" style="flex:2;" data-slot="2" data-type="date">
-            ${U.timeSelectHtml(2)}
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div class="slot-num">3</div>
-            <input type="date" class="input" style="flex:2;" data-slot="3" data-type="date">
-            ${U.timeSelectHtml(3)}
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div class="slot-num">4</div>
-            <input type="date" class="input" style="flex:2;" data-slot="4" data-type="date">
-            ${U.timeSelectHtml(4)}
-          </div>
-        </div>
-        <div style="font-size:.72rem;color:var(--muted);font-style:italic;margin-top:12px;line-height:1.5;">Leave blank to skip date options and just send your position.</div>
-      </div>
-
-      <div style="background:var(--parchment);border-radius:var(--r-md);padding:16px 18px;">
-        <div style="font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:4px;">🔒 Private until filtered</div>
-        <div style="font-size:.78rem;color:var(--muted);line-height:1.55;">${U.esc(theirN)} only sees the calm rewritten version &mdash; not your raw words above.</div>
+      <div style="background:var(--parchment);border-radius:var(--r-md);padding:12px 14px;margin-top:4px;">
+        <div style="font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:2px;">🔒 Safe by design</div>
+        <div style="font-size:.75rem;color:var(--muted);line-height:1.55;">Structured selections are neutral. Any notes are AI-filtered before sending.</div>
       </div>
 
       <button class="btn btn-accent" id="compose-submit">
-        <span id="compose-btn-text">Let Parlay Mediate &rarr;</span>
+        <span id="compose-btn-text">Send to ${U.esc(theirN)} →</span>
       </button>
-      <button class="btn btn-outline" onclick="Router.go('plan')" style="margin-top:-4px;">Cancel</button>
+      <button class="btn btn-outline" onclick="Router.go('compose-pick')" style="margin-top:-4px;">Cancel</button>
     </div>
   </div>`;
 }, (el, { topicId } = {}) => {
+  let _submitting = false;
+  let _dateSlotCount = 1;
   const textarea = el.querySelector('#compose-text');
   const warn = el.querySelector('#tone-warn');
-  let _submitting = false;
 
-  // Wire up intent question radio selectors
-  el.querySelectorAll('.radio-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-      const group = opt.closest('.radio-group');
-      group.querySelectorAll('.radio-opt').forEach(o => o.classList.remove('selected'));
-      opt.classList.add('selected');
+  // Wire pill selectors
+  el.querySelectorAll('.pill-group').forEach(group => {
+    const isMulti = group.dataset.multi === 'true';
+    group.querySelectorAll('.pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        if (isMulti) {
+          pill.classList.toggle('selected');
+        } else {
+          group.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+          pill.classList.add('selected');
+        }
+      });
     });
   });
 
-  // Set min date on date inputs to today
+  // Note toggle
+  el.querySelector('#note-toggle')?.addEventListener('click', () => {
+    const area = el.querySelector('#note-area');
+    const toggle = el.querySelector('#note-toggle');
+    if (area.style.display === 'none') {
+      area.style.display = 'block';
+      toggle.style.display = 'none';
+      textarea?.focus();
+    }
+  });
+
+  // Add date slot
+  el.querySelector('#add-date-slot')?.addEventListener('click', () => {
+    if (_dateSlotCount >= 4) return;
+    _dateSlotCount++;
+    const slots = el.querySelector('#date-slots');
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;gap:8px;align-items:center;';
+    div.innerHTML = `
+      <div class="slot-num">${_dateSlotCount}</div>
+      <input type="date" class="input" style="flex:2;" data-slot="${_dateSlotCount}" data-type="date">
+      ${U.timeSelectHtml(_dateSlotCount)}
+    `;
+    slots.appendChild(div);
+    if (_dateSlotCount >= 4) el.querySelector('#add-date-slot').style.display = 'none';
+    // Set min date
+    const today = new Date().toISOString().split('T')[0];
+    div.querySelector('input[type="date"]').min = today;
+  });
+
+  // Set min date on first slot
   const today = new Date().toISOString().split('T')[0];
   el.querySelectorAll('input[type="date"]').forEach(d => { d.min = today; });
 
-  // Tension detection (debounced, versioned)
+  // Tension detection on note (debounced)
   let _toneTimer, _tensionV = 0;
   textarea?.addEventListener('input', () => {
     clearTimeout(_toneTimer);
@@ -2658,12 +3499,9 @@ Router.register('compose', ({ topicId } = {}) => {
           if (parsed.flag && warn) {
             const h = el.querySelector('#warn-head');
             const b = el.querySelector('#warn-body');
-            const headlines = { criticism:'⚡ Character attack detected', contempt:'🚨 Contempt detected', defensiveness:'⚡ Defensiveness detected', stonewalling:'⚡ Shutdown detected' };
-            if (h) h.textContent = headlines[parsed.horseman] || '⚡ Some heat detected';
+            if (h) h.textContent = parsed.horseman === 'contempt' ? '🚨 Contempt detected' : '⚡ Some heat detected';
             if (b) b.textContent = parsed.note || "That's okay — Parlay will cool it down.";
             warn.style.display = 'block';
-            if (parsed.horseman === 'contempt') { warn.style.background = '#FFF0F0'; warn.style.borderColor = '#E8A0A0'; warn.style.color = '#8A2A2A'; }
-            else { warn.style.background = '#FFF5E0'; warn.style.borderColor = '#E8B88A'; warn.style.color = '#8A6A2A'; }
           } else if (warn) { warn.style.display = 'none'; }
         } catch(e) { /* best-effort */ }
       }, 800);
@@ -2673,120 +3511,94 @@ Router.register('compose', ({ topicId } = {}) => {
   // Submit
   el.querySelector('#compose-submit')?.addEventListener('click', async () => {
     if (_submitting) return;
-    const raw = textarea?.value.trim();
-    if (!raw) { U.toast('Tell Parlay what you need first'); return; }
     _submitting = true;
 
     const btn = el.querySelector('#compose-submit');
     const btnText = el.querySelector('#compose-btn-text');
     btn.disabled = true;
-    btnText.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Filtering your message…';
+    btnText.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Sending…';
 
-    // ── Gather intent context from structured questions ────
-    let intentContext = '';
-    const whoVal = el.querySelector('#iq-who .radio-opt.selected')?.dataset.val;
-    const roleVal = el.querySelector('#iq-role .radio-opt.selected')?.dataset.val;
+    // Collect structured selections
+    const selections = collectStructuredSelections(el);
 
-    if (whoVal) {
-      const whoLabels = {
-        'just-me': 'Just the user going alone — spouse stays home',
-        'me-and-kids': 'User going with kids, spouse NOT coming',
-        'whole-family': 'Whole family going together',
-        'just-us': 'Just the two partners — no kids',
-        'double': 'Double date with friends',
-        'family-outing': 'Family outing (kids included)',
-        'my-family': "User's family",
-        'their-family': "Partner's family",
-        'both': 'Both families',
-        'they-visit-us': 'They come to us',
-        'we-visit-them': 'We go to them',
-        'meet-somewhere': 'Meet somewhere neutral',
-        'dinner': 'Dinner party', 'drinks': 'Drinks & appetizers',
-        'bbq': 'BBQ / backyard', 'game': 'Game night',
-      };
-      intentContext += `WHO/WHAT: ${whoLabels[whoVal] || whoVal}\n`;
-    }
-    if (roleVal) {
-      const roleLabels = {
-        'not-involved': 'Spouse not part of this — they stay home',
-        'aware': 'Spouse just needs to approve the timing',
-        'covering-kids': 'Spouse covers the kids',
-        'share-prep': 'Share cooking & prep equally',
-        'i-handle': 'User handles it, just needs the OK',
-        'plan-together': 'Plan it together',
-      };
-      intentContext += `PARTNER ROLE: ${roleLabels[roleVal] || roleVal}\n`;
-    }
-
-    // Gather date options
+    // Collect date options
     const dateOptions = [];
     for (let n = 1; n <= 4; n++) {
       const d = el.querySelector(`input[data-slot="${n}"][data-type="date"]`)?.value;
       const t = el.querySelector(`[data-slot="${n}"][data-type="time"]`)?.value || '';
       if (d) dateOptions.push({ id: 'opt_' + n, date: d, timeLabel: t || 'Any time' });
     }
-    if (dateOptions.length) {
-      intentContext += `DATE OPTIONS: ${dateOptions.map(o => o.date + (o.timeLabel ? ' ' + o.timeLabel : '')).join('; ')}\n`;
+
+    // Build intent context from selections
+    let intentContext = '';
+    for (const [k, v] of Object.entries(selections)) {
+      const vals = Array.isArray(v) ? v.join(', ') : v;
+      intentContext += `${k}: ${vals}\n`;
     }
 
-    const constraints = el.querySelector('#compose-constraints')?.value.trim();
-    if (constraints) {
-      intentContext += `DATE CONSTRAINTS: ${constraints}\n`;
+    // Get optional note
+    const rawNote = textarea?.value.trim() || '';
+
+    // AI filter the note if present
+    let filteredNote = rawNote;
+    if (rawNote) {
+      try {
+        filteredNote = await runToneFilter(rawNote, intentContext);
+      } catch(e) { filteredNote = rawNote; }
     }
 
-    // ── AI tone filter (best-effort) ────
-    let filtered = raw;
-    let aiWorked = false;
-    try {
-      filtered = await runToneFilter(raw, intentContext);
-      aiWorked = true;
-    } catch(e) {
-      console.error('[compose] AI filter failed:', e);
-      filtered = raw;
-    }
+    // Auto-generate title
+    const title = autoTitle(topicId, selections, dateOptions);
 
     // Save
     const id = 'neg_' + Date.now();
-    const topic = TOPICS.find(t => t.id === topicId) || TOPICS[7];
     try {
       await Store.addParlay({
-        id, topicId,
-        title: topic.label,
+        id, topicId, title,
         date: U.shortDate(new Date()),
-        rawInput: raw,
-        filteredInput: filtered,
+        rawInput: rawNote,
+        filteredInput: filteredNote,
         intentContext,
+        structuredSelections: selections,
         dateOptions,
         status: 'pending_partner',
         createdByUid: Auth.myUid(),
         isMine: true,
         partnerRawReply: null, partnerFilteredReply: null,
-        partnerDateResponse: null, proposal: null, resolution: null,
-        archived: false,
+        partnerDateResponse: null, counterDates: [], confirmedDate: null,
+        proposal: null, resolution: null, archived: false,
+        messageCount: 0, lastActivityBy: Auth.myUid(),
       });
-      Router.go('parlay-sent', { id, aiWorked });
+
+      // Add initial message to thread if note was sent
+      if (rawNote) {
+        await EventMessages.send(id, { type: 'text', rawContent: rawNote, filteredContent: filteredNote });
+      }
+
+      Router.go('parlay-sent', { id, aiWorked: !!rawNote ? filteredNote !== rawNote : true });
     } catch(e) {
       console.error('[compose] save error:', e);
       _submitting = false;
       btn.disabled = false;
-      btnText.textContent = 'Let Parlay Mediate →';
-      U.toast('⚠️ Failed to send — try again');
+      btnText.textContent = `Send to ${Auth.theirName()} →`;
+      U.toast('Failed to send — try again');
     }
   });
 });
+
 
 // ──────────────────────────────────────────────
 // PARLAY SENT
 // ──────────────────────────────────────────────
 Router.register('parlay-sent', ({ id, aiWorked = true } = {}) => {
   const p = Store.findParlay(id);
-  const topic = p ? TOPICS.find(t => t.id === p.topicId) || TOPICS[7] : TOPICS[7];
+  const topic = p ? TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9] : TOPICS_V2[9];
   return `
   <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;text-align:center;">
-    <div style="font-size:3rem;margin-bottom:20px;animation:float 4s ease-in-out infinite;">${aiWorked ? '⚖️' : '⚠️'}</div>
-    <div style="font-family:var(--font-display);font-size:2rem;font-weight:300;margin-bottom:8px;" class="a1">Parlay <em style="color:var(--terra)">sent</em></div>
+    <div style="font-size:3rem;margin-bottom:20px;animation:float 4s ease-in-out infinite;">📬</div>
+    <div style="font-family:var(--font-display);font-size:2rem;font-weight:300;margin-bottom:8px;" class="a1">Proposal <em style="color:var(--terra)">sent</em></div>
     <div style="font-size:.85rem;color:var(--muted);line-height:1.7;max-width:280px;margin-bottom:24px;" class="a2">
-      ${aiWorked ? 'Your position has been filtered and sent. Your partner will see the calm version.' : '⚠️ AI filter was unavailable. Your raw text was sent this time.'}
+      ${U.esc(Auth.theirName())} will see your structured proposal${aiWorked ? ' with any notes filtered for tone' : ''}.
     </div>
     ${p ? `<div style="font-size:.75rem;color:var(--muted);background:var(--parchment);border-radius:var(--r-pill);padding:5px 14px;margin-bottom:28px;">${topic.icon} ${U.esc(p.title)}</div>` : ''}
     <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px;" class="a3">
@@ -2798,31 +3610,37 @@ Router.register('parlay-sent', ({ id, aiWorked = true } = {}) => {
 
 
 // ──────────────────────────────────────────────
-// PARLAY DETAIL
+// PARLAY DETAIL — View event + thread + actions
 // ──────────────────────────────────────────────
 Router.register('parlay-detail', ({ id } = {}) => {
   const p = Store.findParlay(id);
-  if (!p) return `<div style="padding:60px 24px;text-align:center;"><div style="font-size:1.2rem;">Parlay not found</div><button class="btn btn-outline btn-sm" style="margin-top:16px;" onclick="Router.go('plan')">‹ Back</button></div>`;
+  if (!p) return `<div style="padding:60px 24px;text-align:center;"><div style="font-size:1.2rem;">Event not found</div><button class="btn btn-outline btn-sm" style="margin-top:16px;" onclick="Router.go('plan')">‹ Back</button></div>`;
 
-  const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
+  const topic = TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9];
   const isMine = p.isMine;
   const myN = Auth.myName();
   const theirN = Auth.theirName();
   const creatorN = isMine ? myN : theirN;
   const recipN = isMine ? theirN : myN;
+  const messages = EventMessages.getForEvent(id);
 
+  // Status config
   const statusText = {
     pending_partner: isMine ? `Waiting for ${recipN}` : 'Your turn to respond',
     partner_replied: isMine ? `${recipN} has replied` : 'Awaiting proposal',
-    counter_proposed: isMine ? `${recipN} suggested new times` : 'Counter-proposal sent',
+    in_discussion: 'In discussion',
+    counter_proposed: isMine ? `${recipN} suggested new times` : 'Counter sent',
     active: 'Proposal ready',
     resolved: p.resolution === 'needs_discussion' ? 'Needs conversation'
       : p.resolution === 'date_accepted' ? 'Event confirmed'
       : 'Resolved',
+    declined: 'Declined',
   };
-
-  const statusColor = { pending_partner:'#E8B88A', partner_replied:'#7A6A9B', counter_proposed:'#6A8CAA', active:'#C4714A', resolved:'#7A9E8A' };
+  const statusColor = { pending_partner:'#E8B88A', partner_replied:'#7A6A9B', in_discussion:'#6A8CAA', counter_proposed:'#6A8CAA', active:'#C4714A', resolved:'#7A9E8A', declined:'#9B8880' };
   const sc = statusColor[p.status] || '#9B8880';
+
+  // Structured summary
+  const summaryHtml = renderStructuredSummary(p.topicId, p.structuredSelections);
 
   // Date options
   const isConfirmed = p.resolution === 'date_accepted';
@@ -2833,28 +3651,28 @@ Router.register('parlay-detail', ({ id } = {}) => {
         ${p.dateOptions.map(o => {
           const d = new Date(o.date + 'T12:00:00');
           const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
-          const sel = p.partnerDateResponse === o.id;
+          const sel = p.confirmedDate?.id === o.id || p.partnerDateResponse === o.id;
           if (isConfirmed && !sel) return '';
-          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1.5px solid ${sel ? 'var(--sage)' : 'var(--border)'};border-radius:12px;background:${sel ? '#EDF4F0' : 'var(--surface)'};">
-            <div><div style="font-size:.88rem;font-weight:600;">${label}</div>${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}</div>
+          return `<div class="date-opt-card${sel ? ' selected' : ''}">
+            <div><div class="date-label">${label}</div>${o.timeLabel ? `<div class="date-time">${o.timeLabel}</div>` : ''}</div>
             ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">${isConfirmed ? '✓ Confirmed' : '✓ Selected'}</span>` : ''}
           </div>`;
         }).join('')}
       </div>
     </div>` : '';
 
-  // Counter-proposed dates
+  // Counter dates
   const counterHtml = (p.counterDates?.length > 0) ? `
-    <div style="margin-top:16px;margin-bottom:16px;">
+    <div style="margin-top:16px;">
       <div class="input-label">📅 ${!isMine ? 'Your suggested times' : recipN + "'s suggested times"}</div>
       <div style="display:flex;flex-direction:column;gap:6px;" id="counter-dates-list">
         ${p.counterDates.map(o => {
           const d = new Date(o.date + 'T12:00:00');
           const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
           const sel = p.confirmedDate?.id === o.id;
-          return `<div class="counter-date-opt" data-opt="${o.id}" data-date="${o.date}" data-time="${o.timeLabel || ''}" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1.5px solid ${sel ? 'var(--sage)' : 'var(--border)'};border-radius:12px;background:${sel ? '#EDF4F0' : 'var(--surface)'};${p.status === 'counter_proposed' && isMine ? 'cursor:pointer;' : ''}">
-            <div><div style="font-size:.88rem;font-weight:600;">${label}</div>${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}</div>
-            ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Confirmed</span>` : (p.status === 'counter_proposed' && isMine ? `<div class="counter-check" style="width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.7rem;"></div>` : '')}
+          return `<div class="date-opt-card counter-date-opt${sel ? ' selected' : ''}" data-opt="${o.id}" data-date="${o.date}" data-time="${o.timeLabel || ''}" style="${p.status === 'counter_proposed' && isMine ? 'cursor:pointer;' : ''}">
+            <div><div class="date-label">${label}</div>${o.timeLabel ? `<div class="date-time">${o.timeLabel}</div>` : ''}</div>
+            ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Confirmed</span>` : (p.status === 'counter_proposed' && isMine ? `<div class="date-check"></div>` : '')}
           </div>`;
         }).join('')}
       </div>
@@ -2872,45 +3690,101 @@ Router.register('parlay-detail', ({ id } = {}) => {
     </div>`;
   }
 
-  // Actions — every status+role combo has an action or message
+  // Message thread
+  const threadHtml = messages.length > 0 ? `
+    <div style="margin:16px 0;">
+      <div class="input-label">💬 Conversation</div>
+      <div class="msg-thread">
+        ${messages.map(m => {
+          const sender = m.isMine ? myN : theirN;
+          const time = new Date(m.createdAt).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+          const dateStr = new Date(m.createdAt).toLocaleDateString('en-US', { month:'short', day:'numeric' });
+          if (m.type === 'system') {
+            return `<div class="msg-bubble system">${U.esc(m.filteredContent)}</div>`;
+          }
+          return `<div>
+            <div class="msg-bubble ${m.isMine ? 'mine' : 'theirs'}">${U.esc(m.filteredContent)}</div>
+            <div class="msg-meta${m.isMine ? ' right' : ''}">${U.esc(sender)} · ${dateStr} ${time} <span class="msg-filtered-tag">· ✓ Filtered</span></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+  // Actions
   let actionHtml = '';
   if (p.status === 'pending_partner' && !isMine) {
-    actionHtml = `<button class="btn btn-primary" onclick="Router.go('parlay-reply',{id:'${p.id}'})">Share your position →</button>`;
+    actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept as is</button>
+      ${p.dateOptions?.length > 0 ? `<button class="btn btn-outline" onclick="Router.go('parlay-reply',{id:'${p.id}'})">📅 Suggest other times</button>` : ''}
+      <button class="btn btn-outline" id="reply-msg-btn">💬 Send a message</button>
+      <button class="btn btn-outline" style="color:#EF4444;border-color:#EF4444;" id="decline-btn">✕ Decline</button>
+    </div>`;
   } else if (p.status === 'pending_partner' && isMine) {
     actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">⏳ Waiting for ${U.esc(recipN)} to respond</div></div>`;
+  } else if (p.status === 'in_discussion') {
+    actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept</button>
+      <button class="btn btn-outline" id="reply-msg-btn">💬 Send a message</button>
+      ${p.dateOptions?.length > 0 ? `<button class="btn btn-outline" onclick="Router.go('parlay-reply',{id:'${p.id}'})">📅 Suggest other times</button>` : ''}
+    </div>`;
   } else if (p.status === 'partner_replied' && isMine) {
-    actionHtml = `<button class="btn" style="background:linear-gradient(135deg,#4A3568,#7A6A9B);color:#fff;" id="gen-proposal-btn"><span id="gen-btn-text">⚖️ Generate Proposal</span></button>`;
+    actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn" style="background:linear-gradient(135deg,#4A3568,#7A6A9B);color:#fff;" id="gen-proposal-btn"><span id="gen-btn-text">⚖️ Generate Proposal</span></button>
+      <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept as is</button>
+      <button class="btn btn-outline" id="reply-msg-btn">💬 Reply</button>
+    </div>`;
   } else if (p.status === 'partner_replied' && !isMine) {
-    actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">✓ Position sent. Waiting for ${U.esc(creatorN)} to generate proposal.</div></div>`;
+    actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">✓ Position sent. Waiting for ${U.esc(creatorN)} to continue.</div></div>`;
   } else if (p.status === 'counter_proposed' && isMine) {
     actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn" style="background:var(--sage);color:#fff;" id="accept-counter-btn" disabled><span id="accept-counter-text">Select a date above to confirm</span></button>
-      <button class="btn btn-outline" id="discuss-btn">💬 This needs a conversation</button>
+      <button class="btn btn-outline" id="reply-msg-btn">💬 Send a message</button>
     </div>`;
   } else if (p.status === 'counter_proposed' && !isMine) {
     actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">⏳ Waiting for ${U.esc(creatorN)} to pick a time</div></div>`;
   } else if (p.status === 'active' && p.proposal) {
     actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept Proposal</button>
-      <button class="btn btn-outline" id="discuss-btn">💬 This needs a conversation</button>
+      <button class="btn btn-outline" id="reply-msg-btn">💬 Discuss further</button>
     </div>`;
   } else if (p.status === 'resolved') {
     if (p.resolution === 'needs_discussion') {
       actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);">
         <div style="font-size:.85rem;color:var(--muted);font-weight:600;">💬 Marked for conversation</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:6px;">Talk it through together, then come back to resolve.</div>
-        <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="reopen-btn">↻ Reopen Parlay</button>
+        <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="reopen-btn">↻ Reopen</button>
       </div>`;
     } else if (p.resolution === 'date_accepted') {
       actionHtml = `<div style="text-align:center;padding:16px;background:#EDF4F0;border:1.5px solid var(--sage);border-radius:var(--r-md);">
         <div style="font-size:1.5rem;margin-bottom:6px;">🎉</div>
         <div style="font-size:.92rem;color:var(--sage);font-weight:700;">Event Confirmed</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:4px;">You're all set — the date is locked in.</div>
       </div>`;
     } else {
-      actionHtml = `<div style="text-align:center;padding:12px;font-size:.85rem;color:var(--sage);font-weight:600;">✓ Proposal accepted</div>`;
+      actionHtml = `<div style="text-align:center;padding:12px;font-size:.85rem;color:var(--sage);font-weight:600;">✓ Accepted</div>`;
     }
+  } else if (p.status === 'declined') {
+    actionHtml = `<div style="text-align:center;padding:16px;background:#FFF5F5;border:1px solid rgba(239,68,68,.2);border-radius:var(--r-md);">
+      <div style="font-size:.85rem;color:#EF4444;font-weight:600;">✕ Declined</div>
+      <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="reopen-btn">↻ Reopen</button>
+    </div>`;
   }
+
+  // Inline reply box
+  const replyBoxHtml = `
+    <div id="inline-reply" style="display:none;margin-top:12px;">
+      <textarea id="inline-reply-text" class="input" rows="3" placeholder="Type your message..." style="resize:none;line-height:1.6;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-accent" style="flex:1;" id="inline-reply-send"><span id="inline-reply-btn-text">Send →</span></button>
+        <button class="btn btn-outline" style="width:auto;" id="inline-reply-cancel">Cancel</button>
+      </div>
+    </div>`;
+
+  // Decline form
+  const declineFormHtml = `
+    <div id="decline-form" style="display:none;margin-top:12px;">
+      <div class="input-label">Reason (optional)</div>
+      <textarea id="decline-text" class="input" rows="2" placeholder="e.g. This doesn't work for me right now" style="resize:none;"></textarea>
+      <button class="btn btn-danger" style="margin-top:8px;" id="decline-confirm">Decline event</button>
+    </div>`;
 
   return `
   <div data-parlay-id="${p.id}" style="min-height:100dvh;padding:0 20px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(60px,env(safe-area-inset-bottom));">
@@ -2918,58 +3792,85 @@ Router.register('parlay-detail', ({ id } = {}) => {
       <button class="btn btn-outline btn-sm" onclick="Router.go('plan')">‹ Plans</button>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" onclick="Auth.refresh().then(()=>U.toast('Refreshed'))">↻</button>
-        <button class="btn-ghost" id="manage-btn">⋯ Manage</button>
+        <button class="btn-ghost" id="manage-btn">⋯</button>
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;" class="a2">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;" class="a2">
       <div style="width:48px;height:48px;border-radius:14px;background:${topic.color}18;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${topic.icon}</div>
       <div>
-        <div style="font-family:var(--font-display);font-size:1.35rem;">${U.esc(p.title)}</div>
-        <div style="font-size:.72rem;color:var(--muted);">${p.date} · ${isMine ? 'You started this' : creatorN + ' started this'}</div>
+        <div style="font-family:var(--font-display);font-size:1.3rem;">${U.esc(p.title)}</div>
+        <div style="font-size:.72rem;color:var(--muted);">${p.date} · ${isMine ? 'You proposed' : creatorN + ' proposed'}</div>
       </div>
     </div>
 
-    <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:${sc}18;border:1px solid ${sc}44;border-radius:var(--r-pill);margin-bottom:20px;" class="a2">
+    <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:${sc}18;border:1px solid ${sc}44;border-radius:var(--r-pill);margin-bottom:16px;" class="a2">
       <div style="width:6px;height:6px;border-radius:50%;background:${sc};"></div>
       <div style="font-size:.72rem;font-weight:700;color:${sc};">${statusText[p.status] || p.status}</div>
     </div>
 
-    <!-- Creator's message -->
-    <div style="margin-bottom:16px;" class="a3">
-      <div class="input-label">${isMine ? 'Your position' : creatorN + "'s position"}</div>
-      <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);">
-        <div style="font-size:.88rem;line-height:1.65;">${p.filteredInput || p.rawInput || ''}</div>
-        <div style="font-size:.68rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
-      </div>
-      ${dateHtml}
-    </div>
+    <!-- Structured summary -->
+    ${summaryHtml ? `<div style="margin-bottom:16px;" class="a3">${summaryHtml}</div>` : ''}
 
-    <!-- Reply -->
-    ${p.partnerFilteredReply ? `
-    <div style="margin-bottom:16px;" class="a4">
+    <!-- Creator's note -->
+    ${p.filteredInput ? `
+    <div style="margin-bottom:12px;" class="a3">
+      <div class="input-label">${isMine ? 'Your note' : creatorN + "'s note"}</div>
+      <div style="padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);">
+        <div style="font-size:.85rem;line-height:1.65;">${U.esc(p.filteredInput)}</div>
+        <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by Parlay</div>
+      </div>
+    </div>` : ''}
+
+    ${dateHtml}
+
+    <!-- Partner's reply (legacy, for existing parlays) -->
+    ${p.partnerFilteredReply && messages.length === 0 ? `
+    <div style="margin:12px 0;" class="a4">
       <div class="input-label">${!isMine ? 'Your response' : recipN + "'s response"}</div>
-      <div style="padding:14px 16px;background:var(--surface);border:1px solid rgba(122,106,155,.25);border-radius:var(--r-md);">
-        <div style="font-size:.88rem;line-height:1.65;">${p.partnerFilteredReply}</div>
-        <div style="font-size:.68rem;color:var(--muted);margin-top:8px;">✓ Tone-filtered by Parlay</div>
+      <div style="padding:12px 14px;background:var(--surface);border:1px solid rgba(122,106,155,.25);border-radius:var(--r-md);">
+        <div style="font-size:.85rem;line-height:1.65;">${U.esc(p.partnerFilteredReply)}</div>
+        <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by Parlay</div>
       </div>
     </div>` : ''}
 
     ${counterHtml}
     ${proposalHtml}
+    ${threadHtml}
 
     <div style="margin-top:20px;" class="a5">${actionHtml}</div>
+    ${replyBoxHtml}
+    ${declineFormHtml}
   </div>`;
 }, (el, { id } = {}) => {
   const p = Store.findParlay(id);
   if (!p) return;
 
+  // Load messages
+  EventMessages.loadForEvent(id).then(() => {
+    // Re-render only if messages loaded after initial render
+    const msgs = EventMessages.getForEvent(id);
+    if (msgs.length > 0 && !el.querySelector('.msg-thread')) {
+      Router.reload();
+    }
+  });
+
+  // Accept
+  el.querySelector('#accept-btn')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#accept-btn');
+    btn.disabled = true; btn.textContent = 'Accepting…';
+    await Store.updateParlay(p.id, { status: 'resolved', resolution: p.dateOptions?.length > 0 ? 'date_accepted' : 'accepted' });
+    await EventMessages.send(p.id, { type: 'system', rawContent: `${Auth.myName()} accepted the proposal`, filteredContent: `${Auth.myName()} accepted the proposal` });
+    Badges.update();
+    U.toast('Accepted ✓');
+    Router.go('parlay-detail', { id: p.id });
+  });
+
   // Generate proposal
   el.querySelector('#gen-proposal-btn')?.addEventListener('click', async () => {
     const btn = el.querySelector('#gen-proposal-btn');
     const txt = el.querySelector('#gen-btn-text');
-    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.3);margin-right:8px;"></span> Generating proposal…';
-
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.3);margin-right:8px;"></span> Generating…';
     try {
       const parsed = await generateProposal(p);
       await Store.updateParlay(p.id, { proposal: parsed, status: 'active' });
@@ -2980,23 +3881,66 @@ Router.register('parlay-detail', ({ id } = {}) => {
     }
   });
 
-  // Accept
-  el.querySelector('#accept-btn')?.addEventListener('click', async () => {
-    await Store.updateParlay(p.id, { status: 'resolved', resolution: 'accepted' });
+  // Inline reply toggle + send
+  el.querySelector('#reply-msg-btn')?.addEventListener('click', () => {
+    el.querySelector('#inline-reply').style.display = 'block';
+    el.querySelector('#inline-reply-text')?.focus();
+  });
+  el.querySelector('#inline-reply-cancel')?.addEventListener('click', () => {
+    el.querySelector('#inline-reply').style.display = 'none';
+  });
+  el.querySelector('#inline-reply-send')?.addEventListener('click', async () => {
+    const raw = el.querySelector('#inline-reply-text')?.value.trim();
+    if (!raw) { U.toast('Type a message'); return; }
+    const btn = el.querySelector('#inline-reply-send');
+    const txt = el.querySelector('#inline-reply-btn-text');
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Filtering…';
+
+    let filtered = raw;
+    try { filtered = await runToneFilter(raw, p.intentContext || ''); } catch(e) { filtered = raw; }
+
+    await EventMessages.send(p.id, { type: 'text', rawContent: raw, filteredContent: filtered });
+
+    // Update parlay status to in_discussion if it was pending
+    if (['pending_partner', 'partner_replied'].includes(p.status)) {
+      await Store.updateParlay(p.id, {
+        status: p.status === 'pending_partner' && !p.isMine ? 'partner_replied' : 'in_discussion',
+        partnerRawReply: p.isMine ? p.partnerRawReply : raw,
+        partnerFilteredReply: p.isMine ? p.partnerFilteredReply : filtered,
+        lastActivityBy: Auth.myUid(),
+      });
+    } else {
+      await Store.updateParlay(p.id, { status: 'in_discussion', lastActivityBy: Auth.myUid() });
+    }
+
     Badges.update();
-    U.toast('Proposal accepted ✓');
     Router.go('parlay-detail', { id: p.id });
   });
 
-  // Discuss
-  el.querySelector('#discuss-btn')?.addEventListener('click', async () => {
-    await Store.updateParlay(p.id, { status: 'resolved', resolution: 'needs_discussion' });
+  // Decline
+  el.querySelector('#decline-btn')?.addEventListener('click', () => {
+    el.querySelector('#decline-form').style.display = 'block';
+    el.querySelector('#decline-btn').style.display = 'none';
+  });
+  el.querySelector('#decline-confirm')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#decline-confirm');
+    btn.disabled = true; btn.textContent = 'Declining…';
+    const reason = el.querySelector('#decline-text')?.value.trim() || '';
+    let filtered = reason;
+    if (reason) {
+      try { filtered = await runToneFilter(reason, ''); } catch(e) { filtered = reason; }
+    }
+    await Store.updateParlay(p.id, { status: 'declined', resolution: 'declined' });
+    if (reason) {
+      await EventMessages.send(p.id, { type: 'text', rawContent: reason, filteredContent: filtered });
+    }
+    await EventMessages.send(p.id, { type: 'system', rawContent: `${Auth.myName()} declined`, filteredContent: `${Auth.myName()} declined the proposal` });
     Badges.update();
-    U.toast('💬 Time to talk this one through');
+    U.toast('Declined');
     Router.go('plan');
   });
 
-  // Counter-proposed date selection + accept (creator picks from partner's counter-dates)
+  // Counter-date selection
   let _selectedCounterDate = null;
   el.querySelectorAll('.counter-date-opt').forEach(card => {
     card.addEventListener('click', () => {
@@ -3004,67 +3948,48 @@ Router.register('parlay-detail', ({ id } = {}) => {
       _selectedCounterDate = card.dataset.opt;
       el.querySelectorAll('.counter-date-opt').forEach(c => {
         const sel = c.dataset.opt === _selectedCounterDate;
-        c.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
-        c.style.background = sel ? '#EDF4F0' : 'var(--surface)';
-        const check = c.querySelector('.counter-check');
-        if (check) {
-          check.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
-          check.style.background = sel ? 'rgba(122,158,138,.4)' : 'transparent';
-          check.textContent = sel ? '✓' : '';
-          check.style.color = 'var(--sage)';
-        }
+        c.classList.toggle('selected', sel);
       });
       const btn = el.querySelector('#accept-counter-btn');
       if (btn) btn.disabled = false;
       const txt = el.querySelector('#accept-counter-text');
-      if (txt) txt.textContent = '✓ Accept & Confirm Event';
+      if (txt) txt.textContent = '✓ Confirm this date';
     });
   });
 
   el.querySelector('#accept-counter-btn')?.addEventListener('click', async () => {
     if (!_selectedCounterDate) return;
     const btn = el.querySelector('#accept-counter-btn');
-    const txt = el.querySelector('#accept-counter-text');
-    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Confirming…';
+    btn.disabled = true;
     const selectedOpt = p.counterDates?.find(o => o.id === _selectedCounterDate);
-    try {
-      await Store.updateParlay(p.id, {
-        confirmedDate: selectedOpt || { id: _selectedCounterDate },
-        status: 'resolved',
-        resolution: 'date_accepted',
-      });
-      Badges.update();
-      U.toast('Event confirmed ✓');
-      Router.go('parlay-detail', { id: p.id });
-    } catch(e) {
-      btn.disabled = false;
-      txt.textContent = '✓ Accept & Confirm Event';
-      U.toast('⚠️ Failed — try again');
-    }
+    await Store.updateParlay(p.id, { confirmedDate: selectedOpt || { id: _selectedCounterDate }, status: 'resolved', resolution: 'date_accepted' });
+    await EventMessages.send(p.id, { type: 'system', rawContent: 'Date confirmed', filteredContent: `${Auth.myName()} confirmed the date` });
+    Badges.update();
+    U.toast('Event confirmed ✓');
+    Router.go('parlay-detail', { id: p.id });
   });
 
-  // Reopen (from needs_discussion resolved state)
+  // Reopen
   el.querySelector('#reopen-btn')?.addEventListener('click', async () => {
-    // Reopen to partner_replied so the creator can re-generate a proposal
-    await Store.updateParlay(p.id, { status: 'partner_replied', resolution: null });
+    await Store.updateParlay(p.id, { status: 'in_discussion', resolution: null });
     Badges.update();
-    U.toast('Parlay reopened');
+    U.toast('Reopened');
     Router.go('parlay-detail', { id: p.id });
   });
 
   // Manage
   el.querySelector('#manage-btn')?.addEventListener('click', async () => {
-    const action = await U.sheet('Manage Parlay', [
+    const action = await U.sheet('Manage Event', [
       { key: 'archive', label: '📦 Archive', cls: 'btn-outline' },
-      { key: 'delete', label: '🗑 Delete for both partners', cls: 'btn-danger' },
+      { key: 'delete', label: '🗑 Delete', cls: 'btn-danger' },
     ]);
     if (action === 'archive') {
       await Store.updateParlay(p.id, { archived: true });
-      U.toast('Parlay archived');
+      U.toast('Archived');
       Router.go('plan');
     } else if (action === 'delete') {
       await Store.deleteParlay(p.id);
-      U.toast('Parlay deleted');
+      U.toast('Deleted');
       Router.go('plan');
     }
   });
@@ -3072,30 +3997,14 @@ Router.register('parlay-detail', ({ id } = {}) => {
 
 
 // ──────────────────────────────────────────────
-// PARLAY REPLY
+// PARLAY REPLY — Suggest other times + optional note
 // ──────────────────────────────────────────────
 Router.register('parlay-reply', ({ id } = {}) => {
   const p = Store.findParlay(id);
-  if (!p) return `<div style="padding:60px 24px;text-align:center;">Parlay not found.<br><button class="btn btn-outline btn-sm" style="margin-top:16px;" onclick="Router.go('plan')">‹ Back</button></div>`;
+  if (!p) return `<div style="padding:60px 24px;text-align:center;">Event not found.<br><button class="btn btn-outline btn-sm" style="margin-top:16px;" onclick="Router.go('plan')">‹ Back</button></div>`;
 
-  // Guard: only recipient, only pending_partner
-  if (p.isMine || p.status !== 'pending_partner') {
-    setTimeout(() => {
-      let msg;
-      if (p.isMine) {
-        msg = p.status === 'pending_partner' ? 'Waiting for your partner to reply' : 'View the parlay details';
-      } else {
-        msg = 'Already responded';
-      }
-      U.toast(msg);
-      Router.go('parlay-detail', { id });
-    }, 50);
-    return '<div></div>';
-  }
-
-  const topic = TOPICS.find(t => t.id === p.topicId) || TOPICS[7];
-  const creatorN = Auth.theirName();
-  const hasDates = p.dateOptions?.length > 0;
+  const topic = TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9];
+  const creatorN = p.isMine ? Auth.myName() : Auth.theirName();
 
   return `
   <div style="min-height:100dvh;display:flex;flex-direction:column;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
@@ -3105,63 +4014,24 @@ Router.register('parlay-reply', ({ id } = {}) => {
       <span style="font-family:var(--font-display);font-size:1.1rem;">${topic.label}</span>
     </div>
 
-    <div style="background:var(--espresso);border-radius:var(--r-lg);padding:18px;margin-bottom:24px;" class="a2">
-      <div class="input-label" style="color:rgba(232,184,138,.7);">${U.esc(creatorN)}'s position</div>
-      <div style="font-size:.85rem;color:rgba(250,246,241,.88);line-height:1.65;font-style:italic;">"${p.filteredInput || p.rawInput || ''}"</div>
+    <div class="a2" style="margin-bottom:16px;">
+      <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:300;margin-bottom:6px;">Suggest <em style="color:var(--terra)">different times</em></div>
+      <div style="font-size:.78rem;color:var(--muted);line-height:1.6;">Propose up to 4 alternative dates.</div>
     </div>
 
-    ${hasDates ? `
-    <!-- ── Date selection: pick one and accept ── -->
-    <div class="a3" style="margin-bottom:20px;">
-      <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:300;margin-bottom:6px;">Pick a <em style="color:var(--terra)">date</em></div>
-      <div style="font-size:.8rem;color:var(--muted);line-height:1.6;">Select a time that works and confirm the event, or suggest different times below.</div>
-    </div>
-
-    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;" id="reply-dates">
-      ${p.dateOptions.map(o => {
-        const d = new Date(o.date + 'T12:00:00');
-        const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
-        return `<div class="reply-date-opt" data-opt="${o.id}" data-date="${o.date}" data-time="${o.timeLabel || ''}" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;cursor:pointer;background:var(--surface);transition:all .15s;">
-          <div><div style="font-size:.88rem;font-weight:600;">${label}</div>${o.timeLabel ? `<div style="font-size:.72rem;color:var(--muted);">${o.timeLabel}</div>` : ''}</div>
-          <div class="date-check" style="width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.7rem;"></div>
-        </div>`;
-      }).join('')}
-    </div>
-
-    <button class="btn" style="background:var(--sage);color:#fff;margin-bottom:24px;" id="accept-date-btn" disabled>
-      <span id="accept-date-text">Select a date to confirm</span>
-    </button>
-
-    <!-- ── Divider ── -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-      <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">or</div>
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-    </div>
-
-    <!-- ── Counter-propose dates ── -->
-    <div style="margin-bottom:16px;">
-      <div style="font-family:var(--font-display);font-size:1.2rem;font-weight:300;margin-bottom:8px;">Suggest <em style="color:var(--terra)">different times</em></div>
-      <div style="font-size:.78rem;color:var(--muted);margin-bottom:12px;">None of these work? Propose up to 4 alternatives.</div>
-      <div style="display:flex;flex-direction:column;gap:8px;" id="counter-date-slots">
-        <div style="display:flex;gap:8px;">
-          <input type="date" class="input" style="flex:2;" data-cslot="1" data-type="date">
-          ${U.timeSelectHtml('c1')}
-        </div>
-        <div style="display:flex;gap:8px;">
-          <input type="date" class="input" style="flex:2;" data-cslot="2" data-type="date">
-          ${U.timeSelectHtml('c2')}
-        </div>
-        <div style="display:flex;gap:8px;">
-          <input type="date" class="input" style="flex:2;" data-cslot="3" data-type="date">
-          ${U.timeSelectHtml('c3')}
-        </div>
-        <div style="display:flex;gap:8px;">
-          <input type="date" class="input" style="flex:2;" data-cslot="4" data-type="date">
-          ${U.timeSelectHtml('c4')}
-        </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;" id="counter-date-slots">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="slot-num">1</div>
+        <input type="date" class="input" style="flex:2;" data-cslot="1" data-type="date">
+        ${U.timeSelectHtml('c1')}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="slot-num">2</div>
+        <input type="date" class="input" style="flex:2;" data-cslot="2" data-type="date">
+        ${U.timeSelectHtml('c2')}
       </div>
     </div>
+    <div class="add-row" id="add-counter-slot" style="margin-bottom:16px;">+ Add another option</div>
 
     <div style="margin-bottom:16px;">
       <div class="input-label">Add a note (optional)</div>
@@ -3169,167 +4039,75 @@ Router.register('parlay-reply', ({ id } = {}) => {
     </div>
 
     <button class="btn btn-accent" id="counter-submit"><span id="counter-btn-text">Send counter-proposal →</span></button>
-    ` : `
-    <!-- ── No dates: standard position reply ── -->
-    <div class="a3" style="margin-bottom:16px;">
-      <div style="font-family:var(--font-display);font-size:1.7rem;font-weight:300;margin-bottom:6px;">Your <em style="color:var(--terra)">position</em></div>
-      <div style="font-size:.8rem;color:var(--muted);line-height:1.6;">Be honest — Parlay filters everything before ${U.esc(creatorN)} sees it.</div>
-    </div>
-
-    <div style="margin-bottom:16px;" class="a4">
-      <div class="input-label">What do you want or need?</div>
-      <textarea id="reply-text" class="input" rows="4" placeholder="e.g. That works but I need more notice next time." style="resize:none;line-height:1.6;"></textarea>
-    </div>
-
-    <div style="background:var(--parchment);border-radius:var(--r-md);padding:12px 14px;margin-bottom:20px;">
-      <div style="font-size:.72rem;font-weight:600;color:var(--muted);">🔒 Private until filtered</div>
-    </div>
-
-    <button class="btn btn-accent" id="reply-submit"><span id="reply-btn-text">Send my position →</span></button>
-    `}
-
     <button class="btn btn-outline" style="margin-top:10px;" onclick="Router.go('parlay-detail',{id:'${p.id}'})">Cancel</button>
   </div>`;
 }, (el, { id } = {}) => {
   const p = Store.findParlay(id);
   if (!p) return;
-  let _selectedDate = null;
   let _submitting = false;
-  const hasDates = p.dateOptions?.length > 0;
+  let _counterSlots = 2;
 
-  if (hasDates) {
-    // ── Date selection (accept directly) ──
-    el.querySelectorAll('.reply-date-opt').forEach(card => {
-      card.addEventListener('click', () => {
-        _selectedDate = card.dataset.opt;
-        el.querySelectorAll('.reply-date-opt').forEach(c => {
-          const sel = c.dataset.opt === _selectedDate;
-          c.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
-          c.style.background = sel ? '#EDF4F0' : 'var(--surface)';
-          const check = c.querySelector('.date-check');
-          if (check) {
-            check.style.borderColor = sel ? 'var(--sage)' : 'var(--border)';
-            check.style.background = sel ? 'rgba(122,158,138,.4)' : 'transparent';
-            check.textContent = sel ? '✓' : '';
-            check.style.color = 'var(--sage)';
-          }
-        });
-        const btn = el.querySelector('#accept-date-btn');
-        if (btn) { btn.disabled = false; }
-        const txt = el.querySelector('#accept-date-text');
-        if (txt) { txt.textContent = '✓ Accept & Confirm Event'; }
-      });
+  // Set min dates
+  const today = new Date().toISOString().split('T')[0];
+  el.querySelectorAll('input[type="date"]').forEach(d => { d.min = today; });
+
+  // Add counter slot
+  el.querySelector('#add-counter-slot')?.addEventListener('click', () => {
+    if (_counterSlots >= 4) return;
+    _counterSlots++;
+    const slots = el.querySelector('#counter-date-slots');
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;gap:8px;align-items:center;';
+    div.innerHTML = `
+      <div class="slot-num">${_counterSlots}</div>
+      <input type="date" class="input" style="flex:2;" data-cslot="${_counterSlots}" data-type="date" min="${today}">
+      ${U.timeSelectHtml('c' + _counterSlots)}
+    `;
+    slots.appendChild(div);
+    if (_counterSlots >= 4) el.querySelector('#add-counter-slot').style.display = 'none';
+  });
+
+  // Submit
+  el.querySelector('#counter-submit')?.addEventListener('click', async () => {
+    if (_submitting) return;
+    const counterDates = [];
+    for (let n = 1; n <= _counterSlots; n++) {
+      const d = el.querySelector(`[data-cslot="${n}"][data-type="date"]`)?.value;
+      const t = el.querySelector(`[data-slot="c${n}"][data-type="time"]`)?.value || '';
+      if (d) counterDates.push({ id: 'counter_' + n, date: d, timeLabel: t || 'Any time' });
+    }
+    if (counterDates.length === 0) { U.toast('Add at least one date'); return; }
+    _submitting = true;
+    const btn = el.querySelector('#counter-submit');
+    const txt = el.querySelector('#counter-btn-text');
+    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Sending…';
+
+    const raw = el.querySelector('#reply-text')?.value.trim() || '';
+    let filtered = raw;
+    if (raw) {
+      try { filtered = await runToneFilter(raw, p.intentContext || ''); } catch(e) { filtered = raw; }
+    }
+
+    await Store.updateParlay(p.id, {
+      partnerRawReply: raw || p.partnerRawReply,
+      partnerFilteredReply: filtered || p.partnerFilteredReply,
+      counterDates,
+      status: 'counter_proposed',
+      lastActivityBy: Auth.myUid(),
     });
 
-    // Accept date directly — confirms the event
-    el.querySelector('#accept-date-btn')?.addEventListener('click', async () => {
-      if (_submitting || !_selectedDate) return;
-      _submitting = true;
-      const btn = el.querySelector('#accept-date-btn');
-      const txt = el.querySelector('#accept-date-text');
-      btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Confirming…';
+    if (raw) {
+      await EventMessages.send(p.id, { type: 'text', rawContent: raw, filteredContent: filtered });
+    }
+    await EventMessages.send(p.id, { type: 'system', rawContent: 'Counter-proposed', filteredContent: `${Auth.myName()} suggested different times` });
 
-      const selectedOpt = p.dateOptions.find(o => o.id === _selectedDate);
-      try {
-        await Store.updateParlay(p.id, {
-          partnerDateResponse: _selectedDate,
-          confirmedDate: selectedOpt || { id: _selectedDate },
-          status: 'resolved',
-          resolution: 'date_accepted',
-        });
-        Badges.update();
-        U.toast('Event confirmed ✓');
-        Router.go('parlay-detail', { id: p.id });
-      } catch(e) {
-        console.error('[reply] accept error:', e);
-        _submitting = false;
-        btn.disabled = false;
-        txt.textContent = '✓ Accept & Confirm Event';
-        U.toast('⚠️ Failed — try again');
-      }
-    });
-
-    // Counter-propose dates
-    el.querySelector('#counter-submit')?.addEventListener('click', async () => {
-      if (_submitting) return;
-      const counterDates = [];
-      for (let n = 1; n <= 4; n++) {
-        const d = el.querySelector(`[data-cslot="${n}"][data-type="date"]`)?.value;
-        const t = el.querySelector(`[data-slot="c${n}"][data-type="time"]`)?.value || '';
-        if (d) counterDates.push({ id: 'counter_' + n, date: d, timeLabel: t || 'Any time' });
-      }
-      if (counterDates.length === 0) {
-        U.toast('Add at least one date to counter-propose');
-        return;
-      }
-      _submitting = true;
-      const btn = el.querySelector('#counter-submit');
-      const txt = el.querySelector('#counter-btn-text');
-      btn.disabled = true; txt.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Sending…';
-
-      const raw = el.querySelector('#reply-text')?.value.trim() || '';
-      let filtered = raw;
-      if (raw) {
-        try { filtered = await runToneFilter(raw, p.intentContext || ''); } catch(e) { filtered = raw; }
-      }
-
-      try {
-        await Store.updateParlay(p.id, {
-          partnerRawReply: raw || null,
-          partnerFilteredReply: filtered || null,
-          counterDates,
-          status: 'counter_proposed',
-        });
-        Badges.update();
-        U.toast('Counter-proposal sent ✓');
-        Router.go('parlay-detail', { id: p.id });
-      } catch(e) {
-        console.error('[reply] counter error:', e);
-        _submitting = false;
-        btn.disabled = false;
-        txt.textContent = 'Send counter-proposal →';
-        U.toast('⚠️ Failed — try again');
-      }
-    });
-
-  } else {
-    // ── Standard position reply (no dates) ──
-    el.querySelector('#reply-submit')?.addEventListener('click', async () => {
-      if (_submitting) return;
-      const raw = el.querySelector('#reply-text')?.value.trim();
-      if (!raw) { U.toast('Share your position first'); return; }
-      _submitting = true;
-
-      const btn = el.querySelector('#reply-submit');
-      const btnText = el.querySelector('#reply-btn-text');
-      btn.disabled = true; btnText.innerHTML = '<span class="spinner" style="margin-right:8px;"></span> Filtering…';
-
-      let filtered = raw;
-      try {
-        filtered = await runToneFilter(raw, p.intentContext || '');
-      } catch(e) { filtered = raw; }
-
-      const patch = {
-        partnerRawReply: raw,
-        partnerFilteredReply: filtered,
-        status: 'partner_replied',
-      };
-
-      try {
-        await Store.updateParlay(p.id, patch);
-        Badges.update();
-        U.toast('Position sent ✓');
-        Router.go('parlay-detail', { id: p.id });
-      } catch(e) {
-        console.error('[reply] save error:', e);
-        _submitting = false;
-        btn.disabled = false;
-        btnText.textContent = 'Send my position →';
-        U.toast('⚠️ Failed to send — try again');
-      }
-    });
-  }
+    Badges.update();
+    U.toast('Counter-proposal sent ✓');
+    Router.go('parlay-detail', { id: p.id });
+  });
 });
+
+
 
 
 // ──────────────────────────────────────────────
@@ -3714,12 +4492,13 @@ Router.register('setup', () => {
 
     <!-- Profile cards -->
     <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;" class="a2">
-      <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);">
+      <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;" onclick="Router.go('profile-edit')">
         <div style="width:44px;height:44px;border-radius:50%;background:var(--terra);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0;">${U.initials(myN)}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:.92rem;font-weight:600;">${U.esc(myN)}</div>
-          <div style="font-size:.72rem;color:var(--muted);">You</div>
+          <div style="font-size:.72rem;color:var(--muted);">You · tap to edit</div>
         </div>
+        <div style="color:var(--muted);align-self:center;">›</div>
       </div>
       <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);">
         <div style="width:44px;height:44px;border-radius:50%;background:${hasPartner ? 'var(--sage)' : 'var(--border)'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0;">${hasPartner ? U.initials(theirN) : '?'}</div>
@@ -3736,6 +4515,14 @@ Router.register('setup', () => {
       <div class="input-label" style="margin-bottom:10px;">Settings</div>
     </div>
     <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;" class="a3">
+      <div class="mod-card" onclick="Router.go('family-setup')">
+        <div class="mod-icon" style="background:rgba(122,158,138,.1);">👨‍👩‍👧‍👦</div>
+        <div style="flex:1;">
+          <div style="font-size:.9rem;font-weight:600;">Family Members</div>
+          <div style="font-size:.75rem;color:var(--muted);">${FamilyStore.members().length > 0 ? FamilyStore.members().length + ' members' : 'Set up your family'}</div>
+        </div>
+        <div style="color:var(--muted);">›</div>
+      </div>
       <div class="mod-card" onclick="Router.go('setup-tone')">
         <div class="mod-icon" style="background:rgba(196,113,74,.1);">⚖️</div>
         <div style="flex:1;">
@@ -3768,6 +4555,343 @@ Router.register('setup', () => {
   el.querySelector('#setup-code')?.addEventListener('click', () => {
     navigator.clipboard?.writeText(Auth.couple()?.invite_code || '');
     U.toast('Invite code copied ✓');
+  });
+});
+
+
+// ──────────────────────────────────────────────
+// PROFILE EDIT
+// ──────────────────────────────────────────────
+Router.register('profile-edit', () => {
+  const myN = Auth.myName();
+  const couple = Auth.couple();
+  const email = Auth.user()?.email || '';
+
+  return `
+  <div style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(60px,env(safe-area-inset-bottom));">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
+      <button class="btn btn-outline btn-sm" onclick="Router.go('setup')">‹ Back</button>
+      <span style="font-family:var(--font-display);font-size:1.1rem;">Your Profile</span>
+    </div>
+
+    <div style="text-align:center;margin-bottom:24px;" class="a2">
+      <div style="width:72px;height:72px;border-radius:50%;background:var(--terra);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.4rem;margin:0 auto 12px;">${U.initials(myN)}</div>
+      <div style="font-size:.72rem;color:var(--muted);">${U.esc(email)}</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;" class="a3">
+      <div>
+        <div class="input-label">Display name</div>
+        <input type="text" id="profile-name" class="input" value="${U.esc(myN)}" placeholder="Your name">
+      </div>
+      <button class="btn btn-accent" id="profile-save">Save changes</button>
+    </div>
+
+    ${couple?.invite_code ? `
+    <div style="margin-top:28px;padding:16px;background:var(--parchment);border-radius:var(--r-md);" class="a4">
+      <div class="input-label">Invite code</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="font-family:var(--font-display);font-size:1.1rem;letter-spacing:.12em;color:var(--terra);">${couple.invite_code}</div>
+        <button class="btn btn-outline btn-sm" id="copy-invite">Copy</button>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:6px;">Share this code with your partner so they can join.</div>
+    </div>` : ''}
+  </div>`;
+}, (el) => {
+  el.querySelector('#profile-save')?.addEventListener('click', async () => {
+    const name = el.querySelector('#profile-name')?.value.trim();
+    if (!name) { U.toast('Enter a name'); return; }
+    const btn = el.querySelector('#profile-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await Auth.sb().from('couple_members')
+        .update({ display_name: name })
+        .eq('user_id', Auth.user().id)
+        .eq('couple_id', Auth.couple().id);
+      await Auth.refresh();
+      U.toast('Saved ✓');
+      Router.go('setup');
+    } catch(e) {
+      btn.disabled = false; btn.textContent = 'Save changes';
+      U.toast('Failed to save');
+    }
+  });
+  el.querySelector('#copy-invite')?.addEventListener('click', () => {
+    navigator.clipboard?.writeText(Auth.couple()?.invite_code || '');
+    U.toast('Copied ✓');
+  });
+});
+
+
+// ──────────────────────────────────────────────
+// FAMILY SETUP — Add/edit/remove family members
+// ──────────────────────────────────────────────
+Router.register('family-setup', () => {
+  const members = FamilyStore.members();
+  const kids = FamilyStore.children();
+  const extended = FamilyStore.extended();
+  const contacts = FamilyStore.contacts();
+
+  const RELATIONS = {
+    child: ['Son', 'Daughter', 'Stepson', 'Stepdaughter'],
+    extended: ['Grandparent', 'Aunt', 'Uncle', 'Cousin', 'Sibling', 'In-law', 'Other'],
+    contact: ['Babysitter', 'Nanny', 'Tutor', 'Coach', 'Other'],
+  };
+
+  const memberCard = (m) => {
+    const age = FamilyStore.childAge(m);
+    const ageStr = age !== null ? ` · ${age}y` : '';
+    const relation = m.relation ? ` · ${m.relation}` : '';
+    const roleIcon = m.role === 'child' ? '👶' : m.role === 'extended' ? '👪' : '📇';
+    return `<div class="family-card" data-member-id="${m.id}">
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--terra);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">${roleIcon}</div>
+        <div style="min-width:0;">
+          <div style="font-size:.88rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${U.esc(m.name)}</div>
+          <div style="font-size:.7rem;color:var(--muted);">${m.role}${relation}${ageStr}${m.notes ? ' · ' + U.esc(m.notes) : ''}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn-ghost edit-member-btn" data-id="${m.id}" style="font-size:.85rem;padding:4px 8px;">✏️</button>
+        <button class="btn-ghost remove-member-btn" data-id="${m.id}" style="font-size:.85rem;padding:4px 8px;color:#EF4444;">✕</button>
+      </div>
+    </div>`;
+  };
+
+  return `
+  <div style="min-height:100dvh;padding:0 20px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(60px,env(safe-area-inset-bottom));">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" class="a1">
+      <button class="btn btn-outline btn-sm" onclick="Router.go('setup')">‹ Back</button>
+      <span style="font-family:var(--font-display);font-size:1.1rem;">Family Members</span>
+    </div>
+
+    <div class="a2" style="margin-bottom:20px;">
+      <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:4px;">Your <em style="color:var(--terra)">family</em></div>
+      <div style="font-size:.78rem;color:var(--muted);line-height:1.6;">Add kids, grandparents, babysitters — they appear as smart options when planning events.</div>
+    </div>
+
+    <!-- Add member form -->
+    <div id="member-form" style="display:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:16px;margin-bottom:16px;" class="a3">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div class="input-label" style="margin-bottom:0;" id="form-title">Add family member</div>
+        <button class="btn-ghost" id="form-cancel" style="font-size:.85rem;">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <div class="input-label">Name</div>
+          <input type="text" id="fm-name" class="input" placeholder="e.g. Emma">
+        </div>
+        <div>
+          <div class="input-label">Type</div>
+          <div class="pill-group" data-field="fm-role">
+            <div class="pill" data-val="child">Child</div>
+            <div class="pill" data-val="extended">Extended family</div>
+            <div class="pill" data-val="contact">Contact</div>
+          </div>
+        </div>
+        <div id="fm-relation-wrap" style="display:none;">
+          <div class="input-label">Relation</div>
+          <div class="pill-group" data-field="fm-relation" id="fm-relation-pills"></div>
+        </div>
+        <div id="fm-birth-wrap" style="display:none;">
+          <div class="input-label">Birth date <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
+          <input type="date" id="fm-birth" class="input">
+        </div>
+        <div>
+          <div class="input-label">Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></div>
+          <input type="text" id="fm-notes" class="input" placeholder="e.g. Allergic to peanuts">
+        </div>
+        <input type="hidden" id="fm-edit-id" value="">
+        <button class="btn btn-accent" id="fm-save"><span id="fm-save-text">Add member</span></button>
+      </div>
+    </div>
+
+    <div class="a3">
+      <button class="btn btn-outline" id="add-member-btn" style="margin-bottom:16px;">+ Add a family member</button>
+    </div>
+
+    <!-- Members list -->
+    ${kids.length > 0 ? `
+    <div class="a4" style="margin-bottom:16px;">
+      <div class="input-label">👶 Children (${kids.length})</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">${kids.map(memberCard).join('')}</div>
+    </div>` : ''}
+
+    ${extended.length > 0 ? `
+    <div class="a4" style="margin-bottom:16px;">
+      <div class="input-label">👪 Extended Family (${extended.length})</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">${extended.map(memberCard).join('')}</div>
+    </div>` : ''}
+
+    ${contacts.length > 0 ? `
+    <div class="a4" style="margin-bottom:16px;">
+      <div class="input-label">📇 Contacts (${contacts.length})</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">${contacts.map(memberCard).join('')}</div>
+    </div>` : ''}
+
+    ${members.length === 0 ? `
+    <div style="text-align:center;padding:40px 20px;" class="a4">
+      <div style="font-size:2.4rem;margin-bottom:12px;">👨‍👩‍👧‍👦</div>
+      <div style="font-size:.88rem;color:var(--muted);line-height:1.6;max-width:260px;margin:0 auto;">No family members yet. Add kids, grandparents, or key contacts to get smarter event suggestions.</div>
+    </div>` : ''}
+  </div>`;
+}, (el) => {
+  const RELATIONS = {
+    child: ['Son', 'Daughter', 'Stepson', 'Stepdaughter'],
+    extended: ['Grandparent', 'Aunt', 'Uncle', 'Cousin', 'Sibling', 'In-law', 'Other'],
+    contact: ['Babysitter', 'Nanny', 'Tutor', 'Coach', 'Other'],
+  };
+
+  const form = el.querySelector('#member-form');
+  const addBtn = el.querySelector('#add-member-btn');
+  let _selectedRole = null;
+  let _selectedRelation = null;
+
+  // Show/hide form
+  addBtn?.addEventListener('click', () => {
+    resetForm();
+    form.style.display = 'block';
+    addBtn.style.display = 'none';
+    el.querySelector('#fm-name')?.focus();
+  });
+  el.querySelector('#form-cancel')?.addEventListener('click', () => {
+    form.style.display = 'none';
+    addBtn.style.display = 'block';
+  });
+
+  function resetForm() {
+    el.querySelector('#fm-name').value = '';
+    el.querySelector('#fm-birth').value = '';
+    el.querySelector('#fm-notes').value = '';
+    el.querySelector('#fm-edit-id').value = '';
+    el.querySelector('#form-title').textContent = 'Add family member';
+    el.querySelector('#fm-save-text').textContent = 'Add member';
+    _selectedRole = null;
+    _selectedRelation = null;
+    el.querySelectorAll('[data-field="fm-role"] .pill').forEach(p => p.classList.remove('selected'));
+    el.querySelector('#fm-relation-wrap').style.display = 'none';
+    el.querySelector('#fm-birth-wrap').style.display = 'none';
+  }
+
+  // Role pill selection
+  el.querySelectorAll('[data-field="fm-role"] .pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      el.querySelectorAll('[data-field="fm-role"] .pill').forEach(p => p.classList.remove('selected'));
+      pill.classList.add('selected');
+      _selectedRole = pill.dataset.val;
+
+      // Show relation pills
+      const relationWrap = el.querySelector('#fm-relation-wrap');
+      const relationPills = el.querySelector('#fm-relation-pills');
+      const relations = RELATIONS[_selectedRole] || [];
+      relationPills.innerHTML = relations.map(r => `<div class="pill" data-val="${r}">${r}</div>`).join('');
+      relationWrap.style.display = relations.length > 0 ? 'block' : 'none';
+      _selectedRelation = null;
+
+      // Wire relation pills
+      relationPills.querySelectorAll('.pill').forEach(rp => {
+        rp.addEventListener('click', () => {
+          relationPills.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+          rp.classList.add('selected');
+          _selectedRelation = rp.dataset.val;
+        });
+      });
+
+      // Show birth date for children
+      el.querySelector('#fm-birth-wrap').style.display = _selectedRole === 'child' ? 'block' : 'none';
+    });
+  });
+
+  // Save
+  el.querySelector('#fm-save')?.addEventListener('click', async () => {
+    const name = el.querySelector('#fm-name')?.value.trim();
+    if (!name) { U.toast('Enter a name'); return; }
+    if (!_selectedRole) { U.toast('Select a type'); return; }
+
+    const btn = el.querySelector('#fm-save');
+    btn.disabled = true;
+
+    const member = {
+      id: el.querySelector('#fm-edit-id').value || ('fm_' + Date.now()),
+      name,
+      role: _selectedRole,
+      relation: _selectedRelation || null,
+      belongsTo: 'both',
+      birthDate: el.querySelector('#fm-birth')?.value || null,
+      notes: el.querySelector('#fm-notes')?.value.trim() || null,
+      sortOrder: FamilyStore.members().length,
+    };
+
+    const editId = el.querySelector('#fm-edit-id').value;
+    if (editId) {
+      await FamilyStore.update(editId, member);
+      U.toast('Updated');
+    } else {
+      await FamilyStore.add(member);
+      U.toast('Added');
+    }
+
+    Router.go('family-setup');
+  });
+
+  // Edit member
+  el.querySelectorAll('.edit-member-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const m = FamilyStore.find(btn.dataset.id);
+      if (!m) return;
+
+      form.style.display = 'block';
+      addBtn.style.display = 'none';
+      el.querySelector('#form-title').textContent = 'Edit family member';
+      el.querySelector('#fm-save-text').textContent = 'Save changes';
+      el.querySelector('#fm-name').value = m.name;
+      el.querySelector('#fm-edit-id').value = m.id;
+      el.querySelector('#fm-notes').value = m.notes || '';
+      el.querySelector('#fm-birth').value = m.birthDate || '';
+
+      // Select role pill
+      _selectedRole = m.role;
+      el.querySelectorAll('[data-field="fm-role"] .pill').forEach(p => {
+        p.classList.toggle('selected', p.dataset.val === m.role);
+      });
+
+      // Show relation pills and select
+      const relations = RELATIONS[m.role] || [];
+      const relationPills = el.querySelector('#fm-relation-pills');
+      relationPills.innerHTML = relations.map(r => `<div class="pill${r === m.relation ? ' selected' : ''}" data-val="${r}">${r}</div>`).join('');
+      el.querySelector('#fm-relation-wrap').style.display = relations.length > 0 ? 'block' : 'none';
+      _selectedRelation = m.relation;
+
+      // Wire relation pills
+      relationPills.querySelectorAll('.pill').forEach(rp => {
+        rp.addEventListener('click', () => {
+          relationPills.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+          rp.classList.add('selected');
+          _selectedRelation = rp.dataset.val;
+        });
+      });
+
+      el.querySelector('#fm-birth-wrap').style.display = m.role === 'child' ? 'block' : 'none';
+      el.querySelector('#fm-name')?.focus();
+    });
+  });
+
+  // Remove member
+  el.querySelectorAll('.remove-member-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const m = FamilyStore.find(btn.dataset.id);
+      if (!m) return;
+      const action = await U.sheet(`Remove ${m.name}?`, [
+        { key: 'remove', label: 'Remove', cls: 'btn-danger' },
+      ]);
+      if (action === 'remove') {
+        await FamilyStore.remove(m.id);
+        U.toast('Removed');
+        Router.go('family-setup');
+      }
+    });
   });
 });
 
