@@ -1975,8 +1975,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.7.0';
-const BUILD_DATE = '2026-03-11T14:30:00Z';
+const VERSION = '5.7.1';
+const BUILD_DATE = '2026-03-11T15:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2556,10 +2556,54 @@ const Auth = (() => {
       if (!_session) { _bootstrapping = false; return { mode: 'unauthenticated' }; }
 
       // 2. Load couple FIRST — determines which slot I am
-      const { data: coupleData } = await sb.from('couples')
+      let { data: coupleData } = await sb.from('couples')
         .select('*')
         .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`)
         .maybeSingle();
+
+      // 2b. Fallback: if no couple found, check if there's an existing account
+      //     with the same email that IS in a couple (Google OAuth may create a
+      //     new user ID for an existing email/password account).
+      if (!coupleData && _session.user?.email) {
+        const email = _session.user.email;
+        const { data: oldProfile } = await sb.from('profiles')
+          .select('id')
+          .eq('email', email)
+          .neq('id', _uid)
+          .maybeSingle();
+
+        if (oldProfile) {
+          const oldId = oldProfile.id;
+          const { data: oldCouple } = await sb.from('couples')
+            .select('*')
+            .or(`spouse_1_id.eq.${oldId},spouse_2_id.eq.${oldId}`)
+            .maybeSingle();
+
+          if (oldCouple) {
+            // Migrate: update the couple row to reference the new user ID
+            const isSpouse1 = oldCouple.spouse_1_id === oldId;
+            const updateCol = isSpouse1 ? 'spouse_1_id' : 'spouse_2_id';
+            await sb.from('couples').update({ [updateCol]: _uid }).eq('id', oldCouple.id);
+
+            // Copy profile data from old account if current profile is empty
+            const { data: oldFullProfile } = await sb.from('profiles')
+              .select('*').eq('id', oldId).maybeSingle();
+            if (oldFullProfile) {
+              const { id: _drop, ...profileData } = oldFullProfile;
+              await sb.from('profiles').upsert({ id: _uid, ...profileData, email });
+            }
+
+            // Re-fetch the updated couple
+            const { data: refreshed } = await sb.from('couples')
+              .select('*')
+              .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`)
+              .maybeSingle();
+            coupleData = refreshed;
+            console.log('[bootstrap] Migrated couple from old account to Google OAuth user');
+          }
+        }
+      }
+
       _couple = coupleData || null;
       _amSpouse1 = _couple ? (_couple.spouse_1_id === _uid) : true;
 
