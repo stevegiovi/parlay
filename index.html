@@ -693,8 +693,12 @@ select.input {
 // ──────────────────────────────────────────────
 // CONFIG
 // ──────────────────────────────────────────────
-const VERSION = '2.0.5';
-const BUILD_DATE = '2026-03-10T12:00:00Z';
+// ⚠️  RELEASE CHECKLIST — Update BOTH of these on every commit/release:
+//     1. Bump VERSION (semver: major.minor.patch)
+//     2. Set BUILD_DATE to current UTC timestamp
+//     See CLAUDE.md for full release instructions.
+const VERSION = '2.0.6';
+const BUILD_DATE = '2026-03-11T12:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -871,11 +875,11 @@ const DEMO = {
       {
         id: 'demo-t6', title: 'Walk the dog',
         context: null, rawContext: null, filteredContext: null,
-        categoryId: 'pets', presetIcon: '🐕', priority: 'normal', dueDate: ago(1).toISOString().split('T')[0],
+        categoryId: 'pets', presetIcon: '🐕', priority: 'normal', dueDate: ago(1).split('T')[0],
         assignedTo: 'them', createdBy: 'me', status: 'done',
         pendingResponseFrom: null, counterCount: 0,
         counterMessage: null, filteredCounter: null, declineReason: null, filteredDecline: null,
-        completedAt: ago(1).toISOString(), completedBy: 'demo-uid-b',
+        completedAt: ago(1), completedBy: 'demo-uid-b',
       },
     ];
 
