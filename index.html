@@ -1163,7 +1163,7 @@ select.input {
    ═══════════════════════════════════════════════ */
 .cc-wrapper {
   display: flex; flex-direction: column;
-  height: 100dvh; width: 100%;
+  height: calc(100dvh - var(--nav-h)); width: 100%;
   overflow: hidden; position: relative;
 }
 .cc-header {
@@ -1596,8 +1596,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.0.0';
-const BUILD_DATE = '2026-03-12T06:00:00Z';
+const VERSION = '5.0.1';
+const BUILD_DATE = '2026-03-11T20:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2033,6 +2033,20 @@ const U = {
       `<option value="${t}"${t === selected ? ' selected' : ''}>${t || 'Time'}</option>`
     ).join('');
     return `<select class="input" style="flex:1;min-width:0;" data-slot="${slot}" data-type="time">${opts}</select>`;
+  },
+  ago(iso) {
+    if (!iso) return '';
+    const ms = Date.now() - new Date(iso).getTime();
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return 'just now';
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    const d = Math.floor(h / 24);
+    if (d < 7) return d + 'd ago';
+    if (d < 30) return Math.floor(d / 7) + 'w ago';
+    return U.shortDate(iso);
   },
 };
 
@@ -3895,7 +3909,7 @@ const Router = (() => {
   const _routes = {};
   let _current = null;
   let _currentParams = {};
-  const NAV_SCREENS = ['home','couple-chat','calendar','tasks','setup'];
+  const NAV_SCREENS = ['home','couple-chat','calendar','tasks','setup','plan'];
 
   function register(name, renderFn, initFn) {
     _routes[name] = { render: renderFn, init: initFn };
@@ -6472,7 +6486,7 @@ Router.register('task-new', () => {
 
   const defaultCat = TASK_CATEGORIES[0].id;
   return `
-  <div style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
+  <div style="display:flex;flex-direction:column;min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(40px,env(safe-area-inset-bottom));">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;" class="a1">
       <button class="btn btn-outline btn-sm" onclick="Router.go('tasks')">‹ Back</button>
       <span style="font-family:var(--font-display);font-size:1.1rem;">New Task</span>
@@ -6491,7 +6505,7 @@ Router.register('task-new', () => {
     </div>
 
     <!-- Preset grid -->
-    <div id="preset-grid" class="a3" style="margin-bottom:16px;">
+    <div id="preset-grid" class="a3" style="margin-bottom:16px;flex:1;overflow-y:auto;">
       ${TASK_CATEGORIES.filter(c => c.id !== 'other').map(c => `
         <div class="preset-section" data-cat-section="${c.id}" style="display:${c.id !== defaultCat ? 'none' : 'flex'};flex-wrap:wrap;gap:8px;">
           ${(TASK_PRESETS[c.id] || []).map(p => `
@@ -6502,14 +6516,16 @@ Router.register('task-new', () => {
     </div>
 
     <!-- Or type custom -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-      <div style="font-size:.72rem;color:var(--muted);font-weight:600;">OR TYPE YOUR OWN</div>
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <input id="tn-custom" class="input" placeholder="e.g. Organize the garage" style="flex:1;">
-      <button class="btn btn-accent" id="tn-custom-go" style="flex-shrink:0;padding:0 20px;">Next →</button>
+    <div style="flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <div style="font-size:.72rem;color:var(--muted);font-weight:600;">OR TYPE YOUR OWN</div>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <input id="tn-custom" class="input" placeholder="e.g. Organize the garage" style="flex:1;">
+        <button class="btn btn-accent" id="tn-custom-go" style="flex-shrink:0;padding:0 20px;">Next →</button>
+      </div>
     </div>
   </div>`;
 }, (el) => {
