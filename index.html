@@ -5894,8 +5894,7 @@ Router.register('ob-couple', () => {
       </div>
     </div>
   </div>`;
-}
-`, (el) => {
+}, (el) => {
   el.querySelector('#obc-logout').addEventListener('click', () => Auth.signOut());
   el.querySelector('#obc-back-login').addEventListener('click', () => Auth.signOut());
   el.querySelector('#obc-create').addEventListener('click', async () => {
