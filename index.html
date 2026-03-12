@@ -1918,6 +1918,167 @@ select.input {
     .breadcrumb-sep { opacity: .4; }
 
 /* ═══════════════════════════════════════════════
+   PARTNER HUB
+   ═══════════════════════════════════════════════ */
+.ph-hero {
+  background: linear-gradient(135deg, var(--espresso) 0%, #2a1506 100%);
+  padding: 0 24px 28px;
+  padding-top: max(52px, env(safe-area-inset-top));
+  text-align: center;
+}
+.ph-hero-title {
+  font-family: var(--font-display); font-size: 1.8rem; font-weight: 300;
+  color: var(--cream); margin-bottom: 4px;
+}
+.ph-hero-sub { font-size: .78rem; color: rgba(250,246,241,.6); }
+.ph-avatars {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; margin: 20px auto 12px; position: relative;
+}
+.ph-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.1rem; color: #fff;
+  border: 3px solid var(--espresso); position: relative;
+}
+.ph-avatar.me { background: var(--terra); z-index: 2; }
+.ph-avatar.them { background: var(--sage); z-index: 1; margin-left: -16px; }
+.ph-avatar.empty { background: var(--border); z-index: 1; margin-left: -16px; }
+.ph-link-icon {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 3; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--amber); display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+.ph-status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px; font-size: .75rem; font-weight: 600;
+  margin-top: 10px;
+}
+.ph-status-badge.connected { background: rgba(122,158,138,.2); color: var(--sage); }
+.ph-status-badge.waiting { background: rgba(232,184,138,.2); color: var(--amber); }
+.ph-status-badge.disconnected { background: rgba(224,85,85,.2); color: #E05555; }
+
+.ph-section { padding: 16px 20px; }
+.ph-section-title {
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); margin-bottom: 10px;
+}
+.ph-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 16px; margin-bottom: 10px;
+  transition: border-color .15s;
+}
+.ph-card.interactive { cursor: pointer; }
+.ph-card.interactive:hover { border-color: var(--amber); }
+.ph-card.highlight {
+  border-color: var(--amber);
+  background: linear-gradient(135deg, rgba(232,184,138,.06), rgba(196,113,74,.04));
+}
+.ph-card.danger { border-color: rgba(224,85,85,.3); }
+
+.ph-invite-code {
+  font-family: var(--font-display); font-size: 2.2rem;
+  letter-spacing: .18em; color: var(--amber);
+  text-align: center; padding: 16px 0; user-select: all;
+}
+.ph-invite-actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;
+}
+.ph-invite-actions.three-col { grid-template-columns: 1fr 1fr 1fr; }
+.ph-share-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 8px; border-radius: var(--r-md); border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; transition: all .15s;
+  font-size: .68rem; color: var(--text);
+}
+.ph-share-btn:hover { border-color: var(--amber); background: rgba(232,184,138,.06); }
+.ph-share-btn:active { transform: scale(.97); }
+.ph-share-btn .icon { font-size: 1.3rem; }
+
+.ph-email-row {
+  display: flex; gap: 8px; margin-top: 12px;
+}
+.ph-email-row input {
+  flex: 1; min-width: 0;
+}
+.ph-email-row button {
+  flex-shrink: 0;
+}
+
+.ph-diag-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.ph-diag-item {
+  padding: 12px; border-radius: var(--r-md);
+  background: var(--parchment); text-align: center;
+}
+.ph-diag-value {
+  font-family: var(--font-display); font-size: 1.1rem; font-weight: 700;
+  margin-bottom: 2px;
+}
+.ph-diag-label { font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+.ph-timeline {
+  position: relative; padding-left: 24px;
+}
+.ph-timeline::before {
+  content: ''; position: absolute; left: 8px; top: 4px; bottom: 4px;
+  width: 2px; background: var(--border); border-radius: 1px;
+}
+.ph-timeline-item {
+  position: relative; margin-bottom: 16px;
+}
+.ph-timeline-dot {
+  position: absolute; left: -20px; top: 4px;
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--border); background: var(--surface);
+}
+.ph-timeline-dot.active { border-color: var(--sage); background: var(--sage); }
+.ph-timeline-dot.current { border-color: var(--amber); background: var(--amber); }
+.ph-timeline-dot.pending { border-color: var(--border); background: var(--surface); }
+.ph-timeline-title { font-size: .82rem; font-weight: 600; margin-bottom: 2px; }
+.ph-timeline-desc { font-size: .7rem; color: var(--muted); }
+
+.ph-partner-detail {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 12px;
+}
+.ph-partner-info { flex: 1; min-width: 0; }
+.ph-partner-name { font-size: 1rem; font-weight: 700; }
+.ph-partner-email { font-size: .72rem; color: var(--muted); }
+.ph-partner-meta { font-size: .68rem; color: var(--muted); margin-top: 4px; }
+
+.ph-quick-actions {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin-top: 12px;
+}
+.ph-quick-action {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 8px; border-radius: var(--r-md);
+  background: var(--parchment); cursor: pointer; transition: all .15s;
+}
+.ph-quick-action:hover { background: rgba(232,184,138,.15); }
+.ph-quick-action .icon { font-size: 1.2rem; }
+.ph-quick-action .label { font-size: .65rem; font-weight: 600; text-align: center; }
+
+.ph-sync-indicator {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: var(--r-md);
+  font-size: .75rem;
+}
+.ph-sync-indicator.good { background: rgba(122,158,138,.1); color: var(--sage); }
+.ph-sync-indicator.warn { background: rgba(232,184,138,.1); color: var(--amber); }
+.ph-sync-indicator.error { background: rgba(224,85,85,.1); color: #E05555; }
+
+.ph-pulse {
+  animation: ph-pulse 2s ease-in-out infinite;
+}
+@keyframes ph-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+/* ═══════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════ */
 @media (min-width: 600px) {
@@ -1975,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.7.2';
-const BUILD_DATE = '2026-03-11T15:15:00Z';
+const VERSION = '5.8.0';
+const BUILD_DATE = '2026-03-12T12:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2793,12 +2954,96 @@ const Auth = (() => {
     Router.reload();
   }
 
+  // ── Partner connection management ───────────
+  async function regenerateInviteCode() {
+    if (!_couple) return { error: 'No couple record' };
+    if (hasPartner()) return { error: 'Partner already connected' };
+    const newCode = U.code();
+    const { error } = await sb.from('couples')
+      .update({ invite_code: newCode })
+      .eq('id', _couple.id);
+    if (error) return { error: error.message };
+    _couple = { ..._couple, invite_code: newCode };
+    return { code: newCode };
+  }
+
+  async function disconnectPartner() {
+    if (!_couple || !hasPartner()) return { error: 'No partner to disconnect' };
+    const mySlot = _amSpouse1 ? 'spouse_1_id' : 'spouse_2_id';
+    const theirSlot = _amSpouse1 ? 'spouse_2_id' : 'spouse_1_id';
+    // Remove partner from couple row, generate new invite code
+    const newCode = U.code();
+    const { error } = await sb.from('couples')
+      .update({ [theirSlot]: null, invite_code: newCode })
+      .eq('id', _couple.id);
+    if (error) return { error: error.message };
+    _couple = { ..._couple, [theirSlot]: null, invite_code: newCode };
+    _themProfile = null;
+    return { success: true };
+  }
+
+  async function verifyConnection() {
+    if (!_couple) return { status: 'no_couple', ok: false };
+    // Re-fetch couple row to verify
+    const { data, error } = await sb.from('couples')
+      .select('*')
+      .eq('id', _couple.id)
+      .maybeSingle();
+    if (error || !data) return { status: 'fetch_error', ok: false, error: error?.message };
+    _couple = data;
+    _amSpouse1 = _couple.spouse_1_id === _uid;
+
+    const partnerUid = _amSpouse1 ? data.spouse_2_id : data.spouse_1_id;
+    if (!partnerUid) return { status: 'waiting', ok: false, couple: data };
+
+    // Verify partner profile is accessible
+    const { data: partnerProfile, error: pErr } = await sb.from('profiles')
+      .select('*').eq('id', partnerUid).maybeSingle();
+    if (pErr || !partnerProfile) {
+      return { status: 'partner_profile_missing', ok: false, partnerUid };
+    }
+    _themProfile = partnerProfile;
+
+    // Verify realtime is connected
+    const realtimeOk = !!_realtime;
+
+    // Verify shared data loads
+    let dataOk = true;
+    try {
+      const { data: testData, error: testErr } = await sb.from('negotiations')
+        .select('id').eq('couple_id', _couple.id).limit(1);
+      if (testErr) dataOk = false;
+    } catch { dataOk = false; }
+
+    return {
+      status: 'connected',
+      ok: true,
+      partner: { name: partnerProfile.name, email: partnerProfile.email },
+      realtimeOk,
+      dataOk,
+      couple: data,
+    };
+  }
+
+  function connectionAge() {
+    if (!_couple?.created_at) return null;
+    const created = new Date(_couple.created_at);
+    const now = new Date();
+    const days = Math.floor((now - created) / 86400000);
+    if (days < 1) return 'Today';
+    if (days === 1) return '1 day';
+    if (days < 30) return days + ' days';
+    if (days < 365) return Math.floor(days / 30) + ' months';
+    return Math.floor(days / 365) + ' years';
+  }
+
   return {
     sb: () => sb, me, them, user: () => (_session?.user ? { id: _session.user.id, email: _session.user.email } : null), myName, theirName, myUid, theirUid,
     couple, isReady, hasPartner, amSpouse1, getToken,
     signUp, signIn, signOut, signInWithGoogle, refreshSession, refresh,
     createCouple, joinCouple, bootstrap,
     updateMyProfile, saveCoupleSettings, saveMyCommPrefs,
+    regenerateInviteCode, disconnectPartner, verifyConnection, connectionAge,
   };
 })();
 
@@ -5414,7 +5659,20 @@ Router.register('auth-signup', () => `
     }
     // Auto-confirmed — bootstrap
     const boot = await Auth.bootstrap();
-    if (boot.coupled) {
+    // Check for pending invite from link
+    const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
+    if (pendingInvite) {
+      sessionStorage.removeItem('parlay_pending_invite');
+      const joinResult = await Auth.joinCouple(pendingInvite);
+      if (!joinResult.error) {
+        await Auth.bootstrap();
+        U.toast('Connected with your partner! 🎉');
+        Router.go('home');
+      } else {
+        U.toast('Invite error: ' + joinResult.error);
+        Router.go('ob-couple');
+      }
+    } else if (boot.coupled) {
       Router.go('home');
     } else {
       Router.go('ob-couple');
@@ -5470,8 +5728,23 @@ Router.register('auth-signin', () => `
     }
 
     const boot = await Auth.bootstrap();
-    // Existing user sign-in: always go home (couple already set up)
-    Router.go('home');
+    // Check for pending invite
+    const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
+    if (pendingInvite && !boot.hasPartner && !boot.coupled) {
+      sessionStorage.removeItem('parlay_pending_invite');
+      const joinResult = await Auth.joinCouple(pendingInvite);
+      if (!joinResult.error) {
+        await Auth.bootstrap();
+        U.toast('Connected with your partner! 🎉');
+      } else {
+        U.toast('Invite error: ' + joinResult.error);
+      }
+      Router.go('home');
+    } else if (!boot.coupled) {
+      Router.go('ob-couple');
+    } else {
+      Router.go('home');
+    }
   });
 });
 
@@ -5481,17 +5754,46 @@ Router.register('auth-signin', () => `
 Router.register('ob-couple', () => `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;">
     <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Connect with your <em style="color:var(--amber)">partner</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:40px;" class="a1">Are you the first one here, or did your partner send you an invite?</div>
-    <div style="display:flex;flex-direction:column;gap:16px;" class="a2">
-      <button class="btn btn-accent" id="obc-create">I'm setting this up first</button>
-      <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);" id="obc-join">I have an invite code</button>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:12px;" class="a1">Parlay works best when both partners are connected. Choose how to get started:</div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px;" class="a2">
+      <!-- Option 1: I'm first -->
+      <button class="btn btn-accent" id="obc-create" style="padding:18px 20px;text-align:left;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <span style="font-size:1.4rem;">🚀</span>
+          <div>
+            <div style="font-weight:700;font-size:.92rem;">I'm setting this up first</div>
+            <div style="font-size:.72rem;font-weight:400;opacity:.8;margin-top:2px;">Create a space & invite your partner</div>
+          </div>
+        </div>
+      </button>
+
+      <!-- Option 2: I have a code -->
+      <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);padding:18px 20px;text-align:left;" id="obc-join">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <span style="font-size:1.4rem;">🔑</span>
+          <div>
+            <div style="font-weight:700;font-size:.92rem;">I have an invite code</div>
+            <div style="font-size:.72rem;font-weight:400;opacity:.65;margin-top:2px;">Enter the code from your partner</div>
+          </div>
+        </div>
+      </button>
+    </div>
+
+    <div style="padding:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-lg);" class="a3">
+      <div style="font-size:.72rem;color:rgba(250,246,241,.5);line-height:1.6;">
+        <strong style="color:var(--amber);">How it works:</strong> One partner creates the space and gets a unique invite code. The other partner enters that code to connect. Once connected, you'll share parlays, tasks, and chat in real-time.
+      </div>
     </div>
   </div>
 `, (el) => {
   el.querySelector('#obc-create').addEventListener('click', async () => {
+    const btn = el.querySelector('#obc-create');
+    btn.disabled = true;
     const result = await Auth.createCouple();
-    if (result.error) { U.toast(result.error); return; }
-    Router.go('ob-invite');
+    if (result.error) { U.toast(result.error); btn.disabled = false; return; }
+    // Go to the full partner hub for sharing
+    Router.go('partner-hub');
   });
   el.querySelector('#obc-join').addEventListener('click', () => Router.go('ob-join'));
 });
@@ -5500,53 +5802,79 @@ Router.register('ob-invite', () => {
   const code = Auth.couple()?.invite_code || '';
   return `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;align-items:center;text-align:center;">
-    <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Share this <em style="color:var(--amber)">code</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:32px;" class="a1">Your partner enters this code when they sign up.</div>
+    <div style="font-size:2.4rem;margin-bottom:12px;" class="a1">🎉</div>
+    <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Your space is <em style="color:var(--amber)">ready!</em></div>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:32px;" class="a1">Share this code with your partner to connect.</div>
     <div style="font-family:var(--font-display);font-size:3rem;color:var(--amber);letter-spacing:.15em;margin-bottom:24px;background:rgba(255,255,255,.05);padding:20px 32px;border-radius:var(--r-lg);border:1px solid rgba(255,255,255,.1);" class="a2" id="invite-code">${code}</div>
-    <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);max-width:240px;" id="copy-code">Copy to clipboard</button>
+    <div style="display:flex;gap:10px;margin-bottom:20px;" class="a2">
+      <button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);" id="copy-code">📋 Copy Code</button>
+      ${navigator.share ? `<button class="btn" style="background:rgba(255,255,255,.1);color:var(--cream);" id="ob-share-native">📤 Share</button>` : ''}
+    </div>
+    <button class="btn" style="background:rgba(255,255,255,.06);color:rgba(250,246,241,.65);font-size:.78rem;margin-bottom:16px;" onclick="Router.go('partner-hub')">More sharing options →</button>
     <div style="flex:1;"></div>
     <button class="btn btn-accent a3" style="max-width:300px;margin-bottom:max(40px,env(safe-area-inset-bottom));" onclick="Router.go('home')">Continue to Home →</button>
   </div>`;
 }, (el) => {
-  el.querySelector('#copy-code').addEventListener('click', () => {
-    navigator.clipboard?.writeText(Auth.couple()?.invite_code || '');
-    U.toast('Code copied ✓');
+  el.querySelector('#copy-code').addEventListener('click', async () => {
+    const r = await PartnerConnection.copyInvite();
+    U.toast(r.success ? 'Invite copied ✓' : 'Failed to copy');
+  });
+  el.querySelector('#ob-share-native')?.addEventListener('click', async () => {
+    const r = await PartnerConnection.shareNative();
+    if (r.success) U.toast('Shared ✓');
   });
 });
 
 Router.register('ob-join', () => `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;">
     <button class="btn-ghost" style="color:rgba(250,246,241,.65);align-self:flex-start;margin-bottom:24px;" onclick="Router.go('ob-couple')">‹ Back</button>
-    <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Enter invite <em style="color:var(--amber)">code</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:32px;" class="a1">Your partner will have a 6-character code for you.</div>
+    <div style="text-align:center;" class="a1">
+      <div style="font-size:2.8rem;margin-bottom:12px;">🔑</div>
+      <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;">Enter invite <em style="color:var(--amber)">code</em></div>
+      <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:32px;">Your partner will have a 6-character code for you.</div>
+    </div>
     <div style="display:flex;flex-direction:column;gap:16px;" class="a2">
-      <input id="join-code" class="input" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);font-size:1.5rem;text-align:center;letter-spacing:.2em;text-transform:uppercase;" placeholder="ABC123" maxlength="6">
-      <div id="join-error" style="display:none;font-size:.8rem;color:#EF4444;"></div>
-      <button class="btn btn-accent" id="join-submit">Join Partner</button>
+      <input id="join-code" class="input" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:var(--cream);font-size:1.8rem;text-align:center;letter-spacing:.25em;text-transform:uppercase;padding:18px;" placeholder="ABC123" maxlength="6" autocomplete="off" autocapitalize="characters">
+      <div id="join-error" style="display:none;font-size:.8rem;color:#EF4444;text-align:center;"></div>
+      <button class="btn btn-accent" id="join-submit" style="padding:16px;">Connect with Partner</button>
+    </div>
+
+    <div style="margin-top:32px;padding:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-lg);" class="a3">
+      <div style="font-size:.72rem;color:rgba(250,246,241,.45);line-height:1.6;text-align:center;">
+        Can't find the code? Ask your partner to open <strong style="color:var(--amber);">Settings → Partner</strong> in their Parlay app to see or reshare the code.
+      </div>
     </div>
   </div>
 `, (el) => {
+  // Auto-focus the input
+  setTimeout(() => el.querySelector('#join-code')?.focus(), 300);
+
   el.querySelector('#join-submit').addEventListener('click', async () => {
     const code = el.querySelector('#join-code').value.trim();
     const errEl = el.querySelector('#join-error');
     errEl.style.display = 'none';
-    if (!code || code.length < 4) { errEl.textContent = 'Enter the code from your partner'; errEl.style.display = 'block'; return; }
+    if (!code || code.length < 4) { errEl.textContent = 'Enter the 6-character code from your partner'; errEl.style.display = 'block'; return; }
 
     el.querySelector('#join-submit').disabled = true;
-    el.querySelector('#join-submit').textContent = 'Joining…';
+    el.querySelector('#join-submit').textContent = 'Connecting…';
 
     const result = await Auth.joinCouple(code);
     if (result.error) {
       errEl.textContent = result.error;
       errEl.style.display = 'block';
       el.querySelector('#join-submit').disabled = false;
-      el.querySelector('#join-submit').textContent = 'Join Partner';
+      el.querySelector('#join-submit').textContent = 'Connect with Partner';
       return;
     }
 
     await Auth.bootstrap();
-    U.toast('Connected ✓');
+    U.toast('Connected with your partner! 🎉');
     Router.go('home');
+  });
+
+  // Also handle Enter key on the input
+  el.querySelector('#join-code')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') el.querySelector('#join-submit')?.click();
   });
 });
 
@@ -5586,14 +5914,14 @@ Router.register('home', () => {
         </div>
       </div>
       <div class="home-date a1">${U.today()}</div>
-      <div class="partner-bar a2">
+      <div class="partner-bar a2" onclick="Router.go('partner-hub')" style="cursor:pointer;">
         <div class="partner-avatars">
           <div class="avatar" style="background:#3d2510;color:var(--amber);">${U.initials(myN)}</div>
           <div class="avatar" style="background:#1a2d24;color:var(--sage);">${U.initials(theirN)}</div>
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:.82rem;font-weight:600;color:var(--cream);">${U.esc(myN)} & ${U.esc(theirN)}</div>
-          <div style="font-size:.68rem;color:rgba(250,246,241,.65);">${Auth.hasPartner() ? '🟢 Connected' : '⏳ Awaiting partner'}</div>
+          <div style="font-size:.68rem;color:rgba(250,246,241,.65);">${Auth.hasPartner() ? '🟢 Connected' : '⏳ Tap to invite partner'}</div>
         </div>
         ${score.score > 0 ? `
         <div style="text-align:center;cursor:pointer;" onclick="Router.go('insights')">
@@ -5639,13 +5967,13 @@ Router.register('home', () => {
 
     <!-- INVITE BANNER -->
     ${Auth.isReady() && !Auth.hasPartner() ? `
-    <div style="margin:0 20px 12px;background:linear-gradient(135deg,#3d1f0a,#2a1506);border:1px solid rgba(196,113,74,.3);border-radius:var(--r-lg);padding:16px 18px;display:flex;align-items:center;gap:14px;" class="a2">
+    <div style="margin:0 20px 12px;background:linear-gradient(135deg,#3d1f0a,#2a1506);border:1px solid rgba(196,113,74,.3);border-radius:var(--r-lg);padding:16px 18px;display:flex;align-items:center;gap:14px;cursor:pointer;" class="a2" onclick="Router.go('partner-hub')">
       <div style="font-size:1.6rem;">🔗</div>
       <div style="flex:1;">
         <div style="font-size:.82rem;font-weight:700;color:var(--amber);margin-bottom:3px;">Partner hasn't joined yet</div>
-        <div style="font-size:.72rem;color:rgba(250,246,241,.65);">Share your invite code.</div>
+        <div style="font-size:.72rem;color:rgba(250,246,241,.65);">Tap to share invite code via text, email, or link</div>
       </div>
-      <button class="btn btn-sm btn-accent" onclick="Router.go('ob-invite')">Share</button>
+      <button class="btn btn-sm btn-accent" onclick="event.stopPropagation();Router.go('partner-hub')">Invite</button>
     </div>` : ''}
 
     <!-- INBOX -->
@@ -7641,13 +7969,13 @@ Router.register('setup', () => {
         </div>
         <div style="color:var(--muted);align-self:center;">›</div>
       </div>
-      <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);">
+      <div style="display:flex;gap:12px;padding:16px;background:var(--surface);border:1px solid ${hasPartner ? 'var(--sage)' : 'var(--amber)'};border-radius:var(--r-lg);cursor:pointer;" onclick="Router.go('partner-hub')">
         <div style="width:44px;height:44px;border-radius:50%;background:${hasPartner ? 'var(--sage)' : 'var(--border)'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0;">${hasPartner ? U.initials(theirN) : '?'}</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:.92rem;font-weight:600;">${hasPartner ? U.esc(theirN) : 'Waiting for partner'}</div>
-          <div style="font-size:.72rem;color:var(--muted);">${hasPartner ? 'Your partner' : 'Share your invite code'}</div>
+          <div style="font-size:.92rem;font-weight:600;">${hasPartner ? U.esc(theirN) : 'Connect your partner'}</div>
+          <div style="font-size:.72rem;color:var(--muted);">${hasPartner ? '🟢 Connected · tap to manage' : '🟡 Tap to invite & connect'}</div>
         </div>
-        ${!hasPartner && inviteCode ? `<div style="font-family:var(--font-display);font-size:1rem;color:var(--terra);letter-spacing:.1em;align-self:center;" id="setup-code">${inviteCode}</div>` : ''}
+        <div style="color:var(--muted);align-self:center;">›</div>
       </div>
     </div>
 
@@ -7758,10 +8086,7 @@ Router.register('setup', () => {
     ]);
     if (action === 'signout') Auth.signOut();
   });
-  el.querySelector('#setup-code')?.addEventListener('click', () => {
-    navigator.clipboard?.writeText(Auth.couple()?.invite_code || '');
-    U.toast('Invite code copied ✓');
-  });
+  // Partner card now links to partner-hub via onclick
 });
 
 
@@ -12193,6 +12518,605 @@ Router.register('partner-profile', () => {
 
 
 // ──────────────────────────────────────────────
+// PARTNER CONNECTION — Comprehensive partner management
+// ──────────────────────────────────────────────
+const PartnerConnection = (() => {
+  let _lastVerification = null;
+  let _verifying = false;
+
+  function inviteUrl() {
+    const code = Auth.couple()?.invite_code;
+    if (!code) return '';
+    const base = location.origin + location.pathname;
+    return base + '?invite=' + code;
+  }
+
+  function inviteMessage() {
+    const myName = Auth.myName();
+    const code = Auth.couple()?.invite_code || '';
+    return `${myName} invited you to Parlay — the relationship app for couples. ` +
+      `Use invite code: ${code}\n\n` +
+      `Join here: ${inviteUrl()}`;
+  }
+
+  async function shareNative() {
+    const code = Auth.couple()?.invite_code || '';
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join me on Parlay',
+          text: inviteMessage(),
+          url: inviteUrl(),
+        });
+        return { success: true };
+      } catch (e) {
+        if (e.name === 'AbortError') return { cancelled: true };
+        return { error: e.message };
+      }
+    }
+    // Fallback: copy to clipboard
+    return copyInvite();
+  }
+
+  async function copyInvite() {
+    try {
+      await navigator.clipboard?.writeText(inviteMessage());
+      return { success: true, method: 'clipboard' };
+    } catch {
+      return { error: 'Could not copy' };
+    }
+  }
+
+  async function copyCode() {
+    const code = Auth.couple()?.invite_code || '';
+    try {
+      await navigator.clipboard?.writeText(code);
+      return { success: true };
+    } catch {
+      return { error: 'Could not copy' };
+    }
+  }
+
+  function shareSMS() {
+    const body = encodeURIComponent(inviteMessage());
+    window.open('sms:?body=' + body, '_blank');
+  }
+
+  function shareEmail(toEmail) {
+    const subject = encodeURIComponent(Auth.myName() + ' invited you to Parlay');
+    const body = encodeURIComponent(inviteMessage());
+    const mailto = 'mailto:' + (toEmail || '') + '?subject=' + subject + '&body=' + body;
+    window.open(mailto, '_blank');
+  }
+
+  async function sendInAppInvite(email) {
+    if (!email || !email.includes('@')) return { error: 'Invalid email' };
+    // Store the invited email in the couple row metadata for tracking
+    const couple = Auth.couple();
+    if (!couple) return { error: 'Not in a couple' };
+    const invitedEmails = couple.invited_emails || [];
+    if (!invitedEmails.includes(email.toLowerCase())) {
+      invitedEmails.push(email.toLowerCase());
+    }
+    // Update couple row with invited email tracking
+    try {
+      await Auth.sb().from('couples')
+        .update({ invited_emails: invitedEmails })
+        .eq('id', couple.id);
+    } catch (e) {
+      // Non-critical — column may not exist yet
+      console.warn('[PartnerConnection] Could not save invited email:', e.message);
+    }
+    // Open email client with pre-filled invite
+    shareEmail(email);
+    return { success: true, email };
+  }
+
+  async function verify() {
+    if (_verifying) return _lastVerification;
+    _verifying = true;
+    try {
+      _lastVerification = await Auth.verifyConnection();
+      _lastVerification.timestamp = new Date().toISOString();
+    } catch (e) {
+      _lastVerification = { status: 'error', ok: false, error: e.message, timestamp: new Date().toISOString() };
+    }
+    _verifying = false;
+    return _lastVerification;
+  }
+
+  function lastVerification() { return _lastVerification; }
+
+  function connectionSteps() {
+    const couple = Auth.couple();
+    const hasP = Auth.hasPartner();
+    const steps = [
+      { id: 'account', label: 'Account created', desc: 'You signed up for Parlay', done: true },
+      { id: 'couple', label: 'Couple space created', desc: couple ? 'Your shared space is ready' : 'Create your couple space', done: !!couple },
+      { id: 'invite', label: 'Invite sent', desc: couple?.invite_code ? 'Share code: ' + couple.invite_code : 'Generate an invite code', done: !!couple },
+      { id: 'partner_joined', label: 'Partner joined', desc: hasP ? Auth.theirName() + ' is connected' : 'Waiting for partner to join', done: hasP },
+      { id: 'synced', label: 'Data syncing', desc: hasP ? 'Parlays, tasks & chat flowing' : 'Will activate when partner joins', done: hasP },
+    ];
+    return steps;
+  }
+
+  function diagnostics() {
+    const couple = Auth.couple();
+    const hasP = Auth.hasPartner();
+    const msgs = CoupleChat.messages();
+    const parlays = typeof Store !== 'undefined' ? Store.parlays() : [];
+    const tasks = typeof Store !== 'undefined' ? Store.tasks() : [];
+    return {
+      coupleId: couple?.id || null,
+      mySlot: Auth.amSpouse1() ? 'spouse_1' : 'spouse_2',
+      partnerSlot: Auth.amSpouse1() ? 'spouse_2' : 'spouse_1',
+      connected: hasP,
+      partnerName: Auth.theirName(),
+      partnerEmail: Auth.them().email || 'Unknown',
+      inviteCode: couple?.invite_code || 'N/A',
+      connectionAge: Auth.connectionAge() || 'N/A',
+      totalMessages: msgs.length,
+      totalParlays: parlays.length,
+      totalTasks: tasks.length,
+      lastMessage: msgs.length > 0 ? msgs[msgs.length - 1].timestamp : null,
+      myEmail: Auth.me().email,
+      myName: Auth.myName(),
+    };
+  }
+
+  return {
+    inviteUrl, inviteMessage, shareNative, copyInvite, copyCode,
+    shareSMS, shareEmail, sendInAppInvite,
+    verify, lastVerification, connectionSteps, diagnostics,
+  };
+})();
+
+
+// ──────────────────────────────────────────────
+// PARTNER HUB — Comprehensive partner connection management
+// ──────────────────────────────────────────────
+Router.register('partner-hub', () => {
+  const myN = Auth.myName();
+  const theirN = Auth.theirName();
+  const couple = Auth.couple();
+  const hasP = Auth.hasPartner();
+  const inviteCode = couple?.invite_code || '';
+  const steps = PartnerConnection.connectionSteps();
+  const diag = PartnerConnection.diagnostics();
+  const score = typeof Insights !== 'undefined' ? Insights.communicationScore() : { score: 0 };
+  const connAge = Auth.connectionAge();
+  const lastMsg = CoupleChat.lastMessage();
+  const chatCount = CoupleChat.messages().length;
+  const parlayCount = typeof Store !== 'undefined' ? Store.parlays().length : 0;
+  const taskCount = typeof Store !== 'undefined' ? Store.tasks().length : 0;
+  const unread = CoupleChat.unreadCount();
+
+  // Connection status
+  const statusClass = hasP ? 'connected' : 'waiting';
+  const statusLabel = hasP ? 'Connected' : 'Waiting for Partner';
+  const statusDot = hasP ? '🟢' : '🟡';
+
+  return `
+  <div style="padding-bottom:calc(var(--nav-h) + 20px);">
+    <!-- HERO -->
+    <div class="ph-hero">
+      <div class="ph-avatars">
+        <div class="ph-avatar me">${U.initials(myN)}</div>
+        <div class="ph-avatar ${hasP ? 'them' : 'empty'}">${hasP ? U.initials(theirN) : '?'}</div>
+        <div class="ph-link-icon">${hasP ? '🔗' : '⏳'}</div>
+      </div>
+      <div class="ph-hero-title">${hasP ? U.esc(myN) + ' & ' + U.esc(theirN) : 'Connect with Partner'}</div>
+      <div class="ph-hero-sub">${hasP ? 'Partners for ' + (connAge || 'a while') : 'Share your invite to get started'}</div>
+      <div class="ph-status-badge ${statusClass}">${statusDot} ${statusLabel}</div>
+    </div>
+
+    ${hasP ? `
+    <!-- ═══ CONNECTED PARTNER VIEW ═══ -->
+
+    <!-- Quick Actions -->
+    <div class="ph-section">
+      <div class="ph-section-title">Quick Actions</div>
+      <div class="ph-quick-actions">
+        <div class="ph-quick-action" onclick="Router.go('couple-chat')">
+          <span class="icon">💬</span>
+          <span class="label">Chat${unread > 0 ? ' (' + unread + ')' : ''}</span>
+        </div>
+        <div class="ph-quick-action" onclick="Router.go('new-parlay')">
+          <span class="icon">⚖️</span>
+          <span class="label">New Parlay</span>
+        </div>
+        <div class="ph-quick-action" onclick="Router.go('new-task')">
+          <span class="icon">✅</span>
+          <span class="label">Assign Task</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Partner Details -->
+    <div class="ph-section">
+      <div class="ph-section-title">Partner Details</div>
+      <div class="ph-card">
+        <div class="ph-partner-detail">
+          <div style="width:52px;height:52px;border-radius:50%;background:var(--sage);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;">${U.initials(theirN)}</div>
+          <div class="ph-partner-info">
+            <div class="ph-partner-name">${U.esc(theirN)}</div>
+            <div class="ph-partner-email">${U.esc(diag.partnerEmail)}</div>
+            <div class="ph-partner-meta">Connected ${connAge || ''} · You are ${diag.mySlot === 'spouse_1' ? 'Partner 1' : 'Partner 2'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connection Stats -->
+    <div class="ph-section">
+      <div class="ph-section-title">Your Connection</div>
+      <div class="ph-diag-grid">
+        <div class="ph-diag-item">
+          <div class="ph-diag-value" style="color:var(--sage);">${chatCount}</div>
+          <div class="ph-diag-label">Messages</div>
+        </div>
+        <div class="ph-diag-item">
+          <div class="ph-diag-value" style="color:var(--amber);">${parlayCount}</div>
+          <div class="ph-diag-label">Parlays</div>
+        </div>
+        <div class="ph-diag-item">
+          <div class="ph-diag-value" style="color:var(--terra);">${taskCount}</div>
+          <div class="ph-diag-label">Tasks</div>
+        </div>
+        <div class="ph-diag-item">
+          <div class="ph-diag-value" style="color:${score.score >= 60 ? 'var(--sage)' : 'var(--amber)'};">${score.score > 0 ? score.score : '—'}</div>
+          <div class="ph-diag-label">Health Score</div>
+        </div>
+      </div>
+      ${lastMsg ? `
+      <div style="margin-top:12px;padding:12px;background:var(--parchment);border-radius:var(--r-md);">
+        <div style="font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Last Message</div>
+        <div style="font-size:.78rem;color:var(--text);">${U.esc((lastMsg.filtered || lastMsg.raw || '').slice(0, 80))}${(lastMsg.filtered || lastMsg.raw || '').length > 80 ? '...' : ''}</div>
+        <div style="font-size:.62rem;color:var(--muted);margin-top:4px;">${lastMsg.from === 'me' ? 'You' : U.esc(theirN)} · ${U.ago(lastMsg.timestamp)}</div>
+      </div>` : ''}
+    </div>
+
+    <!-- Connection Health -->
+    <div class="ph-section">
+      <div class="ph-section-title">Connection Health</div>
+      <div class="ph-card" id="ph-verify-card">
+        <div id="ph-sync-status" class="ph-sync-indicator good">
+          <span>🟢</span>
+          <span style="flex:1;">Data sync active</span>
+          <button class="btn btn-outline btn-sm" id="ph-verify-btn">Verify</button>
+        </div>
+        <div id="ph-verify-result" style="display:none;margin-top:10px;padding:10px;border-radius:var(--r-md);font-size:.75rem;"></div>
+      </div>
+    </div>
+
+    <!-- Manage Connection -->
+    <div class="ph-section">
+      <div class="ph-section-title">Manage</div>
+      <div class="ph-card interactive" onclick="Router.go('partner-profile')">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:1.2rem;">❤️</span>
+          <div style="flex:1;">
+            <div style="font-size:.85rem;font-weight:600;">About ${U.esc(theirN)}</div>
+            <div style="font-size:.68rem;color:var(--muted);">${typeof PartnerProfile !== 'undefined' && PartnerProfile.isComplete() ? 'Profile complete' : 'Love languages, preferences & more'}</div>
+          </div>
+          <span style="color:var(--muted);">›</span>
+        </div>
+      </div>
+      <div class="ph-card interactive" onclick="Router.go('comm-style')">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:1.2rem;">💬</span>
+          <div style="flex:1;">
+            <div style="font-size:.85rem;font-weight:600;">Communication Style</div>
+            <div style="font-size:.68rem;color:var(--muted);">How you both prefer to communicate</div>
+          </div>
+          <span style="color:var(--muted);">›</span>
+        </div>
+      </div>
+      <div class="ph-card interactive" onclick="Router.go('insights')">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:1.2rem;">📊</span>
+          <div style="flex:1;">
+            <div style="font-size:.85rem;font-weight:600;">Relationship Insights</div>
+            <div style="font-size:.68rem;color:var(--muted);">Trends, patterns & health</div>
+          </div>
+          <span style="color:var(--muted);">›</span>
+        </div>
+      </div>
+      <div class="ph-card danger" id="ph-disconnect-card" style="margin-top:16px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:1.2rem;">⚠️</span>
+          <div style="flex:1;">
+            <div style="font-size:.85rem;font-weight:600;color:#E05555;">Disconnect Partner</div>
+            <div style="font-size:.68rem;color:var(--muted);">Remove connection (can re-invite later)</div>
+          </div>
+          <button class="btn btn-sm" style="background:rgba(224,85,85,.1);color:#E05555;border:1px solid rgba(224,85,85,.3);" id="ph-disconnect-btn">Disconnect</button>
+        </div>
+      </div>
+    </div>
+
+    ` : `
+    <!-- ═══ WAITING FOR PARTNER VIEW ═══ -->
+
+    <!-- Connection Progress -->
+    <div class="ph-section">
+      <div class="ph-section-title">Connection Progress</div>
+      <div class="ph-card">
+        <div class="ph-timeline">
+          ${steps.map((s, i) => {
+            const isCurrent = !s.done && (i === 0 || steps[i-1].done);
+            const dotClass = s.done ? 'active' : isCurrent ? 'current' : 'pending';
+            return `
+            <div class="ph-timeline-item">
+              <div class="ph-timeline-dot ${dotClass}"></div>
+              <div class="ph-timeline-title">${s.done ? '✓ ' : isCurrent ? '→ ' : ''}${s.label}</div>
+              <div class="ph-timeline-desc">${s.desc}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Invite Code -->
+    <div class="ph-section">
+      <div class="ph-section-title">Your Invite Code</div>
+      <div class="ph-card highlight">
+        <div class="ph-invite-code" id="ph-code">${inviteCode}</div>
+        <div style="text-align:center;font-size:.72rem;color:var(--muted);margin-bottom:8px;">
+          Share this code with your partner so they can join Parlay
+        </div>
+        <div class="ph-invite-actions${navigator.share ? ' three-col' : ''}">
+          <button class="ph-share-btn" id="ph-copy-code">
+            <span class="icon">📋</span>
+            <span>Copy Code</span>
+          </button>
+          <button class="ph-share-btn" id="ph-copy-link">
+            <span class="icon">🔗</span>
+            <span>Copy Link</span>
+          </button>
+          ${navigator.share ? `
+          <button class="ph-share-btn" id="ph-share-native">
+            <span class="icon">📤</span>
+            <span>Share</span>
+          </button>` : ''}
+        </div>
+        <div class="ph-invite-actions" style="margin-top:8px;">
+          <button class="ph-share-btn" id="ph-share-sms">
+            <span class="icon">💬</span>
+            <span>Text / SMS</span>
+          </button>
+          <button class="ph-share-btn" id="ph-share-email">
+            <span class="icon">📧</span>
+            <span>Email</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send Invite by Email -->
+    <div class="ph-section">
+      <div class="ph-section-title">Invite by Email</div>
+      <div class="ph-card">
+        <div style="font-size:.78rem;color:var(--text);margin-bottom:10px;">
+          Enter your partner's email address and we'll prepare an invitation for them.
+        </div>
+        <div class="ph-email-row">
+          <input type="email" class="input" id="ph-invite-email" placeholder="partner@email.com" style="font-size:.85rem;">
+          <button class="btn btn-accent btn-sm" id="ph-send-invite" style="white-space:nowrap;">Send Invite</button>
+        </div>
+        <div id="ph-invite-status" style="display:none;font-size:.72rem;margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <!-- Join Code (for receiving partner) -->
+    <div class="ph-section">
+      <div class="ph-section-title">Have an Invite Code?</div>
+      <div class="ph-card">
+        <div style="font-size:.78rem;color:var(--text);margin-bottom:10px;">
+          If your partner already created a space, enter their invite code to join.
+        </div>
+        <div class="ph-email-row">
+          <input type="text" class="input" id="ph-join-code" placeholder="ABC123" maxlength="6"
+            style="font-size:1.2rem;text-align:center;letter-spacing:.15em;text-transform:uppercase;">
+          <button class="btn btn-accent btn-sm" id="ph-join-btn" style="white-space:nowrap;">Join</button>
+        </div>
+        <div id="ph-join-status" style="display:none;font-size:.72rem;margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <!-- Regenerate Code -->
+    <div class="ph-section">
+      <div class="ph-section-title">Troubleshooting</div>
+      <div class="ph-card">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:1.2rem;">🔄</span>
+          <div style="flex:1;">
+            <div style="font-size:.82rem;font-weight:600;">Generate New Code</div>
+            <div style="font-size:.68rem;color:var(--muted);">If your code isn't working, create a fresh one</div>
+          </div>
+          <button class="btn btn-outline btn-sm" id="ph-regen-btn">Regenerate</button>
+        </div>
+      </div>
+      <div class="ph-card" style="margin-top:8px;">
+        <div style="font-size:.75rem;color:var(--text);line-height:1.6;">
+          <strong>Having trouble?</strong>
+          <ul style="margin:6px 0 0 16px;padding:0;">
+            <li>Make sure your partner has created a Parlay account first</li>
+            <li>Codes are not case-sensitive</li>
+            <li>Each code can only be used once</li>
+            <li>Try regenerating the code if the current one doesn't work</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    `}
+
+    <!-- Back -->
+    <div style="padding:16px 20px;text-align:center;">
+      <button class="btn btn-outline" style="max-width:200px;margin:0 auto;" onclick="Router.go('setup')">‹ Back to Settings</button>
+    </div>
+  </div>`;
+}, (el) => {
+  // ── Copy code ──
+  el.querySelector('#ph-copy-code')?.addEventListener('click', async () => {
+    const r = await PartnerConnection.copyCode();
+    U.toast(r.success ? 'Code copied ✓' : 'Failed to copy');
+  });
+
+  // ── Copy link ──
+  el.querySelector('#ph-copy-link')?.addEventListener('click', async () => {
+    const r = await PartnerConnection.copyInvite();
+    U.toast(r.success ? 'Invite link copied ✓' : 'Failed to copy');
+  });
+
+  // ── Native share ──
+  el.querySelector('#ph-share-native')?.addEventListener('click', async () => {
+    const r = await PartnerConnection.shareNative();
+    if (r.success) U.toast('Shared ✓');
+    else if (!r.cancelled) U.toast(r.error || 'Share failed');
+  });
+
+  // ── SMS ──
+  el.querySelector('#ph-share-sms')?.addEventListener('click', () => {
+    PartnerConnection.shareSMS();
+    U.toast('Opening messages...');
+  });
+
+  // ── Email share ──
+  el.querySelector('#ph-share-email')?.addEventListener('click', () => {
+    PartnerConnection.shareEmail();
+    U.toast('Opening email...');
+  });
+
+  // ── Send email invite ──
+  el.querySelector('#ph-send-invite')?.addEventListener('click', async () => {
+    const emailInput = el.querySelector('#ph-invite-email');
+    const statusEl = el.querySelector('#ph-invite-status');
+    const email = emailInput?.value.trim();
+    if (!email || !email.includes('@')) {
+      statusEl.textContent = 'Please enter a valid email address';
+      statusEl.style.color = '#E05555';
+      statusEl.style.display = 'block';
+      return;
+    }
+    const btn = el.querySelector('#ph-send-invite');
+    btn.disabled = true; btn.textContent = 'Sending...';
+    const r = await PartnerConnection.sendInAppInvite(email);
+    btn.disabled = false; btn.textContent = 'Send Invite';
+    if (r.success) {
+      statusEl.textContent = 'Invite prepared for ' + email + ' — check your email app';
+      statusEl.style.color = 'var(--sage)';
+      emailInput.value = '';
+    } else {
+      statusEl.textContent = r.error || 'Failed to send';
+      statusEl.style.color = '#E05555';
+    }
+    statusEl.style.display = 'block';
+  });
+
+  // ── Join code ──
+  el.querySelector('#ph-join-btn')?.addEventListener('click', async () => {
+    const codeInput = el.querySelector('#ph-join-code');
+    const statusEl = el.querySelector('#ph-join-status');
+    const code = codeInput?.value.trim();
+    if (!code || code.length < 4) {
+      statusEl.textContent = 'Enter the 6-character code from your partner';
+      statusEl.style.color = '#E05555';
+      statusEl.style.display = 'block';
+      return;
+    }
+    const btn = el.querySelector('#ph-join-btn');
+    btn.disabled = true; btn.textContent = 'Joining...';
+    const r = await Auth.joinCouple(code);
+    if (r.error) {
+      statusEl.textContent = r.error;
+      statusEl.style.color = '#E05555';
+      statusEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Join';
+      return;
+    }
+    await Auth.bootstrap();
+    U.toast('Connected with your partner! 🎉');
+    Router.go('partner-hub');
+  });
+
+  // ── Regenerate code ──
+  el.querySelector('#ph-regen-btn')?.addEventListener('click', async () => {
+    const action = await U.sheet('Generate new invite code?', [
+      { key: 'regen', label: 'Generate New Code', cls: 'btn-accent' },
+    ]);
+    if (action !== 'regen') return;
+    const btn = el.querySelector('#ph-regen-btn');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    const r = await Auth.regenerateInviteCode();
+    btn.disabled = false; btn.textContent = 'Regenerate';
+    if (r.error) {
+      U.toast(r.error);
+      return;
+    }
+    U.toast('New code generated ✓');
+    Router.go('partner-hub');
+  });
+
+  // ── Verify connection ──
+  el.querySelector('#ph-verify-btn')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#ph-verify-btn');
+    const resultEl = el.querySelector('#ph-verify-result');
+    const statusEl = el.querySelector('#ph-sync-status');
+    btn.disabled = true; btn.textContent = 'Checking...';
+    const v = await PartnerConnection.verify();
+    btn.disabled = false; btn.textContent = 'Verify';
+    resultEl.style.display = 'block';
+    if (v.ok) {
+      statusEl.className = 'ph-sync-indicator good';
+      statusEl.querySelector('span').textContent = '🟢';
+      resultEl.style.background = 'rgba(122,158,138,.1)';
+      resultEl.style.color = 'var(--sage)';
+      resultEl.innerHTML = '<strong>All systems go!</strong><br>' +
+        '✓ Partner: ' + U.esc(v.partner?.name || 'Connected') + '<br>' +
+        '✓ Realtime: ' + (v.realtimeOk ? 'Active' : 'Reconnecting...') + '<br>' +
+        '✓ Data sync: ' + (v.dataOk ? 'Working' : 'Check needed') + '<br>' +
+        '<span style="font-size:.62rem;color:var(--muted);">Verified ' + new Date().toLocaleTimeString() + '</span>';
+    } else {
+      statusEl.className = 'ph-sync-indicator warn';
+      statusEl.querySelector('span').textContent = '🟡';
+      resultEl.style.background = 'rgba(232,184,138,.1)';
+      resultEl.style.color = 'var(--amber)';
+      let msg = '<strong>Connection issue detected</strong><br>';
+      if (v.status === 'no_couple') msg += 'No couple space found. Create one from settings.';
+      else if (v.status === 'waiting') msg += 'Partner has not joined yet. Share your invite code.';
+      else if (v.status === 'partner_profile_missing') msg += 'Partner account found but profile is not accessible. They may need to complete signup.';
+      else msg += 'Error: ' + (v.error || v.status);
+      resultEl.innerHTML = msg;
+    }
+  });
+
+  // ── Disconnect partner ──
+  el.querySelector('#ph-disconnect-btn')?.addEventListener('click', async () => {
+    const action = await U.sheet('Disconnect from ' + Auth.theirName() + '?', [
+      { key: 'disconnect', label: 'Disconnect Partner', cls: 'btn-danger' },
+    ]);
+    if (action !== 'disconnect') return;
+    // Double confirm
+    const confirm2 = await U.sheet('This will remove your partner connection. Are you sure?', [
+      { key: 'yes', label: 'Yes, Disconnect', cls: 'btn-danger' },
+    ]);
+    if (confirm2 !== 'yes') return;
+    const btn = el.querySelector('#ph-disconnect-btn');
+    btn.disabled = true; btn.textContent = 'Disconnecting...';
+    const r = await Auth.disconnectPartner();
+    if (r.error) {
+      U.toast(r.error);
+      btn.disabled = false; btn.textContent = 'Disconnect';
+      return;
+    }
+    U.toast('Partner disconnected');
+    await Auth.refresh();
+    Router.go('partner-hub');
+  });
+});
+
+
+// ──────────────────────────────────────────────
 // SMART REPLIES — Context-aware chat suggestions
 // (Must be defined before couple-chat screen)
 // ──────────────────────────────────────────────
@@ -16443,14 +17367,48 @@ Router.register('daily-tips', () => {
     return;
   }
 
+  // ── Handle invite link (?invite=CODE) ────────
+  const _inviteCode = _devParams.get('invite');
+  if (_inviteCode) {
+    // Store invite code for use after auth
+    sessionStorage.setItem('parlay_pending_invite', _inviteCode.toUpperCase());
+  }
+
   // ── Normal flow ───────────────────────────────
   const boot = await Auth.bootstrap();
 
   if (boot.mode === 'unauthenticated') {
+    if (_inviteCode) {
+      // User clicked invite link but isn't signed in — show signup with context
+      U.toast('Create an account to connect with your partner');
+    }
     Router.go('auth-entry');
   } else {
-    // Authenticated — go straight to the app
-    Router.go('home');
+    // Authenticated — check for pending invite code
+    const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
+    if (pendingInvite && !boot.hasPartner) {
+      sessionStorage.removeItem('parlay_pending_invite');
+      if (!boot.coupled) {
+        // Not in a couple yet — auto-join with the invite code
+        const joinResult = await Auth.joinCouple(pendingInvite);
+        if (joinResult.error) {
+          U.toast('Invite code error: ' + joinResult.error);
+          Router.go('partner-hub');
+        } else {
+          await Auth.bootstrap();
+          U.toast('Connected with your partner! 🎉');
+          Router.go('home');
+        }
+      } else {
+        // Already in a couple (they created one) — show partner hub
+        Router.go('partner-hub');
+      }
+    } else if (!boot.coupled) {
+      // Not coupled yet, not from an invite — go to couple creation
+      Router.go('ob-couple');
+    } else {
+      Router.go('home');
+    }
   }
   updateDevBar();
 
@@ -16470,8 +17428,29 @@ Router.register('daily-tips', () => {
       const b = await Auth.bootstrap();
       // Skip routing if bootstrap was already in progress (sign-in form handles it)
       if (b.mode === 'pending') return;
-      // Authenticated — go straight to the app
-      Router.go('home');
+
+      // Check for pending invite code (from invite link)
+      const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
+      if (pendingInvite && !b.hasPartner) {
+        sessionStorage.removeItem('parlay_pending_invite');
+        if (!b.coupled) {
+          const joinResult = await Auth.joinCouple(pendingInvite);
+          if (joinResult.error) {
+            U.toast('Invite code error: ' + joinResult.error);
+            Router.go('partner-hub');
+          } else {
+            await Auth.bootstrap();
+            U.toast('Connected with your partner! 🎉');
+            Router.go('home');
+          }
+        } else {
+          Router.go('partner-hub');
+        }
+      } else if (!b.coupled) {
+        Router.go('ob-couple');
+      } else {
+        Router.go('home');
+      }
       updateDevBar();
     }
     if (event === 'SIGNED_OUT') {
