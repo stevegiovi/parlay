@@ -2701,6 +2701,11 @@ const Auth = (() => {
     // Guard: if already connected with a partner, don't join another couple
     if (_couple && hasPartner()) return { error: 'Already connected with a partner' };
 
+    // Guard: don't let user join their own couple (would corrupt the row)
+    if (_couple && _couple.invite_code && _couple.invite_code === code.toUpperCase()) {
+      return { error: 'That is your own invite code. Share it with your partner instead.' };
+    }
+
     // If user already created their own couple (but no partner joined yet),
     // delete that orphan row first so the RPC doesn't get confused.
     // Try direct delete; if RLS blocks it, also try nulling the spouse slot.
