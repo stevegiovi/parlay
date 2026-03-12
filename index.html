@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.9.0';
-const BUILD_DATE = '2026-03-12T20:00:00Z';
+const VERSION = '5.9.1';
+const BUILD_DATE = '2026-03-12T20:30:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -5848,8 +5848,19 @@ Router.register('auth-signin', () => `
 // ──────────────────────────────────────────────
 // ONBOARDING: Create or Join couple
 // ──────────────────────────────────────────────
-Router.register('ob-couple', () => `
+Router.register('ob-couple', () => {
+  const email = Auth.me().email || '';
+  return `
   <div style="min-height:100dvh;background:var(--espresso);padding:0 28px;padding-top:max(60px,env(safe-area-inset-top));display:flex;flex-direction:column;">
+    <!-- Logged-in user info -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;" class="a1">
+      <div style="font-size:.75rem;color:rgba(250,246,241,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">Signed in as <span style="color:var(--amber);">${U.esc(email)}</span></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost" style="font-size:.72rem;color:rgba(250,246,241,.5);" id="obc-back-login">Switch Account</button>
+        <button class="btn-ghost" style="font-size:.72rem;color:#E05555;" id="obc-logout">Log Out</button>
+      </div>
+    </div>
+
     <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Connect with your <em style="color:var(--amber)">partner</em></div>
     <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:12px;" class="a1">Parlay works best when both partners are connected. Choose how to get started:</div>
 
@@ -5882,8 +5893,11 @@ Router.register('ob-couple', () => `
         <strong style="color:var(--amber);">How it works:</strong> One partner creates the space and gets a unique invite code. The other partner enters that code to connect. Once connected, you'll share parlays, tasks, and chat in real-time.
       </div>
     </div>
-  </div>
+  </div>`;
+}
 `, (el) => {
+  el.querySelector('#obc-logout').addEventListener('click', () => Auth.signOut());
+  el.querySelector('#obc-back-login').addEventListener('click', () => Auth.signOut());
   el.querySelector('#obc-create').addEventListener('click', async () => {
     const btn = el.querySelector('#obc-create');
     btn.disabled = true;
