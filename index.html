@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.8.1';
-const BUILD_DATE = '2026-03-12T18:30:00Z';
+const VERSION = '5.9.0';
+const BUILD_DATE = '2026-03-12T20:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2679,6 +2679,12 @@ const Auth = (() => {
   // ── Couple operations ─────────────────────────
   async function createCouple() {
     if (!_uid) return { error: 'Not authenticated' };
+    // Guard: if already in a couple with a partner, don't create another
+    if (_couple && hasPartner()) return { error: 'Already connected with a partner' };
+    // If user already has a solo couple, return its existing code
+    if (_couple && !hasPartner()) {
+      return { data: _couple, code: _couple.invite_code };
+    }
     const code = U.code();
     const { data, error } = await sb.from('couples')
       .insert({ spouse_1_id: _uid, invite_code: code })
@@ -2696,10 +2702,27 @@ const Auth = (() => {
     if (_couple && hasPartner()) return { error: 'Already connected with a partner' };
 
     // If user already created their own couple (but no partner joined yet),
-    // delete that orphan row first so .maybeSingle() in bootstrap won't break
+    // delete that orphan row first so the RPC doesn't get confused.
+    // Try direct delete; if RLS blocks it, also try nulling the spouse slot.
+    let orphanId = null;
     if (_couple && !hasPartner()) {
-      const orphanId = _couple.id;
-      try { await sb.from('couples').delete().eq('id', orphanId).eq(_amSpouse1 ? 'spouse_1_id' : 'spouse_2_id', _uid); } catch(e) {}
+      orphanId = _couple.id;
+      const mySlot = _amSpouse1 ? 'spouse_1_id' : 'spouse_2_id';
+      try {
+        await sb.from('couples').delete().eq('id', orphanId).eq(mySlot, _uid);
+      } catch(e) {
+        console.warn('[joinCouple] orphan delete failed, trying slot null:', e);
+      }
+      // Verify delete worked; if not, null out our slot so RPC won't see us in a couple
+      try {
+        const { data: check } = await sb.from('couples').select('id').eq('id', orphanId).maybeSingle();
+        if (check) {
+          // Delete was blocked by RLS — null out our slot instead
+          await sb.from('couples').update({ [mySlot]: null }).eq('id', orphanId);
+        }
+      } catch(e) {
+        console.warn('[joinCouple] orphan cleanup fallback failed:', e);
+      }
       _couple = null;
     }
 
@@ -2714,11 +2737,34 @@ const Auth = (() => {
 
     // Handle RPC returning an array (SETOF) vs a single object
     const coupleRow = Array.isArray(data) ? data[0] : data;
-    if (!coupleRow || !coupleRow.id) return { error: 'Invalid response from server' };
 
-    _couple = coupleRow;
-    _amSpouse1 = false;
-    return { data: coupleRow };
+    // Re-fetch the couple row to guarantee we have correct, complete data.
+    // The RPC may return a sparse object or unexpected format.
+    let finalCouple = null;
+    if (coupleRow && coupleRow.id) {
+      const { data: fresh } = await sb.from('couples').select('*').eq('id', coupleRow.id).maybeSingle();
+      finalCouple = fresh || coupleRow;
+    }
+    // Fallback: query by user ID if RPC didn't return a usable row
+    if (!finalCouple || !finalCouple.id) {
+      const { data: rows } = await sb.from('couples').select('*')
+        .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+      if (rows && rows.length > 0) {
+        // Prefer the row that has both partners
+        finalCouple = rows.find(c => c.spouse_1_id && c.spouse_2_id) || rows[0];
+      }
+    }
+    if (!finalCouple || !finalCouple.id) return { error: 'Join succeeded but could not load couple data. Please refresh.' };
+
+    _couple = finalCouple;
+    _amSpouse1 = finalCouple.spouse_1_id === _uid;
+
+    // Clean up any leftover orphan rows in the background
+    if (orphanId && orphanId !== finalCouple.id) {
+      sb.from('couples').delete().eq('id', orphanId).catch(() => {});
+    }
+
+    return { data: finalCouple };
   }
 
   // ── Bootstrap (THE critical function) ─────────
@@ -5772,18 +5818,20 @@ Router.register('auth-signin', () => `
     }
 
     const boot = await Auth.bootstrap();
-    // Check for pending invite
+    // Check for pending invite — process even if user already has a solo couple
+    // (joinCouple handles orphan cleanup)
     const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
-    if (pendingInvite && !boot.hasPartner && !boot.coupled) {
+    if (pendingInvite && !boot.hasPartner) {
       sessionStorage.removeItem('parlay_pending_invite');
       const joinResult = await Auth.joinCouple(pendingInvite);
       if (!joinResult.error) {
         await Auth.bootstrap();
         U.toast('Connected with your partner! 🎉');
+        Router.go('home');
       } else {
         U.toast('Invite error: ' + joinResult.error);
+        Router.go(boot.coupled ? 'partner-hub' : 'ob-couple');
       }
-      Router.go('home');
     } else if (!boot.coupled) {
       Router.go('ob-couple');
     } else {
@@ -17428,24 +17476,19 @@ Router.register('daily-tips', () => {
     }
     Router.go('auth-entry');
   } else {
-    // Authenticated — check for pending invite code
+    // Authenticated — check for pending invite code.
+    // Auto-join even if user already has a solo couple (joinCouple handles orphan cleanup).
     const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
     if (pendingInvite && !boot.hasPartner) {
       sessionStorage.removeItem('parlay_pending_invite');
-      if (!boot.coupled) {
-        // Not in a couple yet — auto-join with the invite code
-        const joinResult = await Auth.joinCouple(pendingInvite);
-        if (joinResult.error) {
-          U.toast('Invite code error: ' + joinResult.error);
-          Router.go('partner-hub');
-        } else {
-          await Auth.bootstrap();
-          U.toast('Connected with your partner! 🎉');
-          Router.go('home');
-        }
+      const joinResult = await Auth.joinCouple(pendingInvite);
+      if (joinResult.error) {
+        U.toast('Invite code error: ' + joinResult.error);
+        Router.go(boot.coupled ? 'partner-hub' : 'ob-couple');
       } else {
-        // Already in a couple (they created one) — show partner hub
-        Router.go('partner-hub');
+        await Auth.bootstrap();
+        U.toast('Connected with your partner! 🎉');
+        Router.go('home');
       }
     } else if (!boot.coupled) {
       // Not coupled yet, not from an invite — go to couple creation
@@ -17473,22 +17516,19 @@ Router.register('daily-tips', () => {
       // Skip routing if bootstrap was already in progress (sign-in form handles it)
       if (b.mode === 'pending') return;
 
-      // Check for pending invite code (from invite link)
+      // Check for pending invite code (from invite link).
+      // Auto-join even if user already has a solo couple (joinCouple handles orphan cleanup).
       const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
       if (pendingInvite && !b.hasPartner) {
         sessionStorage.removeItem('parlay_pending_invite');
-        if (!b.coupled) {
-          const joinResult = await Auth.joinCouple(pendingInvite);
-          if (joinResult.error) {
-            U.toast('Invite code error: ' + joinResult.error);
-            Router.go('partner-hub');
-          } else {
-            await Auth.bootstrap();
-            U.toast('Connected with your partner! 🎉');
-            Router.go('home');
-          }
+        const joinResult = await Auth.joinCouple(pendingInvite);
+        if (joinResult.error) {
+          U.toast('Invite code error: ' + joinResult.error);
+          Router.go(b.coupled ? 'partner-hub' : 'ob-couple');
         } else {
-          Router.go('partner-hub');
+          await Auth.bootstrap();
+          U.toast('Connected with your partner! 🎉');
+          Router.go('home');
         }
       } else if (!b.coupled) {
         Router.go('ob-couple');
