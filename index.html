@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.9.3';
-const BUILD_DATE = '2026-03-12T21:15:00Z';
+const VERSION = '5.10.0';
+const BUILD_DATE = '2026-03-12T21:30:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2653,6 +2653,7 @@ const Auth = (() => {
     await sb.auth.signOut();
     _session = null; _uid = null; _couple = null;
     _myProfile = null; _themProfile = null; _amSpouse1 = true;
+    localStorage.removeItem('parlay_couple_id');
     Store.clear();
     Router.go('auth-entry');
   }
@@ -2778,6 +2779,9 @@ const Auth = (() => {
     _couple = finalCouple;
     _amSpouse1 = finalCouple.spouse_1_id === _uid;
 
+    // Cache couple ID so bootstrap can find it even if RLS blocks the OR query
+    localStorage.setItem('parlay_couple_id', finalCouple.id);
+
     // Load partner profile immediately so screens show their name/email
     const partnerUid = _amSpouse1 ? finalCouple.spouse_2_id : finalCouple.spouse_1_id;
     if (partnerUid) {
@@ -2814,9 +2818,10 @@ const Auth = (() => {
       //    (e.g. user created one then joined another) we pick the best one.
       let coupleData = null;
       {
-        const { data: coupleRows } = await sb.from('couples')
+        const { data: coupleRows, error: coupleErr } = await sb.from('couples')
           .select('*')
           .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+        if (coupleErr) console.warn('[bootstrap] Couple query error:', coupleErr.message);
         if (coupleRows && coupleRows.length === 1) {
           coupleData = coupleRows[0];
         } else if (coupleRows && coupleRows.length > 1) {
@@ -2829,6 +2834,23 @@ const Auth = (() => {
           for (const c of coupleRows) {
             if (c.id !== coupleData.id) {
               sb.from('couples').delete().eq('id', c.id).catch(() => {});
+            }
+          }
+        }
+
+        // Fallback: if direct query returned nothing, try fetching by cached couple ID.
+        // This handles cases where RLS blocks the OR filter for spouse_2.
+        if (!coupleData) {
+          const cachedId = localStorage.getItem('parlay_couple_id');
+          if (cachedId) {
+            console.log('[bootstrap] Direct couple query empty, trying cached ID:', cachedId);
+            const { data: cached } = await sb.from('couples')
+              .select('*').eq('id', cachedId).maybeSingle();
+            if (cached && (cached.spouse_1_id === _uid || cached.spouse_2_id === _uid)) {
+              coupleData = cached;
+            } else {
+              // Cached ID is stale — remove it
+              localStorage.removeItem('parlay_couple_id');
             }
           }
         }
@@ -2878,6 +2900,11 @@ const Auth = (() => {
 
       _couple = coupleData || null;
       _amSpouse1 = _couple ? (_couple.spouse_1_id === _uid) : true;
+
+      // Cache couple ID for fallback on next load (handles RLS edge cases)
+      if (_couple) {
+        localStorage.setItem('parlay_couple_id', _couple.id);
+      }
 
       // 3. Load my profile
       const { data: myP } = await sb.from('profiles').select('*').eq('id', _uid).maybeSingle();
@@ -5781,7 +5808,11 @@ Router.register('auth-signup', () => `
       return;
     }
     // Auto-confirmed — bootstrap
-    const boot = await Auth.bootstrap();
+    let boot = await Auth.bootstrap();
+    if (boot.mode === 'pending') {
+      await new Promise(r => setTimeout(r, 600));
+      boot = await Auth.bootstrap();
+    }
     // Check for pending invite from link
     const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
     if (pendingInvite) {
@@ -5850,7 +5881,12 @@ Router.register('auth-signin', () => `
       return;
     }
 
-    const boot = await Auth.bootstrap();
+    let boot = await Auth.bootstrap();
+    // If another call (e.g. onAuthStateChange) is already bootstrapping, wait and retry
+    if (boot.mode === 'pending') {
+      await new Promise(r => setTimeout(r, 600));
+      boot = await Auth.bootstrap();
+    }
     // Check for pending invite — process even if user already has a solo couple
     // (joinCouple handles orphan cleanup)
     const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
@@ -17513,7 +17549,11 @@ Router.register('daily-tips', () => {
   }
 
   // ── Normal flow ───────────────────────────────
-  const boot = await Auth.bootstrap();
+  let boot = await Auth.bootstrap();
+  if (boot.mode === 'pending') {
+    await new Promise(r => setTimeout(r, 600));
+    boot = await Auth.bootstrap();
+  }
 
   if (boot.mode === 'unauthenticated') {
     if (_inviteCode) {
