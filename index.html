@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.11.0';
-const BUILD_DATE = '2026-03-12T22:00:00Z';
+const VERSION = '5.10.1';
+const BUILD_DATE = '2026-03-12T22:15:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2677,6 +2677,33 @@ const Auth = (() => {
 
   function getToken() { return _session?.access_token || null; }
 
+  function normalizeInviteCode(rawCode) {
+    return (rawCode || '')
+      .toString()
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
+  }
+
+  function chooseBestCoupleRow(rows, preferredId = null) {
+    if (!rows || rows.length === 0) return null;
+    const scored = rows
+      .filter(r => r && (r.spouse_1_id === _uid || r.spouse_2_id === _uid))
+      .map(r => {
+        const amS1 = r.spouse_1_id === _uid;
+        const partnerUid = amS1 ? r.spouse_2_id : r.spouse_1_id;
+        let score = 0;
+        if (preferredId && r.id === preferredId) score += 100;
+        if (partnerUid) score += 20;
+        if (partnerUid && partnerUid !== _uid) score += 20;
+        if (r.spouse_1_id && r.spouse_2_id) score += 10;
+        return { r, score, ts: new Date(r.updated_at || r.created_at || 0).getTime() || 0 };
+      });
+    if (scored.length === 0) return null;
+    scored.sort((a, b) => (b.score - a.score) || (b.ts - a.ts));
+    return scored[0].r;
+  }
+
   // ── Couple operations ─────────────────────────
   async function createCouple() {
     if (!_uid) return { error: 'Not authenticated' };
@@ -2698,7 +2725,9 @@ const Auth = (() => {
 
   async function joinCouple(code) {
     if (!_uid) return { error: 'Not authenticated' };
-    console.log('[joinCouple] START code=%s uid=%s _couple=%o hasPartner=%s', code, _uid, _couple?.id, _couple ? hasPartner() : 'n/a');
+    const normalizedCode = normalizeInviteCode(code);
+    if (!normalizedCode || normalizedCode.length < 4) return { error: 'Invalid invite code' };
+    console.log('[joinCouple] START code=%s uid=%s _couple=%o hasPartner=%s', normalizedCode, _uid, _couple?.id, _couple ? hasPartner() : 'n/a');
 
     // Guard: if already connected with a partner, don't join another couple
     if (_couple && hasPartner()) {
@@ -2707,7 +2736,7 @@ const Auth = (() => {
     }
 
     // Guard: don't let user join their own couple (would corrupt the row)
-    if (_couple && _couple.invite_code && _couple.invite_code === code.toUpperCase()) {
+    if (_couple && _couple.invite_code && _couple.invite_code === normalizedCode) {
       return { error: 'That is your own invite code. Share it with your partner instead.' };
     }
 
@@ -2745,7 +2774,7 @@ const Auth = (() => {
     // Use RPC function that runs with SECURITY DEFINER to bypass RLS
     // (Spouse 2 isn't in the couples row yet, so normal RLS blocks them)
     const { data, error } = await sb.rpc('join_couple_by_code', {
-      p_code: code.toUpperCase(),
+      p_code: normalizedCode,
       p_user_id: _uid,
     });
     console.log('[joinCouple] RPC result:', { data, error: error?.message });
@@ -2770,8 +2799,7 @@ const Auth = (() => {
         .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
       console.log('[joinCouple] Fallback query returned %d rows', rows?.length || 0);
       if (rows && rows.length > 0) {
-        // Prefer the row that has both partners
-        finalCouple = rows.find(c => c.spouse_1_id && c.spouse_2_id) || rows[0];
+        finalCouple = chooseBestCoupleRow(rows);
       }
     }
     if (!finalCouple || !finalCouple.id) return { error: 'Join succeeded but could not load couple data. Please refresh.' };
@@ -2822,14 +2850,9 @@ const Auth = (() => {
           .select('*')
           .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
         if (coupleErr) console.warn('[bootstrap] Couple query error:', coupleErr.message);
-        if (coupleRows && coupleRows.length === 1) {
-          coupleData = coupleRows[0];
-        } else if (coupleRows && coupleRows.length > 1) {
-          // Prefer the couple row that has both partners connected
-          coupleData = coupleRows.find(c => {
-            const isS1 = c.spouse_1_id === _uid;
-            return isS1 ? !!c.spouse_2_id : !!c.spouse_1_id;
-          }) || coupleRows[0];
+        if (coupleRows && coupleRows.length > 0) {
+          const cachedId = localStorage.getItem('parlay_couple_id');
+          coupleData = chooseBestCoupleRow(coupleRows, cachedId) || coupleRows[0];
           // Clean up orphan couple rows in the background
           for (const c of coupleRows) {
             if (c.id !== coupleData.id) {
@@ -3068,13 +3091,9 @@ const Auth = (() => {
     const { data: coupleRows } = await sb.from('couples')
       .select('*').or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
     let coupleData = null;
-    if (coupleRows && coupleRows.length === 1) {
-      coupleData = coupleRows[0];
-    } else if (coupleRows && coupleRows.length > 1) {
-      coupleData = coupleRows.find(c => {
-        const isS1 = c.spouse_1_id === _uid;
-        return isS1 ? !!c.spouse_2_id : !!c.spouse_1_id;
-      }) || coupleRows[0];
+    if (coupleRows && coupleRows.length > 0) {
+      const cachedId = localStorage.getItem('parlay_couple_id');
+      coupleData = chooseBestCoupleRow(coupleRows, cachedId) || coupleRows[0];
       for (const c of coupleRows) {
         if (c.id !== coupleData.id) sb.from('couples').delete().eq('id', c.id).catch(() => {});
       }
@@ -6031,7 +6050,7 @@ Router.register('ob-join', () => `
   setTimeout(() => el.querySelector('#join-code')?.focus(), 300);
 
   el.querySelector('#join-submit').addEventListener('click', async () => {
-    const code = el.querySelector('#join-code').value.trim();
+    const code = (el.querySelector('#join-code').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     const errEl = el.querySelector('#join-error');
     errEl.style.display = 'none';
     if (!code || code.length < 4) { errEl.textContent = 'Enter the 6-character code from your partner'; errEl.style.display = 'block'; return; }
@@ -13198,7 +13217,7 @@ Router.register('partner-hub', () => {
   el.querySelector('#ph-join-btn')?.addEventListener('click', async () => {
     const codeInput = el.querySelector('#ph-join-code');
     const statusEl = el.querySelector('#ph-join-status');
-    const code = codeInput?.value.trim();
+    const code = (codeInput?.value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!code || code.length < 4) {
       statusEl.textContent = 'Enter the 6-character code from your partner';
       statusEl.style.color = '#E05555';
@@ -17552,7 +17571,7 @@ Router.register('daily-tips', () => {
   const _inviteCode = _devParams.get('invite');
   if (_inviteCode) {
     // Store invite code for use after auth
-    sessionStorage.setItem('parlay_pending_invite', _inviteCode.toUpperCase());
+    sessionStorage.setItem('parlay_pending_invite', (_inviteCode || '').toUpperCase().replace(/[^A-Z0-9]/g, ''));
   }
 
   // ── Normal flow ───────────────────────────────
