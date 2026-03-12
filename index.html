@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.10.0';
-const BUILD_DATE = '2026-03-12T21:30:00Z';
+const VERSION = '5.11.0';
+const BUILD_DATE = '2026-03-12T22:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -5826,7 +5826,7 @@ Router.register('auth-signup', () => `
         U.toast('Invite error: ' + joinResult.error);
         Router.go('ob-couple');
       }
-    } else if (boot.coupled) {
+    } else if (boot.coupled || localStorage.getItem('parlay_setup_done')) {
       Router.go('home');
     } else {
       Router.go('ob-couple');
@@ -5901,7 +5901,7 @@ Router.register('auth-signin', () => `
         U.toast('Invite error: ' + joinResult.error);
         Router.go(boot.coupled ? 'partner-hub' : 'ob-couple');
       }
-    } else if (!boot.coupled) {
+    } else if (!boot.coupled && !localStorage.getItem('parlay_setup_done')) {
       Router.go('ob-couple');
     } else {
       Router.go('home');
@@ -5957,6 +5957,8 @@ Router.register('ob-couple', () => {
         <strong style="color:var(--amber);">How it works:</strong> One partner creates the space and gets a unique invite code. The other partner enters that code to connect. Once connected, you'll share parlays, tasks, and chat in real-time.
       </div>
     </div>
+
+    <button class="btn-ghost" id="obc-skip" style="margin-top:24px;font-size:.78rem;color:rgba(250,246,241,.4);align-self:center;">Skip for now — I'll connect later</button>
   </div>`;
 }, (el) => {
   el.querySelector('#obc-logout').addEventListener('click', () => Auth.signOut());
@@ -5966,10 +5968,15 @@ Router.register('ob-couple', () => {
     btn.disabled = true;
     const result = await Auth.createCouple();
     if (result.error) { U.toast(result.error); btn.disabled = false; return; }
+    localStorage.setItem('parlay_setup_done', '1');
     // Go to the full partner hub for sharing
     Router.go('partner-hub');
   });
   el.querySelector('#obc-join').addEventListener('click', () => Router.go('ob-join'));
+  el.querySelector('#obc-skip').addEventListener('click', () => {
+    localStorage.setItem('parlay_setup_done', '1');
+    Router.go('home');
+  });
 });
 
 Router.register('ob-invite', () => {
