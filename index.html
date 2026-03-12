@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.9.1';
-const BUILD_DATE = '2026-03-12T20:30:00Z';
+const VERSION = '5.9.2';
+const BUILD_DATE = '2026-03-12T21:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2697,9 +2697,13 @@ const Auth = (() => {
 
   async function joinCouple(code) {
     if (!_uid) return { error: 'Not authenticated' };
+    console.log('[joinCouple] START code=%s uid=%s _couple=%o hasPartner=%s', code, _uid, _couple?.id, _couple ? hasPartner() : 'n/a');
 
     // Guard: if already connected with a partner, don't join another couple
-    if (_couple && hasPartner()) return { error: 'Already connected with a partner' };
+    if (_couple && hasPartner()) {
+      console.warn('[joinCouple] BLOCKED — already connected with partner');
+      return { error: 'Already connected with a partner' };
+    }
 
     // Guard: don't let user join their own couple (would corrupt the row)
     if (_couple && _couple.invite_code && _couple.invite_code === code.toUpperCase()) {
@@ -2713,17 +2717,23 @@ const Auth = (() => {
     if (_couple && !hasPartner()) {
       orphanId = _couple.id;
       const mySlot = _amSpouse1 ? 'spouse_1_id' : 'spouse_2_id';
+      console.log('[joinCouple] Cleaning orphan couple id=%s slot=%s', orphanId, mySlot);
       try {
-        await sb.from('couples').delete().eq('id', orphanId).eq(mySlot, _uid);
+        const { error: delErr } = await sb.from('couples').delete().eq('id', orphanId).eq(mySlot, _uid);
+        if (delErr) console.warn('[joinCouple] orphan delete error:', delErr.message);
       } catch(e) {
-        console.warn('[joinCouple] orphan delete failed, trying slot null:', e);
+        console.warn('[joinCouple] orphan delete exception:', e);
       }
       // Verify delete worked; if not, null out our slot so RPC won't see us in a couple
       try {
         const { data: check } = await sb.from('couples').select('id').eq('id', orphanId).maybeSingle();
         if (check) {
+          console.log('[joinCouple] Orphan still exists, nulling slot');
           // Delete was blocked by RLS — null out our slot instead
-          await sb.from('couples').update({ [mySlot]: null }).eq('id', orphanId);
+          const { error: updErr } = await sb.from('couples').update({ [mySlot]: null }).eq('id', orphanId);
+          if (updErr) console.warn('[joinCouple] orphan slot-null error:', updErr.message);
+        } else {
+          console.log('[joinCouple] Orphan deleted successfully');
         }
       } catch(e) {
         console.warn('[joinCouple] orphan cleanup fallback failed:', e);
@@ -2737,6 +2747,7 @@ const Auth = (() => {
       p_code: code.toUpperCase(),
       p_user_id: _uid,
     });
+    console.log('[joinCouple] RPC result:', { data, error: error?.message });
     if (error) return { error: error.message || 'Failed to join' };
     if (!data || data.error) return { error: data?.error || 'Invalid or expired invite code' };
 
@@ -2747,13 +2758,16 @@ const Auth = (() => {
     // The RPC may return a sparse object or unexpected format.
     let finalCouple = null;
     if (coupleRow && coupleRow.id) {
-      const { data: fresh } = await sb.from('couples').select('*').eq('id', coupleRow.id).maybeSingle();
+      const { data: fresh, error: fetchErr } = await sb.from('couples').select('*').eq('id', coupleRow.id).maybeSingle();
+      console.log('[joinCouple] Re-fetch result:', { fresh: fresh?.id, fetchErr: fetchErr?.message });
       finalCouple = fresh || coupleRow;
     }
     // Fallback: query by user ID if RPC didn't return a usable row
     if (!finalCouple || !finalCouple.id) {
+      console.log('[joinCouple] Primary fetch failed, falling back to user-ID query');
       const { data: rows } = await sb.from('couples').select('*')
         .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+      console.log('[joinCouple] Fallback query returned %d rows', rows?.length || 0);
       if (rows && rows.length > 0) {
         // Prefer the row that has both partners
         finalCouple = rows.find(c => c.spouse_1_id && c.spouse_2_id) || rows[0];
