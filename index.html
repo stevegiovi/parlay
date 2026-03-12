@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.9.2';
-const BUILD_DATE = '2026-03-12T21:00:00Z';
+const VERSION = '5.9.3';
+const BUILD_DATE = '2026-03-12T21:15:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2778,6 +2778,19 @@ const Auth = (() => {
     _couple = finalCouple;
     _amSpouse1 = finalCouple.spouse_1_id === _uid;
 
+    // Load partner profile immediately so screens show their name/email
+    const partnerUid = _amSpouse1 ? finalCouple.spouse_2_id : finalCouple.spouse_1_id;
+    if (partnerUid) {
+      try {
+        const { data: theirP } = await sb.from('profiles')
+          .select('*').eq('id', partnerUid).maybeSingle();
+        console.log('[joinCouple] Partner profile fetch:', { partnerUid, found: !!theirP, name: theirP?.name });
+        _themProfile = theirP || null;
+      } catch(e) {
+        console.warn('[joinCouple] Partner profile fetch failed:', e);
+      }
+    }
+
     // Clean up any leftover orphan rows in the background
     if (orphanId && orphanId !== finalCouple.id) {
       sb.from('couples').delete().eq('id', orphanId).catch(() => {});
@@ -2879,7 +2892,8 @@ const Auth = (() => {
       if (_couple && them().uid) {
         const { data: theirP } = await sb.from('profiles')
           .select('*').eq('id', them().uid).maybeSingle();
-        _themProfile = theirP || null;
+        // Only overwrite if we got a result — preserve profile loaded by joinCouple
+        if (theirP) _themProfile = theirP;
       }
 
       // 6. Load shared data
