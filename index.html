@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.10.1';
-const BUILD_DATE = '2026-03-12T22:15:00Z';
+const VERSION = '6.0.0';
+const BUILD_DATE = '2026-03-12T23:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2649,11 +2649,13 @@ const Auth = (() => {
   }
 
   async function signOut() {
-    if (_realtime) { try { _realtime.unsubscribe(); } catch(e) {} _realtime = null; }
+    if (_realtime) { try { _realtime.unsubscribe(); } catch(e) {} _realtime = null; _realtimeCoupleId = null; }
     await sb.auth.signOut();
     _session = null; _uid = null; _couple = null;
     _myProfile = null; _themProfile = null; _amSpouse1 = true;
-    localStorage.removeItem('parlay_couple_id');
+    // NOTE: intentionally keep parlay_couple_id in localStorage.
+    // It's validated against the DB on next bootstrap (Phase 2 fallback).
+    // Clearing it would break spouse_2 login if RLS blocks the .or() query.
     Store.clear();
     Router.go('auth-entry');
   }
@@ -2685,34 +2687,68 @@ const Auth = (() => {
       .replace(/[^A-Z0-9]/g, '');
   }
 
-  function chooseBestCoupleRow(rows, preferredId = null) {
+  /**
+   * Deterministic couple row selection.
+   * Priority: paired (both spouses) > solo. Among ties, most recently updated.
+   * localStorage cache is NOT used as a scoring signal — only DB truth matters.
+   */
+  function _pickCanonicalCouple(rows) {
     if (!rows || rows.length === 0) return null;
-    const scored = rows
-      .filter(r => r && (r.spouse_1_id === _uid || r.spouse_2_id === _uid))
-      .map(r => {
-        const amS1 = r.spouse_1_id === _uid;
-        const partnerUid = amS1 ? r.spouse_2_id : r.spouse_1_id;
-        let score = 0;
-        if (preferredId && r.id === preferredId) score += 100;
-        if (partnerUid) score += 20;
-        if (partnerUid && partnerUid !== _uid) score += 20;
-        if (r.spouse_1_id && r.spouse_2_id) score += 10;
-        return { r, score, ts: new Date(r.updated_at || r.created_at || 0).getTime() || 0 };
-      });
-    if (scored.length === 0) return null;
-    scored.sort((a, b) => (b.score - a.score) || (b.ts - a.ts));
-    return scored[0].r;
+    const mine = rows.filter(r => r && (r.spouse_1_id === _uid || r.spouse_2_id === _uid));
+    if (mine.length === 0) return null;
+    if (mine.length === 1) return mine[0];
+    // Prefer rows where BOTH spouses are set (a real partnership)
+    const paired = mine.filter(r => r.spouse_1_id && r.spouse_2_id && r.spouse_1_id !== r.spouse_2_id);
+    const pool = paired.length > 0 ? paired : mine;
+    // Among finalists, pick most recently updated
+    pool.sort((a, b) => {
+      const ta = new Date(a.updated_at || a.created_at || 0).getTime();
+      const tb = new Date(b.updated_at || b.created_at || 0).getTime();
+      return tb - ta;
+    });
+    return pool[0];
+  }
+
+  /**
+   * Clean up orphan couple rows that are NOT the canonical row.
+   * Fire-and-forget but logged.
+   */
+  function _cleanupOrphanCouples(allRows, canonicalId) {
+    for (const c of allRows) {
+      if (c.id !== canonicalId) {
+        console.log('[Auth] Deleting orphan couple row:', c.id);
+        sb.from('couples').delete().eq('id', c.id).then(({ error }) => {
+          if (error) console.warn('[Auth] Orphan delete failed (RLS?):', c.id, error.message);
+        });
+      }
+    }
   }
 
   // ── Couple operations ─────────────────────────
   async function createCouple() {
     if (!_uid) return { error: 'Not authenticated' };
-    // Guard: if already in a couple with a partner, don't create another
-    if (_couple && hasPartner()) return { error: 'Already connected with a partner' };
-    // If user already has a solo couple, return its existing code
-    if (_couple && !hasPartner()) {
-      return { data: _couple, code: _couple.invite_code };
+
+    // DB-first: always check the database for existing couple rows, not in-memory _couple
+    const { data: existingRows } = await sb.from('couples')
+      .select('*')
+      .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+
+    if (existingRows && existingRows.length > 0) {
+      const best = _pickCanonicalCouple(existingRows);
+      if (best) {
+        const partnerUid = best.spouse_1_id === _uid ? best.spouse_2_id : best.spouse_1_id;
+        if (partnerUid) return { error: 'Already connected with a partner' };
+        // User already has a solo couple — return its code (idempotent)
+        _couple = best;
+        _amSpouse1 = best.spouse_1_id === _uid;
+        localStorage.setItem('parlay_couple_id', best.id);
+        // Clean up any extras
+        if (existingRows.length > 1) _cleanupOrphanCouples(existingRows, best.id);
+        return { data: best, code: best.invite_code };
+      }
     }
+
+    // No existing couple — create one
     const code = U.code();
     const { data, error } = await sb.from('couples')
       .insert({ spouse_1_id: _uid, invite_code: code })
@@ -2720,6 +2756,7 @@ const Auth = (() => {
     if (error) return { error: error.message };
     _couple = data;
     _amSpouse1 = true;
+    localStorage.setItem('parlay_couple_id', data.id);
     return { data, code };
   }
 
@@ -2727,52 +2764,35 @@ const Auth = (() => {
     if (!_uid) return { error: 'Not authenticated' };
     const normalizedCode = normalizeInviteCode(code);
     if (!normalizedCode || normalizedCode.length < 4) return { error: 'Invalid invite code' };
-    console.log('[joinCouple] START code=%s uid=%s _couple=%o hasPartner=%s', normalizedCode, _uid, _couple?.id, _couple ? hasPartner() : 'n/a');
+    console.log('[joinCouple] START code=%s uid=%s', normalizedCode, _uid);
 
-    // Guard: if already connected with a partner, don't join another couple
-    if (_couple && hasPartner()) {
-      console.warn('[joinCouple] BLOCKED — already connected with partner');
-      return { error: 'Already connected with a partner' };
-    }
+    // DB-first guard: check current couple state from the database, not memory
+    const { data: myRows } = await sb.from('couples')
+      .select('*')
+      .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
 
-    // Guard: don't let user join their own couple (would corrupt the row)
-    if (_couple && _couple.invite_code && _couple.invite_code === normalizedCode) {
-      return { error: 'That is your own invite code. Share it with your partner instead.' };
-    }
-
-    // If user already created their own couple (but no partner joined yet),
-    // delete that orphan row first so the RPC doesn't get confused.
-    // Try direct delete; if RLS blocks it, also try nulling the spouse slot.
-    let orphanId = null;
-    if (_couple && !hasPartner()) {
-      orphanId = _couple.id;
-      const mySlot = _amSpouse1 ? 'spouse_1_id' : 'spouse_2_id';
-      console.log('[joinCouple] Cleaning orphan couple id=%s slot=%s', orphanId, mySlot);
-      try {
-        const { error: delErr } = await sb.from('couples').delete().eq('id', orphanId).eq(mySlot, _uid);
-        if (delErr) console.warn('[joinCouple] orphan delete error:', delErr.message);
-      } catch(e) {
-        console.warn('[joinCouple] orphan delete exception:', e);
-      }
-      // Verify delete worked; if not, null out our slot so RPC won't see us in a couple
-      try {
-        const { data: check } = await sb.from('couples').select('id').eq('id', orphanId).maybeSingle();
-        if (check) {
-          console.log('[joinCouple] Orphan still exists, nulling slot');
-          // Delete was blocked by RLS — null out our slot instead
-          const { error: updErr } = await sb.from('couples').update({ [mySlot]: null }).eq('id', orphanId);
-          if (updErr) console.warn('[joinCouple] orphan slot-null error:', updErr.message);
-        } else {
-          console.log('[joinCouple] Orphan deleted successfully');
+    if (myRows && myRows.length > 0) {
+      const best = _pickCanonicalCouple(myRows);
+      if (best) {
+        const partnerUid = best.spouse_1_id === _uid ? best.spouse_2_id : best.spouse_1_id;
+        // Already connected with a real partner
+        if (partnerUid && partnerUid !== _uid) {
+          console.warn('[joinCouple] BLOCKED — already connected with partner');
+          return { error: 'Already connected with a partner' };
         }
-      } catch(e) {
-        console.warn('[joinCouple] orphan cleanup fallback failed:', e);
+        // Guard: don't join own code
+        if (best.invite_code === normalizedCode) {
+          return { error: 'That is your own invite code. Share it with your partner instead.' };
+        }
       }
-      _couple = null;
     }
 
-    // Use RPC function that runs with SECURITY DEFINER to bypass RLS
-    // (Spouse 2 isn't in the couples row yet, so normal RLS blocks them)
+    // Identify orphan solo couples to clean up AFTER successful join
+    const orphanIds = (myRows || [])
+      .filter(r => r.spouse_1_id === _uid && !r.spouse_2_id)
+      .map(r => r.id);
+
+    // Call SECURITY DEFINER RPC (spouse_2 can't see couple row via RLS before joining)
     const { data, error } = await sb.rpc('join_couple_by_code', {
       p_code: normalizedCode,
       p_user_id: _uid,
@@ -2781,172 +2801,139 @@ const Auth = (() => {
     if (error) return { error: error.message || 'Failed to join' };
     if (!data || data.error) return { error: data?.error || 'Invalid or expired invite code' };
 
-    // Handle RPC returning an array (SETOF) vs a single object
+    // Handle RPC returning array (SETOF) vs single object
     const coupleRow = Array.isArray(data) ? data[0] : data;
 
-    // Re-fetch the couple row to guarantee we have correct, complete data.
-    // The RPC may return a sparse object or unexpected format.
+    // Re-fetch the couple row — RPC return format can't be trusted
     let finalCouple = null;
     if (coupleRow && coupleRow.id) {
-      const { data: fresh, error: fetchErr } = await sb.from('couples').select('*').eq('id', coupleRow.id).maybeSingle();
-      console.log('[joinCouple] Re-fetch result:', { fresh: fresh?.id, fetchErr: fetchErr?.message });
+      const { data: fresh } = await sb.from('couples')
+        .select('*').eq('id', coupleRow.id).maybeSingle();
       finalCouple = fresh || coupleRow;
     }
-    // Fallback: query by user ID if RPC didn't return a usable row
+
+    // Fallback: if re-fetch failed, query by user ID (RLS should now allow it since spouse_2 is set)
     if (!finalCouple || !finalCouple.id) {
-      console.log('[joinCouple] Primary fetch failed, falling back to user-ID query');
-      const { data: rows } = await sb.from('couples').select('*')
+      console.log('[joinCouple] Re-fetch failed, querying by user ID');
+      const { data: rows } = await sb.from('couples')
+        .select('*')
         .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
-      console.log('[joinCouple] Fallback query returned %d rows', rows?.length || 0);
       if (rows && rows.length > 0) {
-        finalCouple = chooseBestCoupleRow(rows);
+        // Pick the row that has both spouses — that's the one we just joined
+        finalCouple = _pickCanonicalCouple(rows);
       }
     }
-    if (!finalCouple || !finalCouple.id) return { error: 'Join succeeded but could not load couple data. Please refresh.' };
+    if (!finalCouple || !finalCouple.id) {
+      return { error: 'Join succeeded but could not load couple data. Please refresh.' };
+    }
 
+    // Set canonical state
     _couple = finalCouple;
     _amSpouse1 = finalCouple.spouse_1_id === _uid;
-
-    // Cache couple ID so bootstrap can find it even if RLS blocks the OR query
     localStorage.setItem('parlay_couple_id', finalCouple.id);
 
-    // Load partner profile immediately so screens show their name/email
+    // Load partner profile immediately
     const partnerUid = _amSpouse1 ? finalCouple.spouse_2_id : finalCouple.spouse_1_id;
     if (partnerUid) {
-      try {
-        const { data: theirP } = await sb.from('profiles')
-          .select('*').eq('id', partnerUid).maybeSingle();
-        console.log('[joinCouple] Partner profile fetch:', { partnerUid, found: !!theirP, name: theirP?.name });
-        _themProfile = theirP || null;
-      } catch(e) {
-        console.warn('[joinCouple] Partner profile fetch failed:', e);
-      }
+      const { data: theirP } = await sb.from('profiles')
+        .select('*').eq('id', partnerUid).maybeSingle();
+      _themProfile = theirP || null;
+      console.log('[joinCouple] Partner profile:', { partnerUid, name: _themProfile?.name });
     }
 
-    // Clean up any leftover orphan rows in the background
-    if (orphanId && orphanId !== finalCouple.id) {
-      sb.from('couples').delete().eq('id', orphanId).catch(() => {});
+    // Clean up orphan solo couples in background (non-blocking)
+    for (const oid of orphanIds) {
+      if (oid !== finalCouple.id) {
+        console.log('[joinCouple] Cleaning orphan:', oid);
+        sb.from('couples').delete().eq('id', oid).then(({ error: e }) => {
+          if (e) console.warn('[joinCouple] Orphan cleanup failed:', oid, e.message);
+        });
+      }
     }
 
     return { data: finalCouple };
   }
 
   // ── Bootstrap (THE critical function) ─────────
+  // Split into deterministic phases. Each phase depends on the previous.
+  // Phase 1: Session — resolve authenticated user
+  // Phase 2: Couple — find canonical couple row from DB
+  // Phase 3: Identity — set spouse position, resolve partner UID
+  // Phase 4: Profiles — load my profile and partner profile
+  // Phase 5: Shared data — load parlays, tasks, chat, family, comm prefs
+  // Phase 6: Realtime — subscribe to couple-scoped changes
+  // Phase 7: Settings — extract from couple row
   async function bootstrap() {
     if (_bootstrapping) return { mode: 'pending' };
     _bootstrapping = true;
 
     try {
-      // 1. Session
+      // ── Phase 1: Session ─────────────────────────
       await refreshSession();
       if (!_session) { _bootstrapping = false; return { mode: 'unauthenticated' }; }
 
-      // 2. Load couple FIRST — determines which slot I am
-      //    Use a multi-row query so that if duplicate couple rows exist
-      //    (e.g. user created one then joined another) we pick the best one.
+      // ── Phase 2: Canonical couple resolution ─────
+      // Primary path: query DB for all couple rows involving this user
       let coupleData = null;
-      {
-        const { data: coupleRows, error: coupleErr } = await sb.from('couples')
-          .select('*')
-          .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
-        if (coupleErr) console.warn('[bootstrap] Couple query error:', coupleErr.message);
-        if (coupleRows && coupleRows.length > 0) {
-          const cachedId = localStorage.getItem('parlay_couple_id');
-          coupleData = chooseBestCoupleRow(coupleRows, cachedId) || coupleRows[0];
-          // Clean up orphan couple rows in the background
-          for (const c of coupleRows) {
-            if (c.id !== coupleData.id) {
-              sb.from('couples').delete().eq('id', c.id).catch(() => {});
-            }
-          }
-        }
+      const { data: coupleRows, error: coupleErr } = await sb.from('couples')
+        .select('*')
+        .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+      if (coupleErr) console.warn('[bootstrap] Couple query error:', coupleErr.message);
 
-        // Fallback: if direct query returned nothing, try fetching by cached couple ID.
-        // This handles cases where RLS blocks the OR filter for spouse_2.
-        if (!coupleData) {
-          const cachedId = localStorage.getItem('parlay_couple_id');
-          if (cachedId) {
-            console.log('[bootstrap] Direct couple query empty, trying cached ID:', cachedId);
-            const { data: cached } = await sb.from('couples')
-              .select('*').eq('id', cachedId).maybeSingle();
-            if (cached && (cached.spouse_1_id === _uid || cached.spouse_2_id === _uid)) {
-              coupleData = cached;
-            } else {
-              // Cached ID is stale — remove it
-              localStorage.removeItem('parlay_couple_id');
-            }
+      if (coupleRows && coupleRows.length > 0) {
+        coupleData = _pickCanonicalCouple(coupleRows);
+        // Clean up orphan rows in background
+        if (coupleRows.length > 1 && coupleData) {
+          _cleanupOrphanCouples(coupleRows, coupleData.id);
+        }
+      }
+
+      // Fallback: if .or() query returned nothing (RLS may block spouse_2),
+      // try fetching by cached couple ID. This is a safety net, not truth.
+      if (!coupleData) {
+        const cachedId = localStorage.getItem('parlay_couple_id');
+        if (cachedId) {
+          console.log('[bootstrap] Primary query empty, trying cached ID:', cachedId);
+          const { data: cached } = await sb.from('couples')
+            .select('*').eq('id', cachedId).maybeSingle();
+          if (cached && (cached.spouse_1_id === _uid || cached.spouse_2_id === _uid)) {
+            coupleData = cached;
+          } else {
+            // Cached ID is stale — remove it
+            localStorage.removeItem('parlay_couple_id');
           }
         }
       }
 
-      // 2b. Fallback: if no couple found, check if there's an existing account
-      //     with the same email that IS in a couple (Google OAuth may create a
-      //     new user ID for an existing email/password account).
-      if (!coupleData && _session.user?.email) {
-        const email = _session.user.email;
-        const { data: oldProfile } = await sb.from('profiles')
-          .select('id')
-          .eq('email', email)
-          .neq('id', _uid)
-          .maybeSingle();
-
-        if (oldProfile) {
-          const oldId = oldProfile.id;
-          const { data: oldCouple } = await sb.from('couples')
-            .select('*')
-            .or(`spouse_1_id.eq.${oldId},spouse_2_id.eq.${oldId}`)
-            .maybeSingle();
-
-          if (oldCouple) {
-            // Migrate: update the couple row to reference the new user ID
-            const isSpouse1 = oldCouple.spouse_1_id === oldId;
-            const updateCol = isSpouse1 ? 'spouse_1_id' : 'spouse_2_id';
-            await sb.from('couples').update({ [updateCol]: _uid }).eq('id', oldCouple.id);
-
-            // Copy profile data from old account if current profile is empty
-            const { data: oldFullProfile } = await sb.from('profiles')
-              .select('*').eq('id', oldId).maybeSingle();
-            if (oldFullProfile) {
-              const { id: _drop, ...profileData } = oldFullProfile;
-              await sb.from('profiles').upsert({ id: _uid, ...profileData, email });
-            }
-
-            // Re-fetch the updated couple
-            const { data: refreshedRows } = await sb.from('couples')
-              .select('*')
-              .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
-            coupleData = refreshedRows?.[0] || null;
-            console.log('[bootstrap] Migrated couple from old account to Google OAuth user');
-          }
-        }
-      }
-
+      // ── Phase 3: Identity ────────────────────────
       _couple = coupleData || null;
       _amSpouse1 = _couple ? (_couple.spouse_1_id === _uid) : true;
 
-      // Cache couple ID for fallback on next load (handles RLS edge cases)
+      // Update cache to match DB truth
       if (_couple) {
         localStorage.setItem('parlay_couple_id', _couple.id);
+      } else {
+        localStorage.removeItem('parlay_couple_id');
       }
 
-      // 3. Load my profile
+      // ── Phase 4: Profiles ───────────────────────
       const { data: myP } = await sb.from('profiles').select('*').eq('id', _uid).maybeSingle();
       _myProfile = myP || null;
 
-      // 4. Persist email
+      // Persist email (fire-and-forget, non-blocking)
       if (_session.user?.email) {
         sb.from('profiles').upsert({ id: _uid, email: _session.user.email }).catch(() => {});
       }
 
-      // 5. Load partner profile (may fail due to RLS — ok)
+      // Load partner profile — always re-fetch from DB to avoid stale _themProfile
+      _themProfile = null;
       if (_couple && them().uid) {
         const { data: theirP } = await sb.from('profiles')
           .select('*').eq('id', them().uid).maybeSingle();
-        // Only overwrite if we got a result — preserve profile loaded by joinCouple
-        if (theirP) _themProfile = theirP;
+        _themProfile = theirP || null;
       }
 
-      // 6. Load shared data
+      // ── Phase 5: Shared data ─────────────────────
       if (_couple) {
         await Promise.all([
           Store.loadParlays(),
@@ -2955,10 +2942,15 @@ const Auth = (() => {
           FamilyStore.load(),
           CoupleChat.loadMessages(),
         ]);
-        _subscribeRealtime();
       }
 
-      // 7. Store settings from couple row
+      // ── Phase 6: Realtime ────────────────────────
+      // Tear down stale subscription if couple changed, then (re)subscribe
+      if (_couple) {
+        _ensureRealtime();
+      }
+
+      // ── Phase 7: Settings ────────────────────────
       if (_couple) {
         Store.set('mediatorTone', _couple.mediator_tone || 'neutral');
         Store.set('equity', _couple.equity || {});
@@ -2966,13 +2958,15 @@ const Auth = (() => {
 
       _bootstrapping = false;
 
-      return {
+      const result = {
         mode: 'supabase',
         coupled: !!_couple,
         hasPartner: hasPartner(),
         onboarded: !!_myProfile?.name,
         setupDone: !!_myProfile?.love_language,
       };
+      console.log('[bootstrap] Complete:', result);
+      return result;
     } catch(e) {
       console.error('[bootstrap] Error:', e);
       _bootstrapping = false;
@@ -3002,8 +2996,25 @@ const Auth = (() => {
   }
 
   // ── Realtime ──────────────────────────────────
+  let _realtimeCoupleId = null; // tracks which couple ID the current channel is for
+
+  function _ensureRealtime() {
+    if (!_couple) return;
+    // If already subscribed to the correct couple, no-op
+    if (_realtime && _realtimeCoupleId === _couple.id) return;
+    // Tear down stale channel (couple changed or was null)
+    if (_realtime) {
+      console.log('[realtime] Tearing down stale channel for couple:', _realtimeCoupleId);
+      try { _realtime.unsubscribe(); } catch(e) {}
+      _realtime = null;
+      _realtimeCoupleId = null;
+    }
+    _subscribeRealtime();
+  }
+
   function _subscribeRealtime() {
     if (!_couple || _realtime) return;
+    _realtimeCoupleId = _couple.id;
     _realtime = sb.channel('couple-' + _couple.id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'negotiations',
           filter: `couple_id=eq.${_couple.id}` }, (payload) => {
@@ -3077,7 +3088,8 @@ const Auth = (() => {
           clearTimeout(_reconnectTimer);
           _reconnectTimer = setTimeout(() => {
             _realtime = null;
-            _subscribeRealtime();
+            _realtimeCoupleId = null;
+            _ensureRealtime();
           }, 3000);
         }
       });
@@ -3087,27 +3099,43 @@ const Auth = (() => {
   async function refresh() {
     if (!_session || !_uid) return;
 
-    // Reload couple row (catches partner joining)
+    // Re-resolve couple from DB (catches partner joining since last load)
     const { data: coupleRows } = await sb.from('couples')
       .select('*').or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+
     let coupleData = null;
     if (coupleRows && coupleRows.length > 0) {
-      const cachedId = localStorage.getItem('parlay_couple_id');
-      coupleData = chooseBestCoupleRow(coupleRows, cachedId) || coupleRows[0];
-      for (const c of coupleRows) {
-        if (c.id !== coupleData.id) sb.from('couples').delete().eq('id', c.id).catch(() => {});
+      coupleData = _pickCanonicalCouple(coupleRows);
+      if (coupleData && coupleRows.length > 1) {
+        _cleanupOrphanCouples(coupleRows, coupleData.id);
       }
     }
+    // Fallback to cached ID if primary query empty
+    if (!coupleData) {
+      const cachedId = localStorage.getItem('parlay_couple_id');
+      if (cachedId) {
+        const { data: cached } = await sb.from('couples')
+          .select('*').eq('id', cachedId).maybeSingle();
+        if (cached && (cached.spouse_1_id === _uid || cached.spouse_2_id === _uid)) {
+          coupleData = cached;
+        } else {
+          localStorage.removeItem('parlay_couple_id');
+        }
+      }
+    }
+
     if (coupleData) {
       _couple = coupleData;
       _amSpouse1 = _couple.spouse_1_id === _uid;
+      localStorage.setItem('parlay_couple_id', _couple.id);
       Store.set('mediatorTone', _couple.mediator_tone);
       Store.set('equity', _couple.equity);
     }
 
-    // Reload partner profile if we have a partner but no profile yet
+    // Always re-fetch partner profile from DB (may have changed name, etc.)
+    _themProfile = null;
     const partnerUid = them().uid;
-    if (partnerUid && !_themProfile) {
+    if (partnerUid) {
       const { data: theirP } = await sb.from('profiles')
         .select('*').eq('id', partnerUid).maybeSingle();
       _themProfile = theirP || null;
@@ -3116,7 +3144,7 @@ const Auth = (() => {
     // Reload shared data
     if (_couple) {
       await Promise.all([Store.loadParlays(), Store.loadTasks(), Store.loadCommPrefs(), FamilyStore.load(), CoupleChat.loadMessages()]);
-      if (!_realtime) _subscribeRealtime();
+      _ensureRealtime();
     }
 
     Badges.update();
@@ -3324,10 +3352,25 @@ const Store = (() => {
     };
   }
 
+  /** Convert in-memory task → DB row. Guards against null UID writes. */
+  function _roleToUid(role) {
+    if (role === 'me') return Auth.myUid();
+    if (role === 'them') {
+      const uid = Auth.theirUid();
+      if (!uid) console.warn('[Store] _roleToUid("them") returned null — partner may not be connected');
+      return uid;
+    }
+    return null;
+  }
+
   function _taskToRow(t) {
+    const coupleId = Auth.couple()?.id;
+    if (!coupleId) {
+      console.error('[Store] _taskToRow called without couple — task will not sync');
+    }
     return {
       id: t.id,
-      couple_id: Auth.couple()?.id,
+      couple_id: coupleId,
       title: t.title,
       context: t.context,
       raw_context: t.rawContext,
@@ -3336,11 +3379,10 @@ const Store = (() => {
       preset_icon: t.presetIcon || null,
       priority: t.priority,
       due_date: t.dueDate || null,
-      assigned_to: t.assignedTo === 'me' ? Auth.myUid() : Auth.theirUid(),
-      created_by: t.createdBy === 'me' ? Auth.myUid() : Auth.theirUid(),
+      assigned_to: _roleToUid(t.assignedTo),
+      created_by: _roleToUid(t.createdBy),
       status: t.status,
-      pending_response_from: t.pendingResponseFrom === 'me' ? Auth.myUid()
-        : t.pendingResponseFrom === 'them' ? Auth.theirUid() : null,
+      pending_response_from: _roleToUid(t.pendingResponseFrom),
       counter_count: t.counterCount,
       counter_message: t.counterMessage,
       filtered_counter: t.filteredCounter,
@@ -3378,9 +3420,20 @@ const Store = (() => {
   }
 
   async function addParlay(parlay) {
+    if (!Auth.couple()?.id) {
+      U.toast('⚠️ Cannot create parlay — not connected to a couple');
+      return;
+    }
     _parlays.unshift(parlay);
     try {
-      await Auth.sb().from('negotiations').upsert(_parlayToRow(parlay), { onConflict: 'id' });
+      const row = _parlayToRow(parlay);
+      if (!row.couple_id) {
+        console.error('[Store] addParlay: missing couple_id');
+        U.toast('⚠️ Parlay data incomplete — please refresh and try again');
+        _parlays = _parlays.filter(p => p.id !== parlay.id); // roll back
+        return;
+      }
+      await Auth.sb().from('negotiations').upsert(row, { onConflict: 'id' });
     } catch(e) {
       console.error('[Store] addParlay DB error:', e);
       U.toast('⚠️ Parlay may not have synced');
@@ -3423,9 +3476,20 @@ const Store = (() => {
   function findTask(id)   { return _tasks.find(t => t.id === id) || null; }
 
   async function addTask(task) {
+    if (!Auth.couple()?.id) {
+      U.toast('⚠️ Cannot create task — not connected to a couple');
+      return;
+    }
     _tasks.unshift(task);
     try {
-      await Auth.sb().from('tasks').upsert(_taskToRow(task), { onConflict: 'id' });
+      const row = _taskToRow(task);
+      if (!row.couple_id || !row.assigned_to || !row.created_by) {
+        console.error('[Store] addTask: missing required fields', { couple_id: row.couple_id, assigned_to: row.assigned_to, created_by: row.created_by });
+        U.toast('⚠️ Task data incomplete — please refresh and try again');
+        _tasks = _tasks.filter(t => t.id !== task.id); // roll back
+        return;
+      }
+      await Auth.sb().from('tasks').upsert(row, { onConflict: 'id' });
     } catch(e) {
       console.error('[Store] addTask DB error:', e);
       U.toast('⚠️ Task may not have synced');
@@ -3452,12 +3516,10 @@ const Store = (() => {
         if (map[k]) rowPatch[map[k]] = v;
       }
       if (patch.assignedTo !== undefined) {
-        rowPatch.assigned_to = patch.assignedTo === 'me' ? Auth.myUid()
-          : patch.assignedTo === 'them' ? Auth.theirUid() : patch.assignedTo;
+        rowPatch.assigned_to = _roleToUid(patch.assignedTo) || patch.assignedTo;
       }
       if (patch.pendingResponseFrom !== undefined) {
-        rowPatch.pending_response_from = patch.pendingResponseFrom === 'me' ? Auth.myUid()
-          : patch.pendingResponseFrom === 'them' ? Auth.theirUid() : null;
+        rowPatch.pending_response_from = _roleToUid(patch.pendingResponseFrom);
       }
       try {
         await Auth.sb().from('tasks').update(rowPatch).eq('id', id);
@@ -5826,30 +5888,14 @@ Router.register('auth-signup', () => `
       Router.go('auth-signin');
       return;
     }
-    // Auto-confirmed — bootstrap
+    // Auto-confirmed — bootstrap and route
     let boot = await Auth.bootstrap();
     if (boot.mode === 'pending') {
       await new Promise(r => setTimeout(r, 600));
       boot = await Auth.bootstrap();
     }
-    // Check for pending invite from link
-    const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
-    if (pendingInvite) {
-      sessionStorage.removeItem('parlay_pending_invite');
-      const joinResult = await Auth.joinCouple(pendingInvite);
-      if (!joinResult.error) {
-        await Auth.bootstrap();
-        U.toast('Connected with your partner! 🎉');
-        Router.go('home');
-      } else {
-        U.toast('Invite error: ' + joinResult.error);
-        Router.go('ob-couple');
-      }
-    } else if (boot.coupled || localStorage.getItem('parlay_setup_done')) {
-      Router.go('home');
-    } else {
-      Router.go('ob-couple');
-    }
+    // Pending invite is handled by _processPendingInvite (called below)
+    await _processPendingInvite(boot);
   });
 });
 
@@ -5906,25 +5952,8 @@ Router.register('auth-signin', () => `
       await new Promise(r => setTimeout(r, 600));
       boot = await Auth.bootstrap();
     }
-    // Check for pending invite — process even if user already has a solo couple
-    // (joinCouple handles orphan cleanup)
-    const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
-    if (pendingInvite && !boot.hasPartner) {
-      sessionStorage.removeItem('parlay_pending_invite');
-      const joinResult = await Auth.joinCouple(pendingInvite);
-      if (!joinResult.error) {
-        await Auth.bootstrap();
-        U.toast('Connected with your partner! 🎉');
-        Router.go('home');
-      } else {
-        U.toast('Invite error: ' + joinResult.error);
-        Router.go(boot.coupled ? 'partner-hub' : 'ob-couple');
-      }
-    } else if (!boot.coupled && !localStorage.getItem('parlay_setup_done')) {
-      Router.go('ob-couple');
-    } else {
-      Router.go('home');
-    }
+    // Pending invite is handled by _processPendingInvite (single canonical handler)
+    await _processPendingInvite(boot);
   });
 });
 
@@ -5987,14 +6016,16 @@ Router.register('ob-couple', () => {
     btn.disabled = true;
     const result = await Auth.createCouple();
     if (result.error) { U.toast(result.error); btn.disabled = false; return; }
-    localStorage.setItem('parlay_setup_done', '1');
     // Go to the full partner hub for sharing
     Router.go('partner-hub');
   });
   el.querySelector('#obc-join').addEventListener('click', () => Router.go('ob-join'));
   el.querySelector('#obc-skip').addEventListener('click', () => {
-    localStorage.setItem('parlay_setup_done', '1');
-    Router.go('home');
+    // Create a solo couple so user has a couple_id for creating parlays/tasks
+    Auth.createCouple().then((result) => {
+      if (result.error) U.toast(result.error);
+      Router.go('home');
+    });
   });
 });
 
@@ -10442,7 +10473,7 @@ const CoupleChat = (() => {
     _messages.push(msg);
     _notify('change');
 
-    // Insert into Supabase
+    // Insert into Supabase — roll back optimistic message on failure
     _sb().from('chat_messages').insert({
       couple_id: coupleId,
       sender_id: myUid,
@@ -10454,6 +10485,13 @@ const CoupleChat = (() => {
     }).select().maybeSingle().then(({ data, error }) => {
       if (error) {
         console.error('[CoupleChat] send error:', error.message);
+        // Roll back: remove the optimistic message and notify
+        const idx = _messages.findIndex(m => m.id === tempId);
+        if (idx >= 0) {
+          _messages.splice(idx, 1);
+          _notify('change');
+        }
+        U.toast('⚠️ Message failed to send');
         return;
       }
       if (data) {
@@ -10468,30 +10506,7 @@ const CoupleChat = (() => {
     return msg;
   }
 
-  // ─── Receive partner message (from realtime) ─
-  function receivePartner(rawText, options = {}) {
-    // This is now handled by realtime subscription automatically.
-    // Keep for backwards compatibility / demo mode.
-    const msg = {
-      id: 'cc_' + Date.now() + '_p_' + Math.random().toString(36).slice(2,6),
-      from: 'them',
-      raw: rawText,
-      filtered: options.filtered || rawText,
-      type: options.type || 'text',
-      timestamp: new Date().toISOString(),
-      read: false,
-      status: null,
-      replyTo: options.replyTo || null,
-      reactions: [],
-      metadata: options.metadata || null,
-      editedAt: null,
-      deleted: false,
-      pinned: false,
-    };
-    _messages.push(msg);
-    _notify('newMessage', msg);
-    return msg;
-  }
+  // receivePartner() removed — handled by realtime subscription exclusively
 
   // ─── System + AI messages ───────────────────
   function addSystemMessage(text, metadata = null) {
@@ -10835,7 +10850,7 @@ const CoupleChat = (() => {
   }
 
   return {
-    messages, getById, send, receivePartner, addSystemMessage, addAIInsight,
+    messages, getById, send, addSystemMessage, addAIInsight,
     editMessage, deleteMessage, react, togglePin, pinnedMessages,
     unreadCount, markAllRead, firstUnreadIndex,
     recentMessages, messagesByDate, searchMessages, lastMessage,
@@ -17469,6 +17484,41 @@ Router.register('daily-tips', () => {
    App initialization
    ═══════════════════════════════════════════════════════════════ */
 
+/**
+ * SINGLE canonical handler for pending invite codes.
+ * Called after bootstrap completes. Handles join + re-bootstrap + routing.
+ * No other code path should process sessionStorage pending invites.
+ */
+async function _processPendingInvite(boot) {
+  if (boot.mode !== 'supabase') {
+    // Not authenticated or error — route to auth
+    if (boot.mode === 'unauthenticated') Router.go('auth-entry');
+    return;
+  }
+
+  const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
+  if (pendingInvite && !boot.hasPartner) {
+    sessionStorage.removeItem('parlay_pending_invite');
+    const joinResult = await Auth.joinCouple(pendingInvite);
+    if (joinResult.error) {
+      U.toast('Invite code error: ' + joinResult.error);
+      Router.go(boot.coupled ? 'partner-hub' : 'ob-couple');
+    } else {
+      await Auth.bootstrap();
+      U.toast('Connected with your partner! 🎉');
+      Router.go('home');
+    }
+    return;
+  }
+
+  // Standard routing: coupled → home, uncoupled → onboarding
+  if (!boot.coupled) {
+    Router.go('ob-couple');
+  } else {
+    Router.go('home');
+  }
+}
+
 (async () => {
   Router.initNav();
 
@@ -17583,31 +17633,12 @@ Router.register('daily-tips', () => {
 
   if (boot.mode === 'unauthenticated') {
     if (_inviteCode) {
-      // User clicked invite link but isn't signed in — show signup with context
       U.toast('Create an account to connect with your partner');
     }
     Router.go('auth-entry');
   } else {
-    // Authenticated — check for pending invite code.
-    // Auto-join even if user already has a solo couple (joinCouple handles orphan cleanup).
-    const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
-    if (pendingInvite && !boot.hasPartner) {
-      sessionStorage.removeItem('parlay_pending_invite');
-      const joinResult = await Auth.joinCouple(pendingInvite);
-      if (joinResult.error) {
-        U.toast('Invite code error: ' + joinResult.error);
-        Router.go(boot.coupled ? 'partner-hub' : 'ob-couple');
-      } else {
-        await Auth.bootstrap();
-        U.toast('Connected with your partner! 🎉');
-        Router.go('home');
-      }
-    } else if (!boot.coupled) {
-      // Not coupled yet, not from an invite — go to couple creation
-      Router.go('ob-couple');
-    } else {
-      Router.go('home');
-    }
+    // Authenticated — use single canonical pending-invite handler
+    await _processPendingInvite(boot);
   }
   updateDevBar();
 
@@ -17628,25 +17659,8 @@ Router.register('daily-tips', () => {
       // Skip routing if bootstrap was already in progress (sign-in form handles it)
       if (b.mode === 'pending') return;
 
-      // Check for pending invite code (from invite link).
-      // Auto-join even if user already has a solo couple (joinCouple handles orphan cleanup).
-      const pendingInvite = sessionStorage.getItem('parlay_pending_invite');
-      if (pendingInvite && !b.hasPartner) {
-        sessionStorage.removeItem('parlay_pending_invite');
-        const joinResult = await Auth.joinCouple(pendingInvite);
-        if (joinResult.error) {
-          U.toast('Invite code error: ' + joinResult.error);
-          Router.go(b.coupled ? 'partner-hub' : 'ob-couple');
-        } else {
-          await Auth.bootstrap();
-          U.toast('Connected with your partner! 🎉');
-          Router.go('home');
-        }
-      } else if (!b.coupled) {
-        Router.go('ob-couple');
-      } else {
-        Router.go('home');
-      }
+      // Use single canonical pending-invite handler
+      await _processPendingInvite(b);
       updateDevBar();
     }
     if (event === 'SIGNED_OUT') {
