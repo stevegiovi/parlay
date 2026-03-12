@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '5.8.0';
-const BUILD_DATE = '2026-03-12T12:00:00Z';
+const VERSION = '5.8.1';
+const BUILD_DATE = '2026-03-12T18:30:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2691,6 +2691,18 @@ const Auth = (() => {
 
   async function joinCouple(code) {
     if (!_uid) return { error: 'Not authenticated' };
+
+    // Guard: if already connected with a partner, don't join another couple
+    if (_couple && hasPartner()) return { error: 'Already connected with a partner' };
+
+    // If user already created their own couple (but no partner joined yet),
+    // delete that orphan row first so .maybeSingle() in bootstrap won't break
+    if (_couple && !hasPartner()) {
+      const orphanId = _couple.id;
+      try { await sb.from('couples').delete().eq('id', orphanId).eq(_amSpouse1 ? 'spouse_1_id' : 'spouse_2_id', _uid); } catch(e) {}
+      _couple = null;
+    }
+
     // Use RPC function that runs with SECURITY DEFINER to bypass RLS
     // (Spouse 2 isn't in the couples row yet, so normal RLS blocks them)
     const { data, error } = await sb.rpc('join_couple_by_code', {
@@ -2700,10 +2712,13 @@ const Auth = (() => {
     if (error) return { error: error.message || 'Failed to join' };
     if (!data || data.error) return { error: data?.error || 'Invalid or expired invite code' };
 
-    // data is the updated couple row
-    _couple = data;
+    // Handle RPC returning an array (SETOF) vs a single object
+    const coupleRow = Array.isArray(data) ? data[0] : data;
+    if (!coupleRow || !coupleRow.id) return { error: 'Invalid response from server' };
+
+    _couple = coupleRow;
     _amSpouse1 = false;
-    return { data };
+    return { data: coupleRow };
   }
 
   // ── Bootstrap (THE critical function) ─────────
@@ -2717,10 +2732,29 @@ const Auth = (() => {
       if (!_session) { _bootstrapping = false; return { mode: 'unauthenticated' }; }
 
       // 2. Load couple FIRST — determines which slot I am
-      let { data: coupleData } = await sb.from('couples')
-        .select('*')
-        .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`)
-        .maybeSingle();
+      //    Use a multi-row query so that if duplicate couple rows exist
+      //    (e.g. user created one then joined another) we pick the best one.
+      let coupleData = null;
+      {
+        const { data: coupleRows } = await sb.from('couples')
+          .select('*')
+          .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+        if (coupleRows && coupleRows.length === 1) {
+          coupleData = coupleRows[0];
+        } else if (coupleRows && coupleRows.length > 1) {
+          // Prefer the couple row that has both partners connected
+          coupleData = coupleRows.find(c => {
+            const isS1 = c.spouse_1_id === _uid;
+            return isS1 ? !!c.spouse_2_id : !!c.spouse_1_id;
+          }) || coupleRows[0];
+          // Clean up orphan couple rows in the background
+          for (const c of coupleRows) {
+            if (c.id !== coupleData.id) {
+              sb.from('couples').delete().eq('id', c.id).catch(() => {});
+            }
+          }
+        }
+      }
 
       // 2b. Fallback: if no couple found, check if there's an existing account
       //     with the same email that IS in a couple (Google OAuth may create a
@@ -2755,11 +2789,10 @@ const Auth = (() => {
             }
 
             // Re-fetch the updated couple
-            const { data: refreshed } = await sb.from('couples')
+            const { data: refreshedRows } = await sb.from('couples')
               .select('*')
-              .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`)
-              .maybeSingle();
-            coupleData = refreshed;
+              .or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+            coupleData = refreshedRows?.[0] || null;
             console.log('[bootstrap] Migrated couple from old account to Google OAuth user');
           }
         }
@@ -2926,9 +2959,20 @@ const Auth = (() => {
     if (!_session || !_uid) return;
 
     // Reload couple row (catches partner joining)
-    const { data: coupleData } = await sb.from('couples')
-      .select('*').or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`)
-      .maybeSingle();
+    const { data: coupleRows } = await sb.from('couples')
+      .select('*').or(`spouse_1_id.eq.${_uid},spouse_2_id.eq.${_uid}`);
+    let coupleData = null;
+    if (coupleRows && coupleRows.length === 1) {
+      coupleData = coupleRows[0];
+    } else if (coupleRows && coupleRows.length > 1) {
+      coupleData = coupleRows.find(c => {
+        const isS1 = c.spouse_1_id === _uid;
+        return isS1 ? !!c.spouse_2_id : !!c.spouse_1_id;
+      }) || coupleRows[0];
+      for (const c of coupleRows) {
+        if (c.id !== coupleData.id) sb.from('couples').delete().eq('id', c.id).catch(() => {});
+      }
+    }
     if (coupleData) {
       _couple = coupleData;
       _amSpouse1 = _couple.spouse_1_id === _uid;
