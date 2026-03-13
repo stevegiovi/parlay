@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '6.0.1';
-const BUILD_DATE = '2026-03-13T00:00:00Z';
+const VERSION = '6.0.2';
+const BUILD_DATE = '2026-03-13T01:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2631,8 +2631,10 @@ const Auth = (() => {
   async function signUp(email, password, name) {
     const { data, error } = await sb.auth.signUp({ email, password });
     if (error) return { error: error.message };
+    // Fire-and-forget: don't block signup if profile upsert is slow or fails.
+    // Bootstrap will load/create the profile later.
     if (data.user) {
-      await sb.from('profiles').upsert({ id: data.user.id, name });
+      sb.from('profiles').upsert({ id: data.user.id, name }).catch(() => {});
     }
     if (!data.session) return { data, confirmEmail: true };
     _session = data.session;
@@ -5874,32 +5876,47 @@ Router.register('auth-signup', () => `
     if (!email) { errEl.textContent = 'Email is required'; errEl.style.display = 'block'; return; }
     if (pass.length < 6) { errEl.textContent = 'Password must be 6+ characters'; errEl.style.display = 'block'; return; }
 
-    el.querySelector('#su-submit').disabled = true;
-    el.querySelector('#su-submit').textContent = 'Creating…';
+    const submitBtn = el.querySelector('#su-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating…';
+
+    // Safety timeout — reset UI if anything hangs longer than 15s
+    const resetTimer = setTimeout(() => {
+      if (submitBtn.textContent === 'Creating…') {
+        errEl.textContent = 'Request timed out. Please try again.';
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Account';
+      }
+    }, 15000);
 
     try {
       const result = await Auth.signUp(email, pass, name);
       if (result.error) {
+        clearTimeout(resetTimer);
         errEl.textContent = result.error;
         errEl.style.display = 'block';
-        el.querySelector('#su-submit').disabled = false;
-        el.querySelector('#su-submit').textContent = 'Create Account';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Account';
         return;
       }
       if (result.confirmEmail) {
+        clearTimeout(resetTimer);
         U.toast('Check your email to confirm your account');
         Router.go('auth-signin');
         return;
       }
       // Auto-confirmed — bootstrap (waits for in-progress bootstrap if onAuthStateChange started one)
       const boot = await Auth.bootstrap();
+      clearTimeout(resetTimer);
       await _processPendingInvite(boot);
     } catch(e) {
+      clearTimeout(resetTimer);
       console.error('[signup] Error:', e);
       errEl.textContent = 'Something went wrong. Please try again.';
       errEl.style.display = 'block';
-      el.querySelector('#su-submit').disabled = false;
-      el.querySelector('#su-submit').textContent = 'Create Account';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create Account';
     }
   });
 });
@@ -5939,28 +5956,41 @@ Router.register('auth-signin', () => `
 
     if (!email || !pass) { errEl.textContent = 'Email and password required'; errEl.style.display = 'block'; return; }
 
-    el.querySelector('#si-submit').disabled = true;
-    el.querySelector('#si-submit').textContent = 'Signing in…';
+    const submitBtn = el.querySelector('#si-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Signing in…';
+
+    const resetTimer = setTimeout(() => {
+      if (submitBtn.textContent === 'Signing in…') {
+        errEl.textContent = 'Request timed out. Please try again.';
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In';
+      }
+    }, 15000);
 
     try {
       const result = await Auth.signIn(email, pass);
       if (result.error) {
+        clearTimeout(resetTimer);
         errEl.textContent = result.error;
         errEl.style.display = 'block';
-        el.querySelector('#si-submit').disabled = false;
-        el.querySelector('#si-submit').textContent = 'Sign In';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In';
         return;
       }
 
       // Waits for in-progress bootstrap if onAuthStateChange started one
       const boot = await Auth.bootstrap();
+      clearTimeout(resetTimer);
       await _processPendingInvite(boot);
     } catch(e) {
+      clearTimeout(resetTimer);
       console.error('[signin] Error:', e);
       errEl.textContent = 'Something went wrong. Please try again.';
       errEl.style.display = 'block';
-      el.querySelector('#si-submit').disabled = false;
-      el.querySelector('#si-submit').textContent = 'Sign In';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign In';
     }
   });
 });
@@ -17500,7 +17530,7 @@ Router.register('daily-tips', () => {
 async function _processPendingInvite(boot) {
   if (boot.mode !== 'supabase') {
     // Not authenticated or error — route to auth
-    if (boot.mode === 'unauthenticated') Router.go('auth-entry');
+    Router.go('auth-entry');
     return;
   }
 
