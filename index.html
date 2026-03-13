@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '6.0.2';
-const BUILD_DATE = '2026-03-13T01:00:00Z';
+const VERSION = '6.0.3';
+const BUILD_DATE = '2026-03-13T02:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2634,7 +2634,7 @@ const Auth = (() => {
     // Fire-and-forget: don't block signup if profile upsert is slow or fails.
     // Bootstrap will load/create the profile later.
     if (data.user) {
-      sb.from('profiles').upsert({ id: data.user.id, name }).catch(() => {});
+      sb.from('profiles').upsert({ id: data.user.id, name, email }).catch(() => {});
     }
     if (!data.session) return { data, confirmEmail: true };
     _session = data.session;
@@ -17528,9 +17528,14 @@ Router.register('daily-tips', () => {
  * No other code path should process sessionStorage pending invites.
  */
 async function _processPendingInvite(boot) {
-  if (boot.mode !== 'supabase') {
-    // Not authenticated or error — route to auth
+  if (boot.mode === 'unauthenticated') {
     Router.go('auth-entry');
+    return;
+  }
+  if (boot.mode === 'error') {
+    // Bootstrap failed but user may still be authenticated — try onboarding
+    console.warn('[_processPendingInvite] Bootstrap error, falling through to ob-couple');
+    Router.go('ob-couple');
     return;
   }
 
