@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '6.0.0';
-const BUILD_DATE = '2026-03-12T23:00:00Z';
+const VERSION = '6.0.1';
+const BUILD_DATE = '2026-03-13T00:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2605,7 +2605,7 @@ const Auth = (() => {
   let _amSpouse1  = true;   // true = I'm spouse_1_id, false = I'm spouse_2_id
   let _realtime   = null;
   let _reconnectTimer = null;
-  let _bootstrapping = false;
+  let _bootstrapPromise = null;
 
   // ── Public identity helpers (used by EVERY screen) ────
   const me = () => ({
@@ -2864,13 +2864,18 @@ const Auth = (() => {
   // Phase 6: Realtime — subscribe to couple-scoped changes
   // Phase 7: Settings — extract from couple row
   async function bootstrap() {
-    if (_bootstrapping) return { mode: 'pending' };
-    _bootstrapping = true;
+    // If bootstrap is already running, wait for the same result (no race condition)
+    if (_bootstrapPromise) return _bootstrapPromise;
+    _bootstrapPromise = _doBootstrap();
+    try { return await _bootstrapPromise; }
+    finally { _bootstrapPromise = null; }
+  }
 
+  async function _doBootstrap() {
     try {
       // ── Phase 1: Session ─────────────────────────
       await refreshSession();
-      if (!_session) { _bootstrapping = false; return { mode: 'unauthenticated' }; }
+      if (!_session) { return { mode: 'unauthenticated' }; }
 
       // ── Phase 2: Canonical couple resolution ─────
       // Primary path: query DB for all couple rows involving this user
@@ -2956,8 +2961,6 @@ const Auth = (() => {
         Store.set('equity', _couple.equity || {});
       }
 
-      _bootstrapping = false;
-
       const result = {
         mode: 'supabase',
         coupled: !!_couple,
@@ -2969,7 +2972,6 @@ const Auth = (() => {
       return result;
     } catch(e) {
       console.error('[bootstrap] Error:', e);
-      _bootstrapping = false;
       return { mode: 'error', error: e.message };
     }
   }
@@ -5875,27 +5877,30 @@ Router.register('auth-signup', () => `
     el.querySelector('#su-submit').disabled = true;
     el.querySelector('#su-submit').textContent = 'Creating…';
 
-    const result = await Auth.signUp(email, pass, name);
-    if (result.error) {
-      errEl.textContent = result.error;
+    try {
+      const result = await Auth.signUp(email, pass, name);
+      if (result.error) {
+        errEl.textContent = result.error;
+        errEl.style.display = 'block';
+        el.querySelector('#su-submit').disabled = false;
+        el.querySelector('#su-submit').textContent = 'Create Account';
+        return;
+      }
+      if (result.confirmEmail) {
+        U.toast('Check your email to confirm your account');
+        Router.go('auth-signin');
+        return;
+      }
+      // Auto-confirmed — bootstrap (waits for in-progress bootstrap if onAuthStateChange started one)
+      const boot = await Auth.bootstrap();
+      await _processPendingInvite(boot);
+    } catch(e) {
+      console.error('[signup] Error:', e);
+      errEl.textContent = 'Something went wrong. Please try again.';
       errEl.style.display = 'block';
       el.querySelector('#su-submit').disabled = false;
       el.querySelector('#su-submit').textContent = 'Create Account';
-      return;
     }
-    if (result.confirmEmail) {
-      U.toast('Check your email to confirm your account');
-      Router.go('auth-signin');
-      return;
-    }
-    // Auto-confirmed — bootstrap and route
-    let boot = await Auth.bootstrap();
-    if (boot.mode === 'pending') {
-      await new Promise(r => setTimeout(r, 600));
-      boot = await Auth.bootstrap();
-    }
-    // Pending invite is handled by _processPendingInvite (called below)
-    await _processPendingInvite(boot);
   });
 });
 
@@ -5937,23 +5942,26 @@ Router.register('auth-signin', () => `
     el.querySelector('#si-submit').disabled = true;
     el.querySelector('#si-submit').textContent = 'Signing in…';
 
-    const result = await Auth.signIn(email, pass);
-    if (result.error) {
-      errEl.textContent = result.error;
+    try {
+      const result = await Auth.signIn(email, pass);
+      if (result.error) {
+        errEl.textContent = result.error;
+        errEl.style.display = 'block';
+        el.querySelector('#si-submit').disabled = false;
+        el.querySelector('#si-submit').textContent = 'Sign In';
+        return;
+      }
+
+      // Waits for in-progress bootstrap if onAuthStateChange started one
+      const boot = await Auth.bootstrap();
+      await _processPendingInvite(boot);
+    } catch(e) {
+      console.error('[signin] Error:', e);
+      errEl.textContent = 'Something went wrong. Please try again.';
       errEl.style.display = 'block';
       el.querySelector('#si-submit').disabled = false;
       el.querySelector('#si-submit').textContent = 'Sign In';
-      return;
     }
-
-    let boot = await Auth.bootstrap();
-    // If another call (e.g. onAuthStateChange) is already bootstrapping, wait and retry
-    if (boot.mode === 'pending') {
-      await new Promise(r => setTimeout(r, 600));
-      boot = await Auth.bootstrap();
-    }
-    // Pending invite is handled by _processPendingInvite (single canonical handler)
-    await _processPendingInvite(boot);
   });
 });
 
@@ -17625,11 +17633,7 @@ async function _processPendingInvite(boot) {
   }
 
   // ── Normal flow ───────────────────────────────
-  let boot = await Auth.bootstrap();
-  if (boot.mode === 'pending') {
-    await new Promise(r => setTimeout(r, 600));
-    boot = await Auth.bootstrap();
-  }
+  const boot = await Auth.bootstrap();
 
   if (boot.mode === 'unauthenticated') {
     if (_inviteCode) {
@@ -17656,8 +17660,6 @@ async function _processPendingInvite(boot) {
       }
 
       const b = await Auth.bootstrap();
-      // Skip routing if bootstrap was already in progress (sign-in form handles it)
-      if (b.mode === 'pending') return;
 
       // Use single canonical pending-invite handler
       await _processPendingInvite(b);
