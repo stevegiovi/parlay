@@ -2136,8 +2136,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '6.0.3';
-const BUILD_DATE = '2026-03-13T02:00:00Z';
+const VERSION = '7.0.0';
+const BUILD_DATE = '2026-03-13T12:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2199,7 +2199,7 @@ const DEMO = {
           { id: 'opt_1', date: '2026-03-13', timeLabel: 'Evening' },
           { id: 'opt_2', date: '2026-03-14', timeLabel: 'Evening' },
         ],
-        status: 'pending_partner',
+        status: 'proposed',
         createdByUid: 'demo-uid-a', isMine: true,
         partnerRawReply: null, partnerFilteredReply: null, partnerDateResponse: null,
         counterDates: [], confirmedDate: null,
@@ -2215,7 +2215,7 @@ const DEMO = {
         dateOptions: [
           { id: 'opt_1', date: '2026-03-21', timeLabel: 'Morning' },
         ],
-        status: 'partner_replied',
+        status: 'countered',
         createdByUid: 'demo-uid-b', isMine: false,
         partnerRawReply: "That works but can we do just Saturday daytime? I have a work thing Sunday.",
         partnerFilteredReply: "Saturday daytime would work great for me. I have a commitment on Sunday — could we plan for a Saturday visit instead?",
@@ -2235,7 +2235,7 @@ const DEMO = {
           { id: 'opt_1', date: '2026-04-06', timeLabel: 'All day' },
           { id: 'opt_2', date: '2026-04-13', timeLabel: 'All day' },
         ],
-        status: 'active',
+        status: 'in_discussion',
         createdByUid: 'demo-uid-a', isMine: true,
         partnerRawReply: "Beach sounds great! I prefer the second week so I can finish my project.",
         partnerFilteredReply: "A beach trip sounds wonderful! The second week (Apr 13–17) would work better for me so I can wrap up a work project first.",
@@ -2253,7 +2253,7 @@ const DEMO = {
         intentContext: 'Who: Just me and friends\nPartner role: Covering the kids\n',
         structuredSelections: { 'Who': 'Just me and friends', 'Partner role': 'Covering the kids' },
         dateOptions: [{ id: 'opt_1', date: '2026-02-26', timeLabel: 'Evening' }],
-        status: 'resolved',
+        status: 'accepted',
         createdByUid: 'demo-uid-a', isMine: true,
         partnerRawReply: "Have fun! I'll do bedtime solo.",
         partnerFilteredReply: "Sounds fun! I'm happy to handle bedtime on my own that night.",
@@ -2445,16 +2445,12 @@ const DEMO = {
     // Patch Store data methods
     Store._demoOverride = {
       parlays:        () => this._mockParlays,
-      activeParlays:  () => this._mockParlays.filter(p => !p.archived && p.status !== 'resolved'),
-      resolvedParlays:() => this._mockParlays.filter(p => !p.archived && p.status === 'resolved'),
+      activeParlays:  () => this._mockParlays.filter(p => !p.archived && ParlayStateMachine.isActive(p.status)),
+      resolvedParlays:() => this._mockParlays.filter(p => !p.archived && ParlayStateMachine.isTerminal(p.status)),
       findParlay: (id) => this._mockParlays.find(p => p.id === id) || null,
       myPendingParlayCount: () => this._mockParlays.filter(p =>
-        !p.archived && p.status !== 'resolved' && (
-          (p.status === 'pending_partner' && !p.isMine) ||
-          (p.status === 'partner_replied' && p.isMine) ||
-          (p.status === 'counter_proposed' && p.isMine) ||
-          p.status === 'active'
-        )).length,
+        !p.archived && ParlayStateMachine.needsActionFrom(p) === 'me'
+        ).length,
       tasks:       () => this._mockTasks,
       myTasks:     () => this._mockTasks.filter(t => t.assignedTo === 'me' && t.status !== 'done'),
       sentTasks:   () => this._mockTasks.filter(t => t.createdBy === 'me' && t.assignedTo === 'them'),
@@ -3024,27 +3020,21 @@ const Auth = (() => {
           filter: `couple_id=eq.${_couple.id}` }, (payload) => {
         Store.loadParlays().then(() => {
           Badges.update();
-          // Re-render whatever screen is active (Router.reload preserves params like parlay id)
           Router.reload();
           // Toast for other person's actions
           if (payload.eventType === 'INSERT' && payload.new?.created_by !== _uid) {
-            U.toast('📬 New parlay from ' + theirName());
+            U.toast('📬 New event proposal from ' + theirName());
           }
           if (payload.eventType === 'UPDATE' && payload.old?.status !== payload.new?.status) {
-            const newStatus = payload.new?.status;
-            const isCreator = payload.new?.created_by === _uid;
-            // partner_replied: notify the creator (the partner just replied)
-            if (newStatus === 'partner_replied' && isCreator) U.toast('💬 ' + theirName() + ' responded');
-            // counter_proposed: notify the creator (the partner suggested new times)
-            else if (newStatus === 'counter_proposed' && isCreator) U.toast('📅 ' + theirName() + ' suggested different times');
-            // active (proposal generated): notify the recipient (the creator generated it)
-            else if (newStatus === 'active' && !isCreator) U.toast('⚖️ Proposal is ready');
-            // resolved: notify both — use specific message for date confirmation
-            else if (newStatus === 'resolved') {
-              const res = payload.new?.resolution;
-              if (res === 'date_accepted') U.toast('🎉 Event confirmed!');
-              else U.toast('✓ Parlay resolved');
-            }
+            const newStatus = ParlayStateMachine.normalize(payload.new?.status);
+            const changedByOther = payload.new?.last_activity_by !== _uid;
+            if (!changedByOther) return; // Don't toast my own actions
+            if (newStatus === 'in_discussion') U.toast('💬 ' + theirName() + ' responded');
+            else if (newStatus === 'countered') U.toast('📅 ' + theirName() + ' suggested different times');
+            else if (newStatus === 'accepted') U.toast('🎉 Event accepted!');
+            else if (newStatus === 'declined') U.toast('❌ Event declined');
+            else if (newStatus === 'completed') U.toast('✓ Event marked complete');
+            else if (newStatus === 'cancelled') U.toast('Event cancelled');
           }
         });
       })
@@ -3068,6 +3058,20 @@ const Auth = (() => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages',
           filter: `couple_id=eq.${_couple.id}` }, (payload) => {
         CoupleChat._handleRealtime(payload);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_messages',
+          filter: `couple_id=eq.${_couple.id}` }, (payload) => {
+        // Reload event messages for the affected event and re-render
+        const eventId = payload.new?.event_id || payload.old?.event_id;
+        if (eventId) {
+          EventMessages.loadForEvent(eventId).then(() => {
+            Router.reload();
+            // Toast if another user sent a message
+            if (payload.eventType === 'INSERT' && payload.new?.sender_uid !== _uid) {
+              U.toast('💬 New message on event');
+            }
+          });
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'couples',
           filter: `id=eq.${_couple.id}` }, async (payload) => {
@@ -3249,6 +3253,75 @@ const Auth = (() => {
 })();
 
 // ──────────────────────────────────────────────
+// PARLAY STATE MACHINE — Centralized status transitions
+// ──────────────────────────────────────────────
+const ParlayStateMachine = (() => {
+  // Canonical statuses for event proposals
+  const STATUSES = ['proposed','countered','in_discussion','accepted','declined','completed','cancelled'];
+
+  // Valid transitions from each status
+  const TRANSITIONS = {
+    proposed:      ['accepted','declined','countered','in_discussion'],
+    countered:     ['accepted','declined','countered','in_discussion'],
+    in_discussion: ['accepted','declined','countered','proposed'],
+    accepted:      ['completed','cancelled','in_discussion'],
+    declined:      ['in_discussion'],
+    cancelled:     ['in_discussion'],
+    completed:     [],
+  };
+
+  // Map legacy statuses from DB to canonical statuses
+  function normalize(status) {
+    if (STATUSES.includes(status)) return status;
+    if (status === 'pending_partner') return 'proposed';
+    if (status === 'partner_replied') return 'in_discussion';
+    if (status === 'active') return 'in_discussion';
+    if (status === 'resolved') return 'accepted'; // will be refined by resolution field
+    return 'proposed'; // safe fallback
+  }
+
+  function canTransition(from, to) {
+    const norm = normalize(from);
+    return (TRANSITIONS[norm] || []).includes(to);
+  }
+
+  function transition(from, to) {
+    if (!canTransition(from, to)) {
+      console.warn(`[ParlayStateMachine] Invalid transition: ${from} → ${to}`);
+      return false;
+    }
+    return true;
+  }
+
+  // Determine who needs to act on a parlay
+  function needsActionFrom(parlay) {
+    const s = normalize(parlay.status);
+    if (s === 'proposed') return parlay.isMine ? 'them' : 'me';
+    if (s === 'countered') return parlay.isMine ? 'me' : 'them'; // creator picks from counter-dates
+    if (s === 'in_discussion') {
+      // Whoever did NOT act last needs to respond
+      if (parlay.lastActivityBy === Auth.myUid()) return 'them';
+      if (parlay.lastActivityBy === Auth.theirUid()) return 'me';
+      return null; // unknown — either can act
+    }
+    return null; // accepted/declined/completed/cancelled — no action needed
+  }
+
+  // Is this parlay in a terminal state?
+  function isTerminal(status) {
+    const s = normalize(status);
+    return ['accepted','declined','completed','cancelled'].includes(s);
+  }
+
+  // Is this parlay actionable (not terminal)?
+  function isActive(status) {
+    return !isTerminal(status);
+  }
+
+  return { STATUSES, TRANSITIONS, normalize, canTransition, transition, needsActionFrom, isTerminal, isActive };
+})();
+
+// ──────────────────────────────────────────────
 // STORE — In-memory state, Supabase as source of truth
 // ──────────────────────────────────────────────
 const Store = (() => {
@@ -3258,33 +3331,46 @@ const Store = (() => {
   let _kv = {};  // simple key-value for settings (mediatorTone, equity, etc.)
 
   // ── Parlay helpers ────────────────────────────
+  function _parseJSON(val, fallback) {
+    if (val == null) return fallback;
+    if (typeof val !== 'string') return val || fallback;
+    try { return JSON.parse(val); } catch { return fallback; }
+  }
+
   function _rowToParlay(row) {
+    // Normalize legacy statuses: resolved with resolution=date_accepted → accepted
+    let status = row.status;
+    if (status === 'resolved') {
+      if (row.resolution === 'declined') status = 'declined';
+      else status = 'accepted';
+    }
+    status = ParlayStateMachine.normalize(status);
+
     return {
       id: row.id,
       topicId: row.topic_id,
       title: row.title,
       date: U.shortDate(row.created_at),
+      createdAt: row.created_at,
       rawInput: row.raw_input,
       filteredInput: row.filtered_input,
       intentContext: row.intent_context,
-      dateOptions: typeof row.date_options === 'string'
-        ? (() => { try { return JSON.parse(row.date_options); } catch { return []; } })()
-        : (row.date_options || []),
-      status: row.status,
+      dateOptions: _parseJSON(row.date_options, []),
+      status,
       createdByUid: row.created_by,  // RAW UUID — the only authority
       isMine: row.created_by === Auth.myUid(),
       partnerRawReply: row.partner_raw_reply,
       partnerFilteredReply: row.partner_filtered_reply,
       partnerDateResponse: row.partner_date_response,
-      counterDates: typeof row.counter_dates === 'string'
-        ? (() => { try { return JSON.parse(row.counter_dates); } catch { return []; } })()
-        : (row.counter_dates || []),
-      confirmedDate: typeof row.confirmed_date === 'string'
-        ? (() => { try { return JSON.parse(row.confirmed_date); } catch { return null; } })()
-        : (row.confirmed_date || null),
+      counterDates: _parseJSON(row.counter_dates, []),
+      confirmedDate: _parseJSON(row.confirmed_date, null),
       proposal: row.proposal,
       resolution: row.resolution,
       archived: row.archived || false,
+      // Fields that were previously missing from mapping
+      structuredSelections: _parseJSON(row.structured_selections, null),
+      lastActivityBy: row.last_activity_by || row.created_by,
+      messageCount: row.message_count || 0,
     };
   }
 
@@ -3308,6 +3394,9 @@ const Store = (() => {
       proposal: p.proposal,
       resolution: p.resolution,
       archived: p.archived || false,
+      structured_selections: p.structuredSelections || null,
+      last_activity_by: p.lastActivityBy || null,
+      message_count: p.messageCount || 0,
     };
   }
 
@@ -3320,6 +3409,9 @@ const Store = (() => {
       partnerDateResponse:'partner_date_response', counterDates:'counter_dates',
       confirmedDate:'confirmed_date',
       proposal:'proposal', resolution:'resolution', archived:'archived',
+      structuredSelections:'structured_selections',
+      lastActivityBy:'last_activity_by',
+      messageCount:'message_count',
     };
     const row = {};
     for (const [k,v] of Object.entries(patch)) { if (map[k]) row[map[k]] = v; }
@@ -3408,19 +3500,13 @@ const Store = (() => {
   }
 
   function parlays()        { return _parlays; }
-  function activeParlays()  { return _parlays.filter(p => !p.archived && p.status !== 'resolved'); }
-  function resolvedParlays(){ return _parlays.filter(p => !p.archived && p.status === 'resolved'); }
+  function activeParlays()  { return _parlays.filter(p => !p.archived && ParlayStateMachine.isActive(p.status)); }
+  function resolvedParlays(){ return _parlays.filter(p => !p.archived && ParlayStateMachine.isTerminal(p.status)); }
   function findParlay(id)   { return _parlays.find(p => p.id === id) || null; }
 
   /** Count of parlays that need MY attention */
   function myPendingParlayCount() {
-    return activeParlays().filter(p =>
-      (p.status === 'pending_partner' && !p.isMine) ||
-      (p.status === 'partner_replied' && p.isMine) ||
-      (p.status === 'counter_proposed' && p.isMine) ||
-      (p.status === 'in_discussion' && p.lastActivityBy && p.lastActivityBy !== Auth.myUid()) ||
-      (p.status === 'active')
-    ).length;
+    return activeParlays().filter(p => ParlayStateMachine.needsActionFrom(p) === 'me').length;
   }
 
   async function addParlay(parlay) {
@@ -3447,6 +3533,13 @@ const Store = (() => {
   async function updateParlay(id, patch) {
     const i = _parlays.findIndex(p => p.id === id);
     if (i > -1) {
+      // Validate status transitions via state machine
+      if (patch.status && patch.status !== _parlays[i].status) {
+        if (!ParlayStateMachine.transition(_parlays[i].status, patch.status)) {
+          U.toast('Invalid status change');
+          return;
+        }
+      }
       _parlays[i] = { ..._parlays[i], ...patch };
       try {
         await Auth.sb().from('negotiations').update(_patchToRow(patch)).eq('id', id);
@@ -4097,14 +4190,14 @@ const Insights = (() => {
     let score = 50; // baseline
 
     // Positive signals
-    const resolved = parlays.filter(p => p.status === 'resolved').length;
+    const resolved = parlays.filter(p => ParlayStateMachine.isTerminal(p.status)).length;
     score += Math.min(resolved * 5, 20);
 
     const completedTasks = tasks.filter(t => t.status === 'done').length;
     score += Math.min(completedTasks * 2, 15);
 
     // Active engagement
-    const active = parlays.filter(p => p.status === 'active' || p.status === 'in_discussion').length;
+    const active = parlays.filter(p => ParlayStateMachine.isActive(p.status)).length;
     score += Math.min(active * 3, 10);
 
     // Negative signals
@@ -4112,7 +4205,7 @@ const Insights = (() => {
     score -= Math.min(declined * 3, 10);
 
     const stale = parlays.filter(p => {
-      if (p.status === 'resolved' || p.archived) return false;
+      if (ParlayStateMachine.isTerminal(p.status) || p.archived) return false;
       const d = new Date(p.date);
       return (Date.now() - d.getTime()) > 7 * 86400000;
     }).length;
@@ -4178,7 +4271,7 @@ const Insights = (() => {
       return d.getTime() > weekAgo;
     }).length;
 
-    const resolvedParlays = parlays.filter(p => p.status === 'resolved').length;
+    const resolvedParlays = parlays.filter(p => ParlayStateMachine.isTerminal(p.status)).length;
     const completedTasks = tasks.filter(t => t.status === 'done').length;
     const totalTasks = tasks.length;
 
@@ -4727,12 +4820,12 @@ const SmartSuggestions = (() => {
 
   function forReply(parlay) {
     const suggs = [];
-    if (parlay.status === 'pending_partner' && !parlay.isMine) {
+    if (parlay.status === 'proposed' && ParlayStateMachine.needsActionFrom(parlay) === 'me') {
       suggs.push({ text: "That works for me!", positive: true });
       suggs.push({ text: "I'd prefer a different time", positive: false });
       suggs.push({ text: "Let me think about it", positive: null });
     }
-    if (parlay.status === 'active' && parlay.proposal) {
+    if (parlay.status === 'in_discussion' && parlay.proposal) {
       suggs.push({ text: "I accept this proposal", positive: true });
       suggs.push({ text: "Can we adjust one thing?", positive: null });
     }
@@ -6258,13 +6351,12 @@ Router.register('home', () => {
         </div>
         <div style="background:var(--terra);color:#fff;font-size:.7rem;font-weight:800;min-width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:0 7px;">${totalPending}</div>
       </div>
-      ${activeParlays.filter(p => (p.status === 'pending_partner' && !p.isMine) || (p.status === 'partner_replied' && p.isMine) || (p.status === 'counter_proposed' && p.isMine) || (p.status === 'in_discussion' && p.lastActivityBy && p.lastActivityBy !== Auth.myUid()) || p.status === 'active').slice(0,3).map(p => {
+      ${activeParlays.filter(p => ParlayStateMachine.needsActionFrom(p) === 'me').slice(0,3).map(p => {
         const topic = TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9];
-        const label = (p.status === 'pending_partner' && !p.isMine) ? 'Reply needed'
-          : (p.status === 'partner_replied' && p.isMine) ? 'Reply received'
-          : (p.status === 'counter_proposed' && p.isMine) ? 'New times suggested'
-          : p.status === 'in_discussion' ? 'New message'
-          : 'Proposal ready';
+        const label = p.status === 'proposed' ? 'Reply needed'
+          : p.status === 'countered' ? 'New times suggested'
+          : p.status === 'in_discussion' ? 'Your turn'
+          : 'Action needed';
         return `<div onclick="Router.go('parlay-detail',{id:'${p.id}'})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;cursor:pointer;margin-bottom:6px;">
           <span style="font-size:1.1rem;">${topic.icon}</span>
           <div style="flex:1;min-width:0;">
@@ -6490,33 +6582,28 @@ Router.register('plan', () => {
   const myN = Auth.myName();
   const theirN = Auth.theirName();
 
-  // Smart sections
-  const needsMe = all.filter(p => p.status !== 'resolved' && p.status !== 'declined' && (
-    (p.status === 'pending_partner' && !p.isMine) ||
-    (p.status === 'partner_replied' && p.isMine) ||
-    (p.status === 'counter_proposed' && p.isMine) ||
-    (p.status === 'in_discussion' && p.lastActivityBy && p.lastActivityBy !== Auth.myUid()) ||
-    (p.status === 'active')
-  ));
-  const active = all.filter(p => !['resolved','declined'].includes(p.status) && !needsMe.includes(p));
-  const upcoming = all.filter(p => p.status === 'resolved' && p.resolution === 'date_accepted');
-  const past = all.filter(p => p.status === 'resolved' && p.resolution !== 'date_accepted');
-  const declined = all.filter(p => p.status === 'declined');
+  // Smart sections — use state machine
+  const needsMe = all.filter(p => ParlayStateMachine.needsActionFrom(p) === 'me');
+  const active = all.filter(p => ParlayStateMachine.isActive(p.status) && !needsMe.includes(p));
+  const upcoming = all.filter(p => p.status === 'accepted' && p.confirmedDate);
+  const past = all.filter(p => ['accepted','completed'].includes(p.status) && !p.confirmedDate);
+  const declined = all.filter(p => ['declined','cancelled'].includes(p.status));
 
   const topicForP = (p) => TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9];
 
   const statusLabel = (p) => {
-    if (p.status === 'pending_partner' && !p.isMine) return ['Your turn', '#C4714A', '#C4714A18'];
-    if (p.status === 'pending_partner' && p.isMine)  return ['Sent', '#E8B88A', '#E8B88A18'];
-    if (p.status === 'partner_replied' && p.isMine)   return ['Reply received', '#7A6A9B', '#7A6A9B18'];
-    if (p.status === 'partner_replied' && !p.isMine)  return ['Awaiting proposal', '#7A6A9B', '#7A6A9B18'];
-    if (p.status === 'in_discussion')                  return ['In discussion', '#6A8CAA', '#6A8CAA18'];
-    if (p.status === 'counter_proposed' && p.isMine)   return ['New times', '#6A8CAA', '#6A8CAA18'];
-    if (p.status === 'counter_proposed' && !p.isMine)  return ['Counter sent', '#6A8CAA', '#6A8CAA18'];
-    if (p.status === 'active')                         return ['Proposal ready', '#C4714A', '#C4714A18'];
-    if (p.status === 'resolved' && p.resolution === 'date_accepted') return ['Confirmed', '#7A9E8A', '#7A9E8A18'];
-    if (p.status === 'resolved')                       return ['Resolved', '#7A9E8A', '#7A9E8A18'];
-    if (p.status === 'declined')                       return ['Declined', '#9B8880', '#9B888018'];
+    const needsAction = ParlayStateMachine.needsActionFrom(p);
+    if (p.status === 'proposed' && needsAction === 'me')   return ['Your turn', '#C4714A', '#C4714A18'];
+    if (p.status === 'proposed' && needsAction === 'them') return ['Sent', '#E8B88A', '#E8B88A18'];
+    if (p.status === 'countered' && needsAction === 'me')  return ['New times', '#6A8CAA', '#6A8CAA18'];
+    if (p.status === 'countered' && needsAction === 'them')return ['Counter sent', '#6A8CAA', '#6A8CAA18'];
+    if (p.status === 'in_discussion' && needsAction === 'me') return ['Your turn', '#7A6A9B', '#7A6A9B18'];
+    if (p.status === 'in_discussion')                      return ['In discussion', '#6A8CAA', '#6A8CAA18'];
+    if (p.status === 'accepted' && p.confirmedDate)        return ['Confirmed', '#7A9E8A', '#7A9E8A18'];
+    if (p.status === 'accepted')                           return ['Accepted', '#7A9E8A', '#7A9E8A18'];
+    if (p.status === 'completed')                          return ['Completed', '#7A9E8A', '#7A9E8A18'];
+    if (p.status === 'declined')                           return ['Declined', '#9B8880', '#9B888018'];
+    if (p.status === 'cancelled')                          return ['Cancelled', '#9B8880', '#9B888018'];
     return [p.status, '#9B8880', '#9B888018'];
   };
 
@@ -7052,7 +7139,7 @@ Router.register('compose', ({ topicId, editId } = {}) => {
           intentContext,
           structuredSelections: selections,
           dateOptions,
-          status: 'pending_partner',
+          status: 'proposed',
           createdByUid: Auth.myUid(),
           isMine: true,
           partnerRawReply: null, partnerFilteredReply: null,
@@ -7116,26 +7203,25 @@ Router.register('parlay-detail', ({ id } = {}) => {
   const recipN = isMine ? theirN : myN;
   const messages = EventMessages.getForEvent(id);
 
-  // Status config
+  // Status config — uses state machine
+  const needsAction = ParlayStateMachine.needsActionFrom(p);
   const statusText = {
-    pending_partner: isMine ? `Waiting for ${recipN}` : 'Your turn to respond',
-    partner_replied: isMine ? `${recipN} has replied` : 'Awaiting proposal',
-    in_discussion: 'In discussion',
-    counter_proposed: isMine ? `${recipN} suggested new times` : 'Counter sent',
-    active: 'Proposal ready',
-    resolved: p.resolution === 'needs_discussion' ? 'Needs conversation'
-      : p.resolution === 'date_accepted' ? 'Event confirmed'
-      : 'Resolved',
+    proposed: needsAction === 'me' ? 'Your turn to respond' : `Waiting for ${recipN}`,
+    countered: needsAction === 'me' ? `${recipN} suggested new times` : 'Counter sent',
+    in_discussion: needsAction === 'me' ? 'Your turn' : 'In discussion',
+    accepted: p.confirmedDate ? 'Event confirmed' : 'Accepted',
     declined: 'Declined',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
   };
-  const statusColor = { pending_partner:'#E8B88A', partner_replied:'#7A6A9B', in_discussion:'#6A8CAA', counter_proposed:'#6A8CAA', active:'#C4714A', resolved:'#7A9E8A', declined:'#9B8880' };
+  const statusColor = { proposed:'#E8B88A', countered:'#6A8CAA', in_discussion:'#6A8CAA', accepted:'#7A9E8A', declined:'#9B8880', completed:'#7A9E8A', cancelled:'#9B8880' };
   const sc = statusColor[p.status] || '#9B8880';
 
   // Structured summary
   const summaryHtml = renderStructuredSummary(p.topicId, p.structuredSelections);
 
   // Date options
-  const isConfirmed = p.resolution === 'date_accepted';
+  const isConfirmed = p.status === 'accepted' && !!p.confirmedDate;
   const dateHtml = (p.dateOptions?.length > 0) ? `
     <div style="margin-top:12px;">
       <div class="input-label">📅 ${isConfirmed ? 'Confirmed date' : 'Proposed dates'}</div>
@@ -7162,9 +7248,9 @@ Router.register('parlay-detail', ({ id } = {}) => {
           const d = new Date(o.date + 'T12:00:00');
           const label = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
           const sel = p.confirmedDate?.id === o.id;
-          return `<div class="date-opt-card counter-date-opt${sel ? ' selected' : ''}" data-opt="${o.id}" data-date="${o.date}" data-time="${o.timeLabel || ''}" style="${p.status === 'counter_proposed' && isMine ? 'cursor:pointer;' : ''}">
+          return `<div class="date-opt-card counter-date-opt${sel ? ' selected' : ''}" data-opt="${o.id}" data-date="${o.date}" data-time="${o.timeLabel || ''}" style="${p.status === 'countered' && needsAction === 'me' ? 'cursor:pointer;' : ''}">
             <div><div class="date-label">${label}</div>${o.timeLabel ? `<div class="date-time">${o.timeLabel}</div>` : ''}</div>
-            ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Confirmed</span>` : (p.status === 'counter_proposed' && isMine ? `<div class="date-check"></div>` : '')}
+            ${sel ? `<span style="font-size:.72rem;font-weight:700;color:var(--sage);">✓ Confirmed</span>` : (p.status === 'countered' && needsAction === 'me' ? `<div class="date-check"></div>` : '')}
           </div>`;
         }).join('')}
       </div>
@@ -7206,62 +7292,59 @@ Router.register('parlay-detail', ({ id } = {}) => {
       </div>
     </div>` : '';
 
-  // Actions
+  // Actions — driven by state machine
   let actionHtml = '';
-  if (p.status === 'pending_partner' && !isMine) {
+  if (p.status === 'proposed' && needsAction === 'me') {
+    // I'm the recipient of a proposal — full action set
     actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept as is</button>
       ${p.dateOptions?.length > 0 ? `<button class="btn btn-outline" onclick="Router.go('parlay-reply',{id:'${p.id}'})">📅 Suggest other times</button>` : ''}
       <button class="btn btn-outline" id="reply-msg-btn">💬 Send a message</button>
       <button class="btn btn-outline" style="color:#EF4444;border-color:#EF4444;" id="decline-btn">✕ Decline</button>
     </div>`;
-  } else if (p.status === 'pending_partner' && isMine) {
+  } else if (p.status === 'proposed' && needsAction === 'them') {
+    // I proposed, waiting for partner
     actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">⏳ Waiting for ${U.esc(recipN)} to respond</div></div>`;
-  } else if (p.status === 'in_discussion') {
-    actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
-      <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept</button>
-      <button class="btn btn-outline" id="reply-msg-btn">💬 Send a message</button>
-      ${p.dateOptions?.length > 0 ? `<button class="btn btn-outline" onclick="Router.go('parlay-reply',{id:'${p.id}'})">📅 Suggest other times</button>` : ''}
-    </div>`;
-  } else if (p.status === 'partner_replied' && isMine) {
-    actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
-      <button class="btn" style="background:linear-gradient(135deg,#4A3568,#7A6A9B);color:#fff;" id="gen-proposal-btn"><span id="gen-btn-text">⚖️ Generate Proposal</span></button>
-      <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept as is</button>
-      <button class="btn btn-outline" id="reply-msg-btn">💬 Reply</button>
-    </div>`;
-  } else if (p.status === 'partner_replied' && !isMine) {
-    actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">✓ Position sent. Waiting for ${U.esc(creatorN)} to continue.</div></div>`;
-  } else if (p.status === 'counter_proposed' && isMine) {
+  } else if (p.status === 'countered' && needsAction === 'me') {
+    // Partner counter-proposed, I need to pick a date or respond
     actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn" style="background:var(--sage);color:#fff;" id="accept-counter-btn" disabled><span id="accept-counter-text">Select a date above to confirm</span></button>
       <button class="btn btn-outline" id="reply-msg-btn">💬 Send a message</button>
+      <button class="btn btn-outline" style="color:#EF4444;border-color:#EF4444;" id="decline-btn">✕ Decline</button>
     </div>`;
-  } else if (p.status === 'counter_proposed' && !isMine) {
-    actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">⏳ Waiting for ${U.esc(creatorN)} to pick a time</div></div>`;
-  } else if (p.status === 'active' && p.proposal) {
+  } else if (p.status === 'countered' && needsAction === 'them') {
+    // I counter-proposed, waiting
+    actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);"><div style="font-size:.85rem;color:var(--muted);">⏳ Waiting for ${U.esc(recipN)} to pick a time</div></div>`;
+  } else if (p.status === 'in_discussion') {
+    // Open discussion — both can act
     actionHtml = `<div style="display:flex;flex-direction:column;gap:8px;">
-      <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept Proposal</button>
-      <button class="btn btn-outline" id="reply-msg-btn">💬 Discuss further</button>
+      <button class="btn" style="background:var(--sage);color:#fff;" id="accept-btn">✓ Accept</button>
+      <button class="btn btn-outline" id="reply-msg-btn">💬 Send a message</button>
+      ${p.dateOptions?.length > 0 || p.counterDates?.length > 0 ? `<button class="btn btn-outline" onclick="Router.go('parlay-reply',{id:'${p.id}'})">📅 Suggest other times</button>` : ''}
+      <button class="btn btn-outline" style="color:#EF4444;border-color:#EF4444;" id="decline-btn">✕ Decline</button>
     </div>`;
-  } else if (p.status === 'resolved') {
-    if (p.resolution === 'needs_discussion') {
-      actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);">
-        <div style="font-size:.85rem;color:var(--muted);font-weight:600;">💬 Marked for conversation</div>
-        <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="reopen-btn">↻ Reopen</button>
-      </div>`;
-    } else if (p.resolution === 'date_accepted') {
-      actionHtml = `<div style="text-align:center;padding:16px;background:#EDF4F0;border:1.5px solid var(--sage);border-radius:var(--r-md);">
-        <div style="font-size:1.5rem;margin-bottom:6px;">🎉</div>
-        <div style="font-size:.92rem;color:var(--sage);font-weight:700;">Event Confirmed</div>
-      </div>`;
-    } else {
-      actionHtml = `<div style="text-align:center;padding:12px;font-size:.85rem;color:var(--sage);font-weight:600;">✓ Accepted</div>`;
-    }
+  } else if (p.status === 'accepted') {
+    // Accepted — show confirmation
+    actionHtml = `<div style="text-align:center;padding:16px;background:#EDF4F0;border:1.5px solid var(--sage);border-radius:var(--r-md);">
+      <div style="font-size:1.5rem;margin-bottom:6px;">${p.confirmedDate ? '🎉' : '✓'}</div>
+      <div style="font-size:.92rem;color:var(--sage);font-weight:700;">${p.confirmedDate ? 'Event Confirmed' : 'Accepted'}</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+        <button class="btn btn-outline btn-sm" id="complete-btn">✓ Mark Complete</button>
+        <button class="btn btn-outline btn-sm" id="reopen-btn">↻ Reopen</button>
+      </div>
+    </div>`;
   } else if (p.status === 'declined') {
     actionHtml = `<div style="text-align:center;padding:16px;background:#FFF5F5;border:1px solid rgba(239,68,68,.2);border-radius:var(--r-md);">
       <div style="font-size:.85rem;color:#EF4444;font-weight:600;">✕ Declined</div>
       <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="reopen-btn">↻ Reopen</button>
     </div>`;
+  } else if (p.status === 'cancelled') {
+    actionHtml = `<div style="text-align:center;padding:16px;background:var(--parchment);border-radius:var(--r-md);">
+      <div style="font-size:.85rem;color:var(--muted);font-weight:600;">Cancelled</div>
+      <button class="btn btn-outline btn-sm" style="margin-top:12px;" id="reopen-btn">↻ Reopen</button>
+    </div>`;
+  } else if (p.status === 'completed') {
+    actionHtml = `<div style="text-align:center;padding:12px;font-size:.85rem;color:var(--sage);font-weight:600;">✓ Completed</div>`;
   }
 
   // Inline reply box
@@ -7341,6 +7424,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
 }, (el, { id } = {}) => {
   const p = Store.findParlay(id);
   if (!p) return;
+  const needsAction = ParlayStateMachine.needsActionFrom(p);
 
   // Load messages
   EventMessages.loadForEvent(id).then(() => {
@@ -7351,30 +7435,28 @@ Router.register('parlay-detail', ({ id } = {}) => {
     }
   });
 
-  // Accept
+  // Accept — transitions to 'accepted'
   el.querySelector('#accept-btn')?.addEventListener('click', async () => {
     const btn = el.querySelector('#accept-btn');
     btn.disabled = true; btn.textContent = 'Accepting…';
-    await Store.updateParlay(p.id, { status: 'resolved', resolution: p.dateOptions?.length > 0 ? 'date_accepted' : 'accepted' });
+    const resolution = p.dateOptions?.length > 0 ? 'date_accepted' : 'accepted';
+    const confirmedDate = p.dateOptions?.length === 1 ? p.dateOptions[0] : p.confirmedDate;
+    await Store.updateParlay(p.id, { status: 'accepted', resolution, confirmedDate, lastActivityBy: Auth.myUid() });
     await EventMessages.send(p.id, { type: 'system', rawContent: `${Auth.myName()} accepted the proposal`, filteredContent: `${Auth.myName()} accepted the proposal` });
     Badges.update();
     U.toast('Accepted ✓');
     Router.go('parlay-detail', { id: p.id });
   });
 
-  // Generate proposal
-  el.querySelector('#gen-proposal-btn')?.addEventListener('click', async () => {
-    const btn = el.querySelector('#gen-proposal-btn');
-    const txt = el.querySelector('#gen-btn-text');
-    btn.disabled = true; txt.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.3);margin-right:8px;"></span> Generating…';
-    try {
-      const parsed = await generateProposal(p);
-      await Store.updateParlay(p.id, { proposal: parsed, status: 'active' });
-      Router.go('parlay-detail', { id: p.id });
-    } catch(e) {
-      btn.disabled = false; txt.textContent = '⚖️ Generate Proposal';
-      U.toast('AI error — try again');
-    }
+  // Complete — transitions accepted to completed
+  el.querySelector('#complete-btn')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#complete-btn');
+    btn.disabled = true; btn.textContent = 'Completing…';
+    await Store.updateParlay(p.id, { status: 'completed', lastActivityBy: Auth.myUid() });
+    await EventMessages.send(p.id, { type: 'system', rawContent: `${Auth.myName()} marked as complete`, filteredContent: `${Auth.myName()} marked the event as complete` });
+    Badges.update();
+    U.toast('Completed ✓');
+    Router.go('parlay-detail', { id: p.id });
   });
 
   // Inline reply toggle + send
@@ -7397,23 +7479,22 @@ Router.register('parlay-detail', ({ id } = {}) => {
 
     await EventMessages.send(p.id, { type: 'text', rawContent: raw, filteredContent: filtered });
 
-    // Update parlay status to in_discussion if it was pending
-    if (['pending_partner', 'partner_replied'].includes(p.status)) {
+    // Transition to in_discussion if currently in a proposal/counter state
+    if (ParlayStateMachine.isActive(p.status) && p.status !== 'in_discussion') {
       await Store.updateParlay(p.id, {
-        status: p.status === 'pending_partner' && !p.isMine ? 'partner_replied' : 'in_discussion',
-        partnerRawReply: p.isMine ? p.partnerRawReply : raw,
-        partnerFilteredReply: p.isMine ? p.partnerFilteredReply : filtered,
+        status: 'in_discussion',
         lastActivityBy: Auth.myUid(),
       });
     } else {
-      await Store.updateParlay(p.id, { status: 'in_discussion', lastActivityBy: Auth.myUid() });
+      // Just update last activity
+      await Store.updateParlay(p.id, { lastActivityBy: Auth.myUid() });
     }
 
     Badges.update();
     Router.go('parlay-detail', { id: p.id });
   });
 
-  // Decline
+  // Decline — transitions to 'declined'
   el.querySelector('#decline-btn')?.addEventListener('click', () => {
     el.querySelector('#decline-form').style.display = 'block';
     el.querySelector('#decline-btn').style.display = 'none';
@@ -7426,7 +7507,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
     if (reason) {
       try { filtered = await runToneFilter(reason, ''); } catch(e) { filtered = reason; }
     }
-    await Store.updateParlay(p.id, { status: 'declined', resolution: 'declined' });
+    await Store.updateParlay(p.id, { status: 'declined', resolution: 'declined', lastActivityBy: Auth.myUid() });
     if (reason) {
       await EventMessages.send(p.id, { type: 'text', rawContent: reason, filteredContent: filtered });
     }
@@ -7436,11 +7517,11 @@ Router.register('parlay-detail', ({ id } = {}) => {
     Router.go('plan');
   });
 
-  // Counter-date selection
+  // Counter-date selection (for countered status)
   let _selectedCounterDate = null;
   el.querySelectorAll('.counter-date-opt').forEach(card => {
     card.addEventListener('click', () => {
-      if (p.status !== 'counter_proposed' || !p.isMine) return;
+      if (p.status !== 'countered' || needsAction !== 'me') return;
       _selectedCounterDate = card.dataset.opt;
       el.querySelectorAll('.counter-date-opt').forEach(c => {
         const sel = c.dataset.opt === _selectedCounterDate;
@@ -7458,16 +7539,17 @@ Router.register('parlay-detail', ({ id } = {}) => {
     const btn = el.querySelector('#accept-counter-btn');
     btn.disabled = true;
     const selectedOpt = p.counterDates?.find(o => o.id === _selectedCounterDate);
-    await Store.updateParlay(p.id, { confirmedDate: selectedOpt || { id: _selectedCounterDate }, status: 'resolved', resolution: 'date_accepted' });
+    await Store.updateParlay(p.id, { confirmedDate: selectedOpt || { id: _selectedCounterDate }, status: 'accepted', resolution: 'date_accepted', lastActivityBy: Auth.myUid() });
     await EventMessages.send(p.id, { type: 'system', rawContent: 'Date confirmed', filteredContent: `${Auth.myName()} confirmed the date` });
     Badges.update();
     U.toast('Event confirmed ✓');
     Router.go('parlay-detail', { id: p.id });
   });
 
-  // Reopen
+  // Reopen — transitions terminal states back to in_discussion
   el.querySelector('#reopen-btn')?.addEventListener('click', async () => {
-    await Store.updateParlay(p.id, { status: 'in_discussion', resolution: null });
+    await Store.updateParlay(p.id, { status: 'in_discussion', resolution: null, lastActivityBy: Auth.myUid() });
+    await EventMessages.send(p.id, { type: 'system', rawContent: `${Auth.myName()} reopened`, filteredContent: `${Auth.myName()} reopened the event` });
     Badges.update();
     U.toast('Reopened');
     Router.go('parlay-detail', { id: p.id });
@@ -7477,8 +7559,12 @@ Router.register('parlay-detail', ({ id } = {}) => {
   el.querySelector('#manage-btn')?.addEventListener('click', async () => {
     const options = [];
     // Edit only if creator and no partner response yet
-    if (p.isMine && p.status === 'pending_partner') {
+    if (p.isMine && p.status === 'proposed') {
       options.push({ key: 'edit', label: '✏️ Edit proposal', cls: 'btn-outline' });
+    }
+    // Cancel only for accepted events
+    if (p.status === 'accepted') {
+      options.push({ key: 'cancel', label: '✕ Cancel event', cls: 'btn-outline' });
     }
     options.push({ key: 'archive', label: '📦 Archive', cls: 'btn-outline' });
     options.push({ key: 'delete', label: '🗑 Delete', cls: 'btn-danger' });
@@ -7486,6 +7572,12 @@ Router.register('parlay-detail', ({ id } = {}) => {
     const action = await U.sheet('Manage Event', options);
     if (action === 'edit') {
       Router.go('compose', { topicId: p.topicId, editId: p.id });
+    } else if (action === 'cancel') {
+      await Store.updateParlay(p.id, { status: 'cancelled', lastActivityBy: Auth.myUid() });
+      await EventMessages.send(p.id, { type: 'system', rawContent: `${Auth.myName()} cancelled`, filteredContent: `${Auth.myName()} cancelled the event` });
+      Badges.update();
+      U.toast('Cancelled');
+      Router.go('plan');
     } else if (action === 'archive') {
       await Store.updateParlay(p.id, { archived: true });
       U.toast('Archived');
@@ -7601,7 +7693,7 @@ Router.register('parlay-reply', ({ id } = {}) => {
       partnerRawReply: raw || p.partnerRawReply,
       partnerFilteredReply: filtered || p.partnerFilteredReply,
       counterDates,
-      status: 'counter_proposed',
+      status: 'countered',
       lastActivityBy: Auth.myUid(),
     });
 
@@ -9464,7 +9556,7 @@ const ConvoAnalytics = (() => {
         id: p.id,
         isMine: p.isMine,
       });
-      if (p.status === 'resolved') {
+      if (ParlayStateMachine.isTerminal(p.status)) {
         events.push({
           type: 'parlay',
           subtype: 'resolved',
@@ -9525,7 +9617,7 @@ const ConvoAnalytics = (() => {
   function resolutionRate() {
     const parlays = Store.parlays();
     if (parlays.length === 0) return { rate: 0, resolved: 0, total: 0 };
-    const resolved = parlays.filter(p => p.status === 'resolved').length;
+    const resolved = parlays.filter(p => ParlayStateMachine.isTerminal(p.status)).length;
     return { rate: parlays.length > 0 ? Math.round((resolved / parlays.length) * 100) : 0, resolved, total: parlays.length };
   }
 
@@ -9543,9 +9635,9 @@ const ConvoAnalytics = (() => {
     const parlays = Store.parlays().slice(-10);
     return parlays.map(p => {
       let sentiment = 'neutral';
-      if (p.status === 'resolved') sentiment = 'positive';
-      else if (p.status === 'declined' || p.status === 'counter_proposed') sentiment = 'mixed';
-      else if (p.status === 'active' || p.status === 'in_discussion') sentiment = 'engaged';
+      if (ParlayStateMachine.isTerminal(p.status)) sentiment = 'positive';
+      else if (p.status === 'declined' || p.status === 'countered') sentiment = 'mixed';
+      else if (p.status === 'in_discussion' || p.status === 'proposed') sentiment = 'engaged';
       return { title: p.title, sentiment, date: p.date };
     });
   }
@@ -9575,7 +9667,7 @@ const ConvoAnalytics = (() => {
   // Win streaks — consecutive days with positive activity
   function winStreaks() {
     const parlays = Store.parlays();
-    const resolved = parlays.filter(p => p.status === 'resolved').length;
+    const resolved = parlays.filter(p => ParlayStateMachine.isTerminal(p.status)).length;
     const tasks = Store.tasks();
     const done = tasks.filter(t => t.status === 'done').length;
     return {
@@ -9763,7 +9855,7 @@ const Tips = (() => {
     },
     'guided-convo': {
       trigger: () => {
-        const stale = Store.parlays().filter(p => p.status === 'pending_partner' || p.status === 'in_discussion');
+        const stale = Store.parlays().filter(p => p.status === 'proposed' || p.status === 'in_discussion');
         return stale.length > 0 && !_tipsSeen().includes('guided-convo');
       },
       title: 'Try a guided conversation',
@@ -9976,8 +10068,8 @@ const AIContext = (() => {
 
     // Recent activity summary
     const parlays = Store.parlays();
-    const recentResolved = parlays.filter(p => p.status === 'resolved').length;
-    const recentPending = parlays.filter(p => p.status === 'pending_partner').length;
+    const recentResolved = parlays.filter(p => ParlayStateMachine.isTerminal(p.status)).length;
+    const recentPending = parlays.filter(p => p.status === 'proposed').length;
     parts.push(`ACTIVITY: ${parlays.length} total plans, ${recentResolved} resolved, ${recentPending} awaiting response`);
 
     // Appreciation count
@@ -11157,7 +11249,7 @@ const CalendarEngine = (() => {
 
     // Parlays with dates
     Store.parlays().forEach(p => {
-      if (p.confirmedDate && p.confirmedDate === dateStr) {
+      if (p.confirmedDate && (p.confirmedDate.date === dateStr || p.confirmedDate === dateStr)) {
         const topic = TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9];
         events.push({
           id: p.id, type: 'confirmed', icon: topic.icon,
@@ -11535,7 +11627,7 @@ const ReflectionStore = (() => {
 const Milestones = (() => {
   const DEFINITIONS = [
     { id: 'first-parlay', icon: '🎯', title: 'First Proposal', desc: 'Sent your first parlay proposal', check: () => Store.parlays().length >= 1 },
-    { id: 'first-resolved', icon: '🤝', title: 'First Resolution', desc: 'Successfully resolved a parlay together', check: () => Store.parlays().some(p => p.status === 'resolved') },
+    { id: 'first-resolved', icon: '🤝', title: 'First Resolution', desc: 'Successfully resolved a parlay together', check: () => Store.parlays().some(p => ParlayStateMachine.isTerminal(p.status)) },
     { id: 'five-parlays', icon: '📋', title: 'Active Communicator', desc: 'Created 5 or more proposals', check: () => Store.parlays().length >= 5 },
     { id: 'first-task', icon: '✅', title: 'Task Master', desc: 'Created your first task', check: () => Store.tasks().length >= 1 },
     { id: 'five-tasks-done', icon: '🏆', title: 'Getting Things Done', desc: 'Completed 5 tasks together', check: () => Store.tasks().filter(t => t.status === 'done').length >= 5 },
@@ -11547,7 +11639,7 @@ const Milestones = (() => {
     { id: 'mediator-used', icon: '🤖', title: 'AI Ally', desc: 'Used the AI Mediator for guidance', check: () => {
       try { return MediatorChat.messages().length > 1; } catch { return false; }
     }},
-    { id: 'ten-resolved', icon: '🎉', title: 'Power Couple', desc: 'Resolved 10+ proposals together', check: () => Store.parlays().filter(p => p.status === 'resolved').length >= 10 },
+    { id: 'ten-resolved', icon: '🎉', title: 'Power Couple', desc: 'Resolved 10+ proposals together', check: () => Store.parlays().filter(p => ParlayStateMachine.isTerminal(p.status)).length >= 10 },
   ];
 
   function getAll() {
@@ -12291,7 +12383,7 @@ Router.register('parlay-thread', ({ id } = {}) => {
   if (!p) return `<div style="padding:60px 24px;text-align:center;">Thread not found.<br><button class="btn btn-outline btn-sm" style="margin-top:16px;" onclick="Router.go('plan')">‹ Back</button></div>`;
 
   const topic = TOPICS_V2.find(t => t.id === p.topicId) || TOPICS_V2[9];
-  const msgs = EventMessages.list(id);
+  const msgs = EventMessages.getForEvent(id);
   const myN = Auth.myName();
   const theirN = Auth.theirName();
 
@@ -12310,7 +12402,7 @@ Router.register('parlay-thread', ({ id } = {}) => {
     <!-- Messages -->
     <div style="flex:1;overflow-y:auto;padding:16px 20px;" id="thread-messages">
       ${msgs.length > 0 ? msgs.map(m => {
-        const isMe = m.fromUid === Auth.myUid() || m.from === 'me';
+        const isMe = m.isMine || m.senderUid === Auth.myUid();
         const isSystem = m.type === 'system';
         if (isSystem) {
           return `
@@ -12327,7 +12419,7 @@ Router.register('parlay-thread', ({ id } = {}) => {
             <div style="font-size:.62rem;font-weight:600;margin-bottom:3px;${isMe ? 'opacity:.8;' : 'color:var(--muted);'}">${isMe ? myN : theirN}</div>
             <div style="font-size:.85rem;line-height:1.55;">${U.esc(m.filteredContent || m.rawContent)}</div>
             <div style="font-size:.58rem;${isMe ? 'opacity:.6;' : 'color:var(--muted);'}margin-top:4px;text-align:right;">
-              ${m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
+              ${m.createdAt ? new Date(m.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
               ${m.filteredContent && m.filteredContent !== m.rawContent ? ' · ✓ Filtered' : ''}
             </div>
           </div>
@@ -12352,6 +12444,12 @@ Router.register('parlay-thread', ({ id } = {}) => {
   const textarea = el.querySelector('#thread-input');
   const coach = el.querySelector('#thread-coach');
   if (textarea && coach) ToneCoach.attachToTextarea(textarea, coach);
+
+  // Load messages from DB (ensures thread is fresh)
+  EventMessages.loadForEvent(id).then(() => {
+    const msgs = EventMessages.getForEvent(id);
+    if (msgs.length > 0) Router.reload();
+  });
 
   // Auto-resize textarea
   textarea?.addEventListener('input', () => {
@@ -12382,6 +12480,14 @@ Router.register('parlay-thread', ({ id } = {}) => {
       rawContent: text,
       filteredContent: filtered,
     });
+
+    // Transition to in_discussion if in a proposal state
+    const p = Store.findParlay(id);
+    if (p && ParlayStateMachine.isActive(p.status) && p.status !== 'in_discussion') {
+      await Store.updateParlay(id, { status: 'in_discussion', lastActivityBy: Auth.myUid() });
+    } else if (p) {
+      await Store.updateParlay(id, { lastActivityBy: Auth.myUid() });
+    }
 
     textarea.value = '';
     textarea.style.height = 'auto';
@@ -15822,7 +15928,7 @@ const CoupleStats = (() => {
     const conflicts = ConflictTracker.all();
     const goals = GoalStore.all();
 
-    const resolved = parlays.filter(p => p.status === 'resolved');
+    const resolved = parlays.filter(p => ParlayStateMachine.isTerminal(p.status));
     const resolvedPct = parlays.length > 0 ? Math.round(resolved.length / parlays.length * 100) : 0;
     const completedTasks = tasks.filter(t => t.status === 'completed');
     const taskPct = tasks.length > 0 ? Math.round(completedTasks.length / tasks.length * 100) : 0;
@@ -17272,7 +17378,7 @@ Router.register('timeline', () => {
       type: 'parlay',
       icon: topic.icon,
       title: p.title,
-      subtitle: p.status === 'resolved' ? 'Resolved' : p.status,
+      subtitle: ParlayStateMachine.isTerminal(p.status) ? (p.status === 'accepted' ? 'Accepted' : p.status) : p.status,
       color: '#C4714A',
       route: 'parlay-detail',
       id: p.id,
