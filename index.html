@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Parlay helps couples plan events, negotiate decisions, and manage tasks — with AI-powered tone filtering to keep things calm.">
+<meta name="description" content="HoneyCal helps couples plan events, negotiate decisions, and manage tasks — with AI-powered tone filtering to keep things calm.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a1208">
-<title>Parlay — for couples who talk it through</title>
+<title>HoneyCal — for couples who talk it through</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -1675,6 +1675,16 @@ select.input {
 .cc-bubble-wrap.swiping .cc-swipe-hint { opacity: 1; }
 
 /* ═══════════════════════════════════════════════
+   GOOGLE CALENDAR BADGE
+   ═══════════════════════════════════════════════ */
+.gcal-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .58rem; font-weight: 600; color: #4285F4;
+  background: rgba(66,133,244,.1); padding: 2px 6px;
+  border-radius: 4px; letter-spacing: .02em;
+}
+
+/* ═══════════════════════════════════════════════
    CALENDAR
    ═══════════════════════════════════════════════ */
 .cal-wrapper {
@@ -2136,8 +2146,8 @@ select.input {
 //     1. Bump VERSION (semver: major.minor.patch)
 //     2. Set BUILD_DATE to current UTC timestamp
 //     See CLAUDE.md for full release instructions.
-const VERSION = '7.0.0';
-const BUILD_DATE = '2026-03-13T12:00:00Z';
+const VERSION = '8.0.0';
+const BUILD_DATE = '2026-03-14T12:00:00Z';
 
 // ── DEV MODE ────────────────────────────────────
 // Activate: add ?dev=1 to URL
@@ -2160,8 +2170,8 @@ const DEMO = {
   currentPartner: 'A',  // 'A' or 'B'
 
   partners: {
-    A: { uid: 'demo-uid-a', name: 'Alex', email: 'alex@demo.parlay' },
-    B: { uid: 'demo-uid-b', name: 'Jordan', email: 'jordan@demo.parlay' },
+    A: { uid: 'demo-uid-a', name: 'Alex', email: 'alex@demo.honeycal' },
+    B: { uid: 'demo-uid-b', name: 'Jordan', email: 'jordan@demo.honeycal' },
   },
 
   couple: {
@@ -2364,7 +2374,7 @@ const DEMO = {
     this._mockChatMessages = [
       { id: 'mc-1', role: 'system', text: 'Welcome! I\'m your relationship mediator. Ask me anything about communication, planning, or how you\'re doing as a couple.', timestamp: ago(2) },
       { id: 'mc-2', role: 'user', text: 'How can we communicate better as a couple?', timestamp: ago(1.5) },
-      { id: 'mc-3', role: 'ai', text: 'Great question! Research shows three things make the biggest difference: 1) responding to each other\'s small bids for connection, 2) expressing appreciation daily, and 3) using "I" statements during disagreements. You\'re already using Parlay to filter tone — that\'s a great start!', timestamp: ago(1.5) },
+      { id: 'mc-3', role: 'ai', text: 'Great question! Research shows three things make the biggest difference: 1) responding to each other\'s small bids for connection, 2) expressing appreciation daily, and 3) using "I" statements during disagreements. You\'re already using HoneyCal to filter tone — that\'s a great start!', timestamp: ago(1.5) },
     ];
 
     // Mock comm profile
@@ -3519,14 +3529,14 @@ const Store = (() => {
       const row = _parlayToRow(parlay);
       if (!row.couple_id) {
         console.error('[Store] addParlay: missing couple_id');
-        U.toast('⚠️ Parlay data incomplete — please refresh and try again');
+        U.toast('⚠️ HoneyCal data incomplete — please refresh and try again');
         _parlays = _parlays.filter(p => p.id !== parlay.id); // roll back
         return;
       }
       await Auth.sb().from('negotiations').upsert(row, { onConflict: 'id' });
     } catch(e) {
       console.error('[Store] addParlay DB error:', e);
-      U.toast('⚠️ Parlay may not have synced');
+      U.toast('⚠️ HoneyCal may not have synced');
     }
   }
 
@@ -4122,7 +4132,7 @@ const ToneCoach = (() => {
     { rx: /\byou don'?t (care|listen|try)\b/i, level: 'warn', msg: 'Character judgments trigger defensiveness. Try describing how you feel instead.' },
     { rx: /\bwhy can'?t you\b/i, level: 'warn', msg: 'This can sound demanding. Try "I\'d appreciate if..." instead.' },
     { rx: /\byou('re| are) (so|such a)\b/i, level: 'warn', msg: 'Labeling can shut down dialogue. Focus on the behavior, not the person.' },
-    { rx: /\bfuck|shit|bitch|damn|hell|crap\b/i, level: 'warn', msg: 'Strong language can escalate. Parlay will soften this, but starting calmer helps you feel calmer too.' },
+    { rx: /\bfuck|shit|bitch|damn|hell|crap\b/i, level: 'warn', msg: 'Strong language can escalate. HoneyCal will soften this, but starting calmer helps you feel calmer too.' },
     { rx: /\bI feel\b/i, level: 'gentle', msg: '"I feel" statements are great — they express your experience without blaming.' },
     { rx: /\bI('d| would) (love|like|appreciate)\b/i, level: 'gentle', msg: 'Nice! Framing requests positively makes them easier to hear.' },
     { rx: /\bcould we\b/i, level: 'gentle', msg: 'Using "we" shows you\'re approaching this as a team.' },
@@ -4593,7 +4603,7 @@ const MediatorChat = (() => {
       }
     } catch(e) {
       // Fallback to basic system prompt
-      systemPrompt = `You are Parlay's AI Mediator — a warm, wise relationship coach embedded in a couples planning app. Your role is to help ${myN} and ${theirN} communicate better.
+      systemPrompt = `You are HoneyCal's AI Mediator — a warm, wise relationship coach embedded in a couples planning app. Your role is to help ${myN} and ${theirN} communicate better.
 
 TONE: ${tone?.label || 'Neutral'} — ${tone?.filterInstructions || 'Be balanced and clear.'}
 
@@ -4675,7 +4685,7 @@ RULES:
       } else if (lower.includes('difficult conversation') || lower.includes('bring up')) {
         response = "Starting tough conversations is actually one of the bravest things you can do for your relationship. Try this: pick a calm moment (not right after work), start with 'I've been thinking about...' rather than 'We need to talk,' and lead with how you feel rather than what they did. Would you like to practice what you want to say?";
       } else if (lower.includes('communicate better')) {
-        response = "Great question! Research shows three things make the biggest difference: 1) responding to each other's small bids for connection (like when one of you shares something about your day), 2) expressing appreciation daily, and 3) using 'I' statements during disagreements. You're already using Parlay to filter tone — that's a great start!";
+        response = "Great question! Research shows three things make the biggest difference: 1) responding to each other's small bids for connection (like when one of you shares something about your day), 2) expressing appreciation daily, and 3) using 'I' statements during disagreements. You're already using HoneyCal to filter tone — that's a great start!";
       } else if (lower.includes('doing well')) {
         response = `From what I can see, you and ${Auth.theirName()} are actively planning together and managing tasks — that shows real teamwork! The fact that you're using a tool to communicate more thoughtfully says a lot about your commitment. Keep celebrating these small wins together.`;
       } else if (lower.includes('approach') || lower.includes('plan')) {
@@ -5110,7 +5120,7 @@ const DemoRewriter = (() => {
       return JSON.stringify({
         flag: hasHeat,
         horseman,
-        note: hasHeat ? "That's okay — Parlay will cool it down for you." : ''
+        note: hasHeat ? "That's okay — HoneyCal will cool it down for you." : ''
       });
     }
 
@@ -5652,7 +5662,7 @@ async function runToneFilter(rawText, intentContext = '') {
     : '';
 
   return AI.call(
-    `You are Parlay's Communication Translator — an expert in couples communication grounded in research-backed relationship psychology.
+    `You are HoneyCal's Communication Translator — an expert in couples communication grounded in research-backed relationship psychology.
 
 ═══ PHASE 1: DECODE THE MESSAGE ═══
 
@@ -5720,7 +5730,7 @@ async function generateProposal(parlay) {
   const recipientPrefs = getRecipientPrefsPrompt();
 
   const raw = await AI.call(
-    `You are Parlay's Compromise Generator for a couple (${creatorN} and ${recipN}).
+    `You are HoneyCal's Compromise Generator for a couple (${creatorN} and ${recipN}).
 
 Given two positions, create a fair compromise that:
 1. Acknowledges both people's needs
@@ -5757,7 +5767,7 @@ async function filterTaskContext(rawContext) {
   if (!rawContext || rawContext.length < 10) return rawContext;
   try {
     return await AI.call(
-      `You are Parlay's Communication Translator. Rewrite this task description using relationship-safe communication:
+      `You are HoneyCal's Communication Translator. Rewrite this task description using relationship-safe communication:
 • Remove blame, criticism, or passive aggression
 • Frame as a team need, not a personal failing ("We need…" or "This needs…")
 • Keep it brief and actionable — facts only, no emotional loading
@@ -5902,7 +5912,7 @@ const GOOGLE_SVG = `<svg width="18" height="18" viewBox="0 0 48 48"><path fill="
 Router.register('auth-entry', () => `
   <div style="width:100%;height:100dvh;background:var(--espresso);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;">
     <div style="font-family:var(--font-display);font-size:5rem;font-weight:300;color:var(--cream);line-height:1;" class="a1">
-      Par<em style="font-style:italic;color:var(--amber)">lay</em>
+      Honey<em style="font-style:italic;color:var(--amber)">Cal</em>
     </div>
     <div style="font-size:.72rem;color:rgba(250,246,241,.65);letter-spacing:.2em;text-transform:uppercase;margin:10px 0 48px;" class="a1">
       for couples who talk it through
@@ -6105,7 +6115,7 @@ Router.register('ob-couple', () => {
     </div>
 
     <div style="font-family:var(--font-display);font-size:2rem;color:var(--cream);margin-bottom:6px;" class="a1">Connect with your <em style="color:var(--amber)">partner</em></div>
-    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:12px;" class="a1">Parlay works best when both partners are connected. Choose how to get started:</div>
+    <div style="font-size:.82rem;color:rgba(250,246,241,.65);margin-bottom:12px;" class="a1">HoneyCal works best when both partners are connected. Choose how to get started:</div>
 
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px;" class="a2">
       <!-- Option 1: I'm first -->
@@ -6203,7 +6213,7 @@ Router.register('ob-join', () => `
 
     <div style="margin-top:32px;padding:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-lg);" class="a3">
       <div style="font-size:.72rem;color:rgba(250,246,241,.45);line-height:1.6;text-align:center;">
-        Can't find the code? Ask your partner to open <strong style="color:var(--amber);">Settings → Partner</strong> in their Parlay app to see or reshare the code.
+        Can't find the code? Ask your partner to open <strong style="color:var(--amber);">Settings → Partner</strong> in their HoneyCal app to see or reshare the code.
       </div>
     </div>
   </div>
@@ -6486,7 +6496,7 @@ Router.register('home', () => {
     <div class="mod-card a4" onclick="Router.go('plan')">
       <div class="mod-icon" style="background:rgba(196,113,74,.1);">📅</div>
       <div style="flex:1;">
-        <div style="font-size:.9rem;font-weight:600;">${activeParlays.length > 0 ? activeParlays.length + ' active parlay' + (activeParlays.length !== 1 ? 's' : '') : 'Plan an Event'}</div>
+        <div style="font-size:.9rem;font-weight:600;">${activeParlays.length > 0 ? activeParlays.length + ' active plan' + (activeParlays.length !== 1 ? 's' : '') : 'Plan an Event'}</div>
         <div style="font-size:.75rem;color:var(--muted);">${activeParlays.length > 0 ? 'Tap to view' : 'Date nights, family visits, trips'}</div>
       </div>
       <div style="color:var(--muted);font-size:1.2rem;">›</div>
@@ -6559,7 +6569,7 @@ Router.register('home', () => {
     </div>
     ` : ''}
 
-    <div style="text-align:center;padding:12px 0 8px;font-size:.65rem;color:var(--border);">Parlay v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+    <div style="text-align:center;padding:12px 0 8px;font-size:.65rem;color:var(--border);">HoneyCal v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
   </div>`;
 }, (el) => {
   Badges.update();
@@ -6789,7 +6799,7 @@ Router.register('compose-pick', () => `
       <span style="font-family:var(--font-display);font-size:1.1rem;">New Event</span>
     </div>
     <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;" class="a1">What are you <em style="color:var(--terra)">planning?</em></div>
-    <div style="font-size:.82rem;color:var(--muted);margin-bottom:24px;line-height:1.6;" class="a2">Pick a type — Parlay handles the rest.</div>
+    <div style="font-size:.82rem;color:var(--muted);margin-bottom:24px;line-height:1.6;" class="a2">Pick a type — HoneyCal handles the rest.</div>
     <div class="topic-grid a3">
       ${TOPICS_V2.map(t => `
         <div class="topic-card" data-topic="${t.id}">
@@ -6870,14 +6880,14 @@ Router.register('compose', ({ topicId, editId } = {}) => {
         <div id="note-area" style="display:none;">
           <textarea id="compose-text" class="input" rows="3" placeholder="Optional — add context, feelings, or details..." style="resize:none;line-height:1.6;"></textarea>
           <div class="tone-coach tone-coach-hidden" id="compose-coach"></div>
-          <div style="font-size:.68rem;color:var(--muted);margin-top:4px;">🔒 Filtered by Parlay before ${U.esc(theirN)} sees it</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-top:4px;">🔒 Filtered by HoneyCal before ${U.esc(theirN)} sees it</div>
         </div>
       </div>
 
       <!-- Tone warning -->
       <div id="tone-warn" style="display:none;padding:12px 14px;background:#FFF5E0;border:1px solid #E8B88A;border-radius:var(--r-md);font-size:.78rem;color:#8A6A2A;line-height:1.5;">
-        <div style="font-weight:700;margin-bottom:3px;" id="warn-head">⚡ Parlay detected some heat</div>
-        <div id="warn-body">That's okay — Parlay will cool it down before sending.</div>
+        <div style="font-weight:700;margin-bottom:3px;" id="warn-head">⚡ HoneyCal detected some heat</div>
+        <div id="warn-body">That's okay — HoneyCal will cool it down before sending.</div>
       </div>
 
       <div style="background:var(--parchment);border-radius:var(--r-md);padding:12px 14px;margin-top:4px;">
@@ -7045,7 +7055,7 @@ Router.register('compose', ({ topicId, editId } = {}) => {
             const h = el.querySelector('#warn-head');
             const b = el.querySelector('#warn-body');
             if (h) h.textContent = parsed.horseman === 'contempt' ? '🚨 Contempt detected' : '⚡ Some heat detected';
-            if (b) b.textContent = parsed.note || "That's okay — Parlay will cool it down.";
+            if (b) b.textContent = parsed.note || "That's okay — HoneyCal will cool it down.";
             warn.style.display = 'block';
           } else if (warn) { warn.style.display = 'none'; }
         } catch(e) { /* best-effort */ }
@@ -7262,7 +7272,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
     const pr = typeof p.proposal === 'string' ? (() => { try { return JSON.parse(p.proposal); } catch { return { proposal: p.proposal }; } })() : p.proposal;
     proposalHtml = `
     <div style="margin:16px 0;padding:16px;background:linear-gradient(135deg,rgba(122,106,155,.08),rgba(122,158,138,.06));border:1.5px solid rgba(122,106,155,.25);border-radius:var(--r-lg);">
-      <div class="input-label" style="color:var(--purple);">⚖️ Parlay's Proposal</div>
+      <div class="input-label" style="color:var(--purple);">⚖️ HoneyCal's Proposal</div>
       <div style="font-size:.88rem;line-height:1.65;margin-bottom:8px;">${pr.proposal || ''}</div>
       ${pr.reasoning ? `<div style="font-size:.76rem;color:var(--muted);line-height:1.5;padding-top:8px;border-top:1px solid rgba(122,106,155,.15);font-style:italic;">${pr.reasoning}</div>` : ''}
     </div>`;
@@ -7328,9 +7338,10 @@ Router.register('parlay-detail', ({ id } = {}) => {
     actionHtml = `<div style="text-align:center;padding:16px;background:#EDF4F0;border:1.5px solid var(--sage);border-radius:var(--r-md);">
       <div style="font-size:1.5rem;margin-bottom:6px;">${p.confirmedDate ? '🎉' : '✓'}</div>
       <div style="font-size:.92rem;color:var(--sage);font-weight:700;">${p.confirmedDate ? 'Event Confirmed' : 'Accepted'}</div>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px;">
         <button class="btn btn-outline btn-sm" id="complete-btn">✓ Mark Complete</button>
         <button class="btn btn-outline btn-sm" id="reopen-btn">↻ Reopen</button>
+        ${GoogleCalendar.isConnected() && p.confirmedDate ? '<button class="btn btn-outline btn-sm" style="color:#4285F4;border-color:#4285F4;" id="gcal-push-btn">📆 Add to Google Calendar</button>' : ''}
       </div>
     </div>`;
   } else if (p.status === 'declined') {
@@ -7397,7 +7408,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
       <div class="input-label">${isMine ? 'Your note' : creatorN + "'s note"}</div>
       <div style="padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);">
         <div style="font-size:.85rem;line-height:1.65;">${U.esc(p.filteredInput)}</div>
-        <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by Parlay</div>
+        <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by HoneyCal</div>
       </div>
     </div>` : ''}
 
@@ -7409,7 +7420,7 @@ Router.register('parlay-detail', ({ id } = {}) => {
       <div class="input-label">${!isMine ? 'Your response' : recipN + "'s response"}</div>
       <div style="padding:12px 14px;background:var(--surface);border:1px solid rgba(122,106,155,.25);border-radius:var(--r-md);">
         <div style="font-size:.85rem;line-height:1.65;">${U.esc(p.partnerFilteredReply)}</div>
-        <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by Parlay</div>
+        <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by HoneyCal</div>
       </div>
     </div>` : ''}
 
@@ -7443,9 +7454,27 @@ Router.register('parlay-detail', ({ id } = {}) => {
     const confirmedDate = p.dateOptions?.length === 1 ? p.dateOptions[0] : p.confirmedDate;
     await Store.updateParlay(p.id, { status: 'accepted', resolution, confirmedDate, lastActivityBy: Auth.myUid() });
     await EventMessages.send(p.id, { type: 'system', rawContent: `${Auth.myName()} accepted the proposal`, filteredContent: `${Auth.myName()} accepted the proposal` });
+    // Auto-push to Google Calendar if enabled
+    if (GoogleCalendar.isConnected() && Store.get('gcal_auto_push')) {
+      const updated = Store.findParlay(p.id);
+      if (updated?.confirmedDate) GoogleCalendar.pushToGoogle(updated).catch(e => console.warn('[GCal] Auto-push failed:', e));
+    }
     Badges.update();
     U.toast('Accepted ✓');
     Router.go('parlay-detail', { id: p.id });
+  });
+
+  // Push to Google Calendar
+  el.querySelector('#gcal-push-btn')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#gcal-push-btn');
+    btn.disabled = true; btn.textContent = 'Pushing...';
+    try {
+      await GoogleCalendar.pushToGoogle(p);
+      U.toast('Added to Google Calendar!');
+    } catch(e) {
+      U.toast('Failed: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = '📆 Add to Google Calendar';
   });
 
   // Complete — transitions accepted to completed
@@ -7541,6 +7570,11 @@ Router.register('parlay-detail', ({ id } = {}) => {
     const selectedOpt = p.counterDates?.find(o => o.id === _selectedCounterDate);
     await Store.updateParlay(p.id, { confirmedDate: selectedOpt || { id: _selectedCounterDate }, status: 'accepted', resolution: 'date_accepted', lastActivityBy: Auth.myUid() });
     await EventMessages.send(p.id, { type: 'system', rawContent: 'Date confirmed', filteredContent: `${Auth.myName()} confirmed the date` });
+    // Auto-push to Google Calendar if enabled
+    if (GoogleCalendar.isConnected() && Store.get('gcal_auto_push')) {
+      const updated = Store.findParlay(p.id);
+      if (updated?.confirmedDate) GoogleCalendar.pushToGoogle(updated).catch(e => console.warn('[GCal] Auto-push failed:', e));
+    }
     Badges.update();
     U.toast('Event confirmed ✓');
     Router.go('parlay-detail', { id: p.id });
@@ -7972,7 +8006,7 @@ Router.register('task-new-details', ({ title = '', icon = '', categoryId = 'othe
         </div>
         <div id="tnd-note-area" style="display:none;">
           <textarea id="tnd-context" class="input" rows="3" placeholder="Why, when, any specifics..." style="resize:none;line-height:1.6;"></textarea>
-          <div style="font-size:.68rem;color:var(--muted);margin-top:4px;">🔒 Filtered by Parlay before ${U.esc(theirN)} sees it</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-top:4px;">🔒 Filtered by HoneyCal before ${U.esc(theirN)} sees it</div>
         </div>
       </div>
 
@@ -8176,7 +8210,7 @@ Router.register('task-detail', ({ id } = {}) => {
     <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:16px;" class="a3">
       <div class="input-label">Details</div>
       <div style="font-size:.88rem;line-height:1.65;">${U.esc(t.filteredContext || t.context)}</div>
-      <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by Parlay</div>
+      <div style="font-size:.65rem;color:var(--sage);margin-top:6px;">✓ Filtered by HoneyCal</div>
     </div>` : ''}
 
     ${actionHtml}
@@ -8225,7 +8259,7 @@ Router.register('task-detail', ({ id } = {}) => {
     let filtered = msg;
     try {
       filtered = await AI.call(
-        `You are Parlay's Communication Translator. Rewrite this task counter-proposal using relationship-safe communication:
+        `You are HoneyCal's Communication Translator. Rewrite this task counter-proposal using relationship-safe communication:
 • Convert any criticism to a soft startup (specific behavior + feeling + need)
 • Remove blame, contempt, or defensiveness entirely
 • Replace demands with invitations ("Would it work if…" / "How about…")
@@ -8266,7 +8300,7 @@ Router.register('task-detail', ({ id } = {}) => {
     if (reason) {
       try {
         filtered = await AI.call(
-          `You are Parlay's Communication Translator. Rewrite this task decline using relationship-safe communication:
+          `You are HoneyCal's Communication Translator. Rewrite this task decline using relationship-safe communication:
 • Frame the boundary with care — declining is healthy, HOW you decline matters
 • Remove any contempt, blame, or passive aggression entirely
 • If possible, acknowledge the ask before stating the boundary
@@ -8397,7 +8431,7 @@ Router.register('setup', () => {
         <div class="mod-icon" style="background:rgba(196,113,74,.1);">❤️</div>
         <div style="flex:1;">
           <div style="font-size:.9rem;font-weight:600;">About ${U.esc(theirN)}</div>
-          <div style="font-size:.75rem;color:var(--muted);">${PartnerProfile.isComplete() ? 'Profile complete' : 'Help Parlay understand your partner'}</div>
+          <div style="font-size:.75rem;color:var(--muted);">${PartnerProfile.isComplete() ? 'Profile complete' : 'Help HoneyCal understand your partner'}</div>
         </div>
         <div style="color:var(--muted);">›</div>
       </div>
@@ -8414,6 +8448,14 @@ Router.register('setup', () => {
         <div style="flex:1;">
           <div style="font-size:.9rem;font-weight:600;">Schedule & Calendar</div>
           <div style="font-size:.75rem;color:var(--muted);">Upcoming dates & availability</div>
+        </div>
+        <div style="color:var(--muted);">›</div>
+      </div>
+      <div class="mod-card" onclick="Router.go('gcal-settings')">
+        <div class="mod-icon" style="background:rgba(66,133,244,.1);">📆</div>
+        <div style="flex:1;">
+          <div style="font-size:.9rem;font-weight:600;">Google Calendar</div>
+          <div style="font-size:.75rem;color:var(--muted);">${GoogleCalendar.isConnected() ? 'Connected · ' + (GoogleCalendar.connectedEmail() || 'Syncing') : 'Connect to sync events'}</div>
         </div>
         <div style="color:var(--muted);">›</div>
       </div>
@@ -8437,7 +8479,7 @@ Router.register('setup', () => {
 
     <div style="padding:28px 20px;text-align:center;" class="a4">
       <button class="btn btn-danger" style="max-width:220px;margin:0 auto;" id="signout-btn">Sign Out</button>
-      <div style="margin-top:16px;font-size:.65rem;color:var(--border);">Parlay v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+      <div style="margin-top:16px;font-size:.65rem;color:var(--border);">HoneyCal v${VERSION} · ${new Date(BUILD_DATE).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
     </div>
   </div>`;
 }, (el) => {
@@ -8448,6 +8490,319 @@ Router.register('setup', () => {
     if (action === 'signout') Auth.signOut();
   });
   // Partner card now links to partner-hub via onclick
+});
+
+
+// ──────────────────────────────────────────────
+// GOOGLE CALENDAR SETTINGS
+// ──────────────────────────────────────────────
+Router.register('gcal-settings', () => {
+  const connected = GoogleCalendar.isConnected();
+  const email = GoogleCalendar.connectedEmail();
+  const lastSync = GoogleCalendar.lastSyncTime();
+  const clientId = GoogleCalendar.getClientId() || '';
+  const eventCount = GoogleCalendar.events().length;
+
+  return `
+  <div style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(100px,env(safe-area-inset-bottom));">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
+      <button class="btn btn-outline btn-sm" onclick="Router.go('setup')">‹ Back</button>
+      <span style="font-family:var(--font-display);font-size:1.1rem;">Google Calendar</span>
+    </div>
+
+    <div style="text-align:center;margin-bottom:28px;" class="a2">
+      <div style="font-size:2.5rem;margin-bottom:8px;">📆</div>
+      <div style="font-size:.85rem;color:var(--muted);line-height:1.6;">
+        Sync your Google Calendar with HoneyCal to see all your events in one place and push confirmed plans to your calendar.
+      </div>
+    </div>
+
+    <!-- Client ID Configuration -->
+    <div class="insight-card a2" style="margin-bottom:16px;">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;">API Configuration</div>
+      <div class="input-label">Google OAuth Client ID</div>
+      <input id="gcal-client-id" class="input" style="font-size:.8rem;" placeholder="your-client-id.apps.googleusercontent.com" value="${U.esc(clientId)}">
+      <div style="font-size:.62rem;color:var(--muted);margin-top:6px;line-height:1.5;">
+        Create a project in Google Cloud Console, enable the Calendar API, and create an OAuth 2.0 Client ID (Web application type). Add your domain as an authorized redirect URI.
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px;" id="gcal-save-id">Save Client ID</button>
+    </div>
+
+    <!-- Connection Status -->
+    <div class="insight-card a3" style="margin-bottom:16px;">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:12px;">Connection</div>
+      ${connected ? `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="width:40px;height:40px;border-radius:50%;background:rgba(66,133,244,.12);display:flex;align-items:center;justify-content:center;font-size:1.1rem;">✅</div>
+          <div style="flex:1;">
+            <div style="font-size:.85rem;font-weight:600;color:var(--sage);">Connected</div>
+            ${email ? `<div style="font-size:.72rem;color:var(--muted);">${U.esc(email)}</div>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" id="gcal-sync-btn">Sync Now</button>
+          <button class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.2);" id="gcal-disconnect-btn">Disconnect</button>
+        </div>
+        ${lastSync ? `<div style="font-size:.62rem;color:var(--muted);margin-top:8px;">Last synced: ${new Date(lastSync).toLocaleString()}</div>` : ''}
+        <div style="font-size:.62rem;color:var(--muted);margin-top:2px;">${eventCount} events cached</div>
+      ` : `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="width:40px;height:40px;border-radius:50%;background:rgba(232,184,138,.12);display:flex;align-items:center;justify-content:center;font-size:1.1rem;">🔗</div>
+          <div style="flex:1;">
+            <div style="font-size:.85rem;font-weight:600;">Not Connected</div>
+            <div style="font-size:.72rem;color:var(--muted);">Authorize access to your Google Calendar</div>
+          </div>
+        </div>
+        <button class="btn btn-accent" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;" id="gcal-connect-btn" ${!GoogleCalendar.isConfigured() ? 'disabled' : ''}>
+          ${GOOGLE_SVG} Connect Google Calendar
+        </button>
+        ${!GoogleCalendar.isConfigured() ? '<div style="font-size:.62rem;color:var(--terra);margin-top:6px;">Set a Client ID above first</div>' : ''}
+      `}
+    </div>
+
+    <!-- Sync Options -->
+    ${connected ? `
+    <div class="insight-card a4" style="margin-bottom:16px;">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:12px;">Sync Options</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:.82rem;font-weight:600;">Auto-push confirmed events</div>
+            <div style="font-size:.68rem;color:var(--muted);">When a plan is accepted, create a Google Calendar event</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+            <input type="checkbox" id="gcal-auto-push" style="opacity:0;width:0;height:0;" ${Store.get('gcal_auto_push') ? 'checked' : ''}>
+            <span style="position:absolute;inset:0;background:var(--border);border-radius:24px;transition:.2s;"></span>
+            <span style="position:absolute;left:2px;bottom:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></span>
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:.82rem;font-weight:600;">Show Google events in calendar</div>
+            <div style="font-size:.68rem;color:var(--muted);">Display imported Google Calendar events</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+            <input type="checkbox" id="gcal-show-events" style="opacity:0;width:0;height:0;" checked>
+            <span style="position:absolute;inset:0;background:var(--border);border-radius:24px;transition:.2s;"></span>
+            <span style="position:absolute;left:2px;bottom:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="insight-card a5" style="margin-bottom:16px;">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:12px;">Quick Actions</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-outline btn-sm" style="width:100%;text-align:left;" id="gcal-create-event">+ Create Google Calendar Event</button>
+        <button class="btn btn-outline btn-sm" style="width:100%;text-align:left;" id="gcal-push-all">Push all confirmed plans to Google</button>
+      </div>
+    </div>
+    ` : ''}
+  </div>`;
+}, (el) => {
+  // Save Client ID
+  el.querySelector('#gcal-save-id')?.addEventListener('click', () => {
+    const input = el.querySelector('#gcal-client-id');
+    const val = input?.value.trim();
+    if (!val) { U.toast('Please enter a Client ID'); return; }
+    GoogleCalendar.setClientId(val);
+    U.toast('Client ID saved');
+    Router.go('gcal-settings');
+  });
+
+  // Connect button
+  el.querySelector('#gcal-connect-btn')?.addEventListener('click', () => {
+    GoogleCalendar.authorize();
+  });
+
+  // Sync button
+  el.querySelector('#gcal-sync-btn')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#gcal-sync-btn');
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    await GoogleCalendar.syncFromGoogle();
+    U.toast('Sync complete');
+    Router.go('gcal-settings');
+  });
+
+  // Disconnect button
+  el.querySelector('#gcal-disconnect-btn')?.addEventListener('click', async () => {
+    const action = await U.sheet('Disconnect Google Calendar?', [
+      { key: 'disconnect', label: 'Disconnect', cls: 'btn-danger' },
+    ]);
+    if (action === 'disconnect') {
+      GoogleCalendar.disconnect();
+      Router.go('gcal-settings');
+    }
+  });
+
+  // Toggle auto-push
+  el.querySelector('#gcal-auto-push')?.addEventListener('change', (e) => {
+    Store.set('gcal_auto_push', e.target.checked);
+    // Style the toggle
+    const label = e.target.parentElement;
+    const track = label.querySelectorAll('span')[0];
+    const thumb = label.querySelectorAll('span')[1];
+    if (e.target.checked) {
+      track.style.background = 'var(--sage)';
+      thumb.style.transform = 'translateX(20px)';
+    } else {
+      track.style.background = 'var(--border)';
+      thumb.style.transform = 'none';
+    }
+  });
+
+  // Style toggles on load
+  el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    const label = cb.parentElement;
+    const track = label.querySelectorAll('span')[0];
+    const thumb = label.querySelectorAll('span')[1];
+    if (cb.checked) {
+      track.style.background = 'var(--sage)';
+      thumb.style.transform = 'translateX(20px)';
+    }
+  });
+
+  // Toggle show events
+  el.querySelector('#gcal-show-events')?.addEventListener('change', (e) => {
+    Store.set('gcal_show_events', e.target.checked);
+    const label = e.target.parentElement;
+    const track = label.querySelectorAll('span')[0];
+    const thumb = label.querySelectorAll('span')[1];
+    if (e.target.checked) {
+      track.style.background = 'var(--sage)';
+      thumb.style.transform = 'translateX(20px)';
+    } else {
+      track.style.background = 'var(--border)';
+      thumb.style.transform = 'none';
+    }
+  });
+
+  // Create Google Calendar Event
+  el.querySelector('#gcal-create-event')?.addEventListener('click', () => {
+    Router.go('gcal-create');
+  });
+
+  // Push all confirmed plans to Google
+  el.querySelector('#gcal-push-all')?.addEventListener('click', async () => {
+    const btn = el.querySelector('#gcal-push-all');
+    btn.disabled = true;
+    btn.textContent = 'Pushing events...';
+    const confirmed = Store.parlays().filter(p => p.confirmedDate);
+    let pushed = 0;
+    for (const p of confirmed) {
+      try {
+        await GoogleCalendar.pushToGoogle(p);
+        pushed++;
+      } catch(e) { console.warn('[GCal] Push failed for', p.title, e); }
+    }
+    U.toast(`Pushed ${pushed} event${pushed !== 1 ? 's' : ''} to Google Calendar`);
+    Router.go('gcal-settings');
+  });
+});
+
+// ──────────────────────────────────────────────
+// GOOGLE CALENDAR — Create Event Screen
+// ──────────────────────────────────────────────
+Router.register('gcal-create', () => {
+  const today = new Date().toISOString().split('T')[0];
+
+  return `
+  <div style="min-height:100dvh;padding:0 24px;padding-top:max(52px,env(safe-area-inset-top));padding-bottom:max(100px,env(safe-area-inset-bottom));">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;" class="a1">
+      <button class="btn btn-outline btn-sm" onclick="Router.go('gcal-settings')">‹ Back</button>
+      <span style="font-family:var(--font-display);font-size:1.1rem;">New Google Calendar Event</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;" class="a2">
+      <div>
+        <div class="input-label">Event Title</div>
+        <input id="gcal-ev-title" class="input" placeholder="Dinner with friends">
+      </div>
+      <div>
+        <div class="input-label">Description (optional)</div>
+        <textarea id="gcal-ev-desc" class="input" style="min-height:60px;resize:vertical;" placeholder="Notes..."></textarea>
+      </div>
+      <div>
+        <div class="input-label">Location (optional)</div>
+        <input id="gcal-ev-location" class="input" placeholder="Restaurant name or address">
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;">
+          <div class="input-label">Start Date</div>
+          <input id="gcal-ev-start-date" class="input" type="date" value="${today}">
+        </div>
+        <div style="flex:1;">
+          <div class="input-label">Start Time</div>
+          <input id="gcal-ev-start-time" class="input" type="time" value="18:00">
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;">
+          <div class="input-label">End Date</div>
+          <input id="gcal-ev-end-date" class="input" type="date" value="${today}">
+        </div>
+        <div style="flex:1;">
+          <div class="input-label">End Time</div>
+          <input id="gcal-ev-end-time" class="input" type="time" value="19:00">
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer;">
+        <input type="checkbox" id="gcal-ev-allday"> All-day event
+      </label>
+      <div id="gcal-ev-error" style="display:none;font-size:.8rem;color:#EF4444;"></div>
+      <button class="btn btn-accent" id="gcal-ev-submit" style="margin-top:8px;">Create Event in Google Calendar</button>
+    </div>
+  </div>`;
+}, (el) => {
+  const allDayCb = el.querySelector('#gcal-ev-allday');
+  const startTime = el.querySelector('#gcal-ev-start-time');
+  const endTime = el.querySelector('#gcal-ev-end-time');
+
+  allDayCb?.addEventListener('change', () => {
+    startTime.style.display = allDayCb.checked ? 'none' : '';
+    endTime.style.display = allDayCb.checked ? 'none' : '';
+    startTime.parentElement.style.display = allDayCb.checked ? 'none' : '';
+    endTime.parentElement.style.display = allDayCb.checked ? 'none' : '';
+  });
+
+  el.querySelector('#gcal-ev-submit')?.addEventListener('click', async () => {
+    const title = el.querySelector('#gcal-ev-title')?.value.trim();
+    const desc = el.querySelector('#gcal-ev-desc')?.value.trim();
+    const location = el.querySelector('#gcal-ev-location')?.value.trim();
+    const startDate = el.querySelector('#gcal-ev-start-date')?.value;
+    const stTime = startTime?.value;
+    const endDate = el.querySelector('#gcal-ev-end-date')?.value;
+    const eTime = endTime?.value;
+    const isAllDay = allDayCb?.checked;
+    const errEl = el.querySelector('#gcal-ev-error');
+
+    errEl.style.display = 'none';
+    if (!title) { errEl.textContent = 'Title is required'; errEl.style.display = 'block'; return; }
+    if (!startDate) { errEl.textContent = 'Start date is required'; errEl.style.display = 'block'; return; }
+
+    const btn = el.querySelector('#gcal-ev-submit');
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
+    try {
+      await GoogleCalendar.createEvent({
+        title, description: desc, location,
+        startDate, startTime: isAllDay ? null : stTime,
+        endDate: endDate || startDate,
+        endTime: isAllDay ? null : eTime,
+        isAllDay,
+      });
+      U.toast('Event created in Google Calendar!');
+      Router.go('gcal-settings');
+    } catch(e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Create Event in Google Calendar';
+    }
+  });
 });
 
 
@@ -8817,7 +9172,7 @@ Router.register('setup-tone', () => {
       <button class="btn btn-outline btn-sm" onclick="Router.go('setup')">‹ Setup</button>
     </div>
     <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;" class="a1">Mediator <em style="color:var(--terra)">Tone</em></div>
-    <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:28px;" class="a2">How Parlay frames all communication.</div>
+    <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:28px;" class="a2">How HoneyCal frames all communication.</div>
     <div class="radio-group a3" id="tone-opts">
       ${Object.entries(TONES).map(([id, t]) => `
         <div class="radio-opt${id === current ? ' selected' : ''}" data-id="${id}">
@@ -8871,7 +9226,7 @@ Router.register('mood-checkin', () => {
       <button class="btn btn-outline btn-sm" onclick="Router.go('home')">‹ Home</button>
     </div>
     <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;" class="a1">How are you <em style="color:var(--terra)">feeling</em>?</div>
-    <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:24px;" class="a2">Check in with yourself. This helps Parlay personalize your experience.</div>
+    <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:24px;" class="a2">Check in with yourself. This helps HoneyCal personalize your experience.</div>
 
     ${todayMood ? `
     <div class="insight-card a2" style="margin-bottom:20px;">
@@ -8953,7 +9308,7 @@ Router.register('mediator', () => {
       <button class="btn-ghost" style="color:var(--cream);padding:4px;" onclick="Router.go('home')">‹</button>
       <div style="flex:1;">
         <div style="font-size:.92rem;font-weight:600;color:var(--cream);">AI Mediator</div>
-        <div style="font-size:.62rem;color:var(--amber);">Powered by Parlay</div>
+        <div style="font-size:.62rem;color:var(--amber);">Powered by HoneyCal</div>
       </div>
       <button class="btn-ghost" style="color:rgba(250,246,241,.5);font-size:.72rem;" onclick="MediatorChat.clear();Router.reload();">Clear</button>
     </div>
@@ -8961,12 +9316,12 @@ Router.register('mediator', () => {
     <div class="chat-messages" id="chat-messages">
       ${msgs.length === 0 ? `
         <div class="chat-ai slide-up">
-          <div class="ai-name">Parlay Mediator</div>
+          <div class="ai-name">HoneyCal Mediator</div>
           Welcome! I'm here to help you and ${U.esc(Auth.theirName())} communicate better. You can ask me for advice, practice tough conversations, or just vent — I'm a safe space.
         </div>
       ` : msgs.map(m => {
         if (m.role === 'user') return `<div class="chat-user">${U.esc(m.text)}</div>`;
-        if (m.role === 'ai') return `<div class="chat-ai"><div class="ai-name">Parlay Mediator</div>${U.esc(m.text)}</div>`;
+        if (m.role === 'ai') return `<div class="chat-ai"><div class="ai-name">HoneyCal Mediator</div>${U.esc(m.text)}</div>`;
         return `<div class="chat-system">${U.esc(m.text)}</div>`;
       }).join('')}
     </div>
@@ -9027,7 +9382,7 @@ Router.register('mediator', () => {
     // Show typing indicator
     const typing = document.createElement('div');
     typing.className = 'chat-ai chat-typing slide-up';
-    typing.innerHTML = '<div class="ai-name">Parlay Mediator</div><div class="dots"><span></span><span></span><span></span></div>';
+    typing.innerHTML = '<div class="ai-name">HoneyCal Mediator</div><div class="dots"><span></span><span></span><span></span></div>';
     msgContainer.appendChild(typing);
     msgContainer.scrollTop = msgContainer.scrollHeight;
 
@@ -9038,7 +9393,7 @@ Router.register('mediator', () => {
     typing.remove();
     const aiBubble = document.createElement('div');
     aiBubble.className = 'chat-ai slide-up';
-    aiBubble.innerHTML = `<div class="ai-name">Parlay Mediator</div>${U.esc(response)}`;
+    aiBubble.innerHTML = `<div class="ai-name">HoneyCal Mediator</div>${U.esc(response)}`;
     msgContainer.appendChild(aiBubble);
     msgContainer.scrollTop = msgContainer.scrollHeight;
 
@@ -9209,7 +9564,7 @@ Router.register('insights', () => {
 
       <!-- AI Tips -->
       <div class="a5" style="margin-top:4px;">
-        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">Parlay Tips</div>
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;">HoneyCal Tips</div>
         ${tips.map(tip => `
           <div class="tip-card" style="margin:0 0 8px;">
             <div class="tip-icon">${tip.icon}</div>
@@ -9279,7 +9634,7 @@ Router.register('comm-style', () => {
       <button class="btn btn-outline btn-sm" onclick="Router.go('setup')">‹ Setup</button>
     </div>
     <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:6px;" class="a1">Communication <em style="color:var(--terra)">Style</em></div>
-    <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:28px;" class="a2">Help Parlay understand how you communicate. This shapes the AI mediator's responses.</div>
+    <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:28px;" class="a2">Help HoneyCal understand how you communicate. This shapes the AI mediator's responses.</div>
 
     <div class="a3">
       ${COMM_TRAITS.map(trait => {
@@ -9804,7 +10159,7 @@ const Tips = (() => {
     'first-parlay': {
       trigger: () => Store.parlays().length === 0,
       title: 'Start your first conversation',
-      body: 'Tap "New Plan" to propose something. Parlay helps you structure it so your partner gets all the info without the tension.',
+      body: 'Tap "New Plan" to propose something. HoneyCal helps you structure it so your partner gets all the info without the tension.',
       icon: '🎯',
       action: { label: 'New Plan →', route: 'compose-pick' },
     },
@@ -9828,7 +10183,7 @@ const Tips = (() => {
     'check-mood': {
       trigger: () => !MoodStore.todayMood(),
       title: 'How are you feeling?',
-      body: 'Daily mood check-ins help Parlay personalize your experience and track your emotional wellbeing over time.',
+      body: 'Daily mood check-ins help HoneyCal personalize your experience and track your emotional wellbeing over time.',
       icon: '💭',
       action: { label: 'Check In →', route: 'mood-checkin' },
     },
@@ -9842,14 +10197,14 @@ const Tips = (() => {
     'comm-style': {
       trigger: () => !CommProfile.isComplete(),
       title: 'Discover your communication style',
-      body: 'Understanding how you communicate helps Parlay give you better coaching and more relevant suggestions.',
+      body: 'Understanding how you communicate helps HoneyCal give you better coaching and more relevant suggestions.',
       icon: '🎨',
       action: { label: 'Take Quiz →', route: 'comm-style' },
     },
     'explore-insights': {
       trigger: () => Store.parlays().length >= 3 && !_tipsSeen().includes('explore-insights'),
       title: 'Check your relationship insights',
-      body: "You have enough data for Parlay to show you patterns in your communication. See what's working well.",
+      body: "You have enough data for HoneyCal to show you patterns in your communication. See what's working well.",
       icon: '📊',
       action: { label: 'View Insights →', route: 'insights' },
     },
@@ -10087,7 +10442,7 @@ const AIContext = (() => {
     const senderBlock = getSenderPrefsPrompt();
     const recipientBlock = getRecipientPrefsPrompt();
 
-    const systemPrompt = `You are Parlay's Communication Translator — an expert in couples communication grounded in research-backed relationship psychology.
+    const systemPrompt = `You are HoneyCal's Communication Translator — an expert in couples communication grounded in research-backed relationship psychology.
 
 YOUR METHODOLOGY (apply in order):
 
@@ -10254,7 +10609,7 @@ ${intentContext ? `INTENT TO PRESERVE:\n${intentContext}\nDo NOT change who is g
       partnerCtx += `\nCONFLICT RESOLUTION RATE: ${conflicts.resolutionRate}%`;
     }
 
-    return `You are Parlay's AI Mediator — a relationship communication coach grounded in Gottman Method, Nonviolent Communication (NVC), Emotionally Focused Therapy (EFT), and attachment science. You help individuals think through relationship challenges privately.
+    return `You are HoneyCal's AI Mediator — a relationship communication coach grounded in Gottman Method, Nonviolent Communication (NVC), Emotionally Focused Therapy (EFT), and attachment science. You help individuals think through relationship challenges privately.
 
 ABOUT THIS PERSON:
 ${ctx}
@@ -10907,7 +11262,7 @@ const CoupleChat = (() => {
 
     // Budget/money language
     if (/\b(cost|expensive|budget|afford|price|money|spend|buy)\b/i.test(rawText)) {
-      return { type: 'budget', msg: '💰 Talking about money? A Parlay proposal can help you both agree on the budget.', action: 'compose-pick' };
+      return { type: 'budget', msg: '💰 Talking about money? A HoneyCal proposal can help you both agree on the budget.', action: 'compose-pick' };
     }
 
     return null;
@@ -11032,7 +11387,7 @@ const CoupleChat = (() => {
     _demoMsg('cc_d1', 'system', 'Chat started', new Date(Date.now() - 86400000 * 3).toISOString(), { type: 'system' }),
     _demoMsg('cc_1', 'them', 'Hey, what do you think about dinner plans for Saturday?', new Date(Date.now() - 86400000 * 2 - 3600000).toISOString(), { reactions: [{ from: 'me', emoji: '👍', ts: new Date().toISOString() }] }),
     _demoMsg('cc_2', 'me', "That sounds great! I was thinking Italian — there's that new place on Main St.", new Date(Date.now() - 86400000 * 2 - 3000000).toISOString()),
-    _demoMsg('cc_ai1', 'ai', '📅 You\'re discussing dinner plans — want to create a Parlay proposal to lock in the details?', new Date(Date.now() - 86400000 * 2 - 2900000).toISOString(), { type: 'ai-insight', metadata: { actionRoute: 'compose-pick' } }),
+    _demoMsg('cc_ai1', 'ai', '📅 You\'re discussing dinner plans — want to create a HoneyCal proposal to lock in the details?', new Date(Date.now() - 86400000 * 2 - 2900000).toISOString(), { type: 'ai-insight', metadata: { actionRoute: 'compose-pick' } }),
     _demoMsg('cc_3', 'them', 'Perfect! I love Italian. Can you check if they take reservations?', new Date(Date.now() - 86400000 * 2 - 2400000).toISOString()),
     _demoMsg('cc_4', 'me', "I'll call them after work. Want to invite the Johnsons too or just us?", new Date(Date.now() - 86400000 * 2 - 1800000).toISOString()),
     _demoMsg('cc_5', 'them', 'Just us this time — it\'s been a while since we had a proper date night ❤️', new Date(Date.now() - 86400000 * 2 - 1200000).toISOString(), { reactions: [{ from: 'me', emoji: '❤️', ts: new Date().toISOString() }], pinned: true }),
@@ -11241,6 +11596,7 @@ const CalendarEngine = (() => {
     proposed: 'var(--amber)',
     confirmed: '#7A6A9B',
     goal: 'var(--purple)',
+    google: '#4285F4',
   };
 
   // Get all events across the system for a given date range
@@ -11419,6 +11775,427 @@ const CalendarEngine = (() => {
 
   return { eventsForDate, eventsForRange, monthGrid, weekDays, aiSummary, EVENT_COLORS };
 })();
+
+
+/* ═══════════════════════════════════════════════════════════════
+   GOOGLE CALENDAR — OAuth + Read/Write sync with Google Calendar API v3
+   ═══════════════════════════════════════════════════════════════ */
+
+const GoogleCalendar = (() => {
+  const STORAGE_KEY = 'honeycal_gcal';
+  const SCOPES = 'https://www.googleapis.com/auth/calendar';
+  const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
+  const API_BASE = 'https://www.googleapis.com/calendar/v3';
+
+  let _token = null;        // { access_token, expires_at, email }
+  let _events = [];          // cached Google Calendar events
+  let _syncing = false;
+  let _lastSync = null;
+  let _clientId = null;
+
+  // ── Persistence ─────────────────────────────────
+  function _save() {
+    const data = { token: _token, events: _events, lastSync: _lastSync, clientId: _clientId };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+  function _load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      _token = data.token || null;
+      _events = data.events || [];
+      _lastSync = data.lastSync || null;
+      _clientId = data.clientId || null;
+      // Check token expiry
+      if (_token && _token.expires_at && Date.now() > _token.expires_at) {
+        console.log('[GCal] Token expired, clearing');
+        _token = null;
+        _save();
+      }
+    } catch(e) { console.warn('[GCal] Load error:', e); }
+  }
+
+  // ── Client ID management ────────────────────────
+  function setClientId(id) {
+    _clientId = (id || '').trim();
+    _save();
+  }
+  function getClientId() { return _clientId; }
+  function isConfigured() { return !!_clientId; }
+
+  // ── OAuth 2.0 (Implicit grant for SPA) ──────────
+  function isConnected() {
+    return !!_token && _token.access_token && (!_token.expires_at || Date.now() < _token.expires_at);
+  }
+  function connectedEmail() { return _token?.email || null; }
+
+  function authorize() {
+    if (!_clientId) {
+      U.toast('Set your Google Client ID in Settings first');
+      return;
+    }
+    const redirectUri = window.location.origin + window.location.pathname;
+    const state = 'gcal_' + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem('gcal_oauth_state', state);
+
+    const params = new URLSearchParams({
+      client_id: _clientId,
+      redirect_uri: redirectUri,
+      response_type: 'token',
+      scope: SCOPES,
+      state: state,
+      prompt: 'consent',
+      access_type: 'online',
+      include_granted_scopes: 'true',
+    });
+    window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  }
+
+  function handleOAuthRedirect() {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes('access_token')) return false;
+
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get('access_token');
+    const expiresIn = parseInt(params.get('expires_in') || '3600', 10);
+    const state = params.get('state');
+
+    // Validate state
+    const savedState = sessionStorage.getItem('gcal_oauth_state');
+    if (state && savedState && state !== savedState) {
+      console.warn('[GCal] State mismatch, ignoring OAuth redirect');
+      return false;
+    }
+    sessionStorage.removeItem('gcal_oauth_state');
+
+    if (accessToken) {
+      _token = {
+        access_token: accessToken,
+        expires_at: Date.now() + (expiresIn * 1000),
+        email: null,
+      };
+      // Clear the hash from URL
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+
+      // Fetch user email for display
+      _fetchUserEmail().then(() => {
+        _save();
+        U.toast('Google Calendar connected!');
+        // Trigger initial sync
+        syncFromGoogle();
+      });
+
+      return true;
+    }
+    return false;
+  }
+
+  async function _fetchUserEmail() {
+    if (!_token?.access_token) return;
+    try {
+      const resp = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { 'Authorization': 'Bearer ' + _token.access_token },
+      });
+      if (resp.ok) {
+        const info = await resp.json();
+        _token.email = info.email;
+      }
+    } catch(e) { console.warn('[GCal] Email fetch error:', e); }
+  }
+
+  function disconnect() {
+    // Revoke the token if possible
+    if (_token?.access_token) {
+      fetch('https://oauth2.googleapis.com/revoke?token=' + _token.access_token, { method: 'POST' }).catch(() => {});
+    }
+    _token = null;
+    _events = [];
+    _lastSync = null;
+    _save();
+    U.toast('Google Calendar disconnected');
+  }
+
+  // ── API helpers ─────────────────────────────────
+  async function _apiRequest(url, options = {}) {
+    if (!isConnected()) throw new Error('Not connected to Google Calendar');
+    const headers = {
+      'Authorization': 'Bearer ' + _token.access_token,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    };
+    const resp = await fetch(url, { ...options, headers });
+    if (resp.status === 401) {
+      // Token expired
+      _token = null;
+      _save();
+      U.toast('Google Calendar session expired — please reconnect');
+      throw new Error('Token expired');
+    }
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${resp.status}`);
+    }
+    if (resp.status === 204) return null;
+    return resp.json();
+  }
+
+  // ── READ: Fetch events from Google Calendar ─────
+  async function syncFromGoogle(timeMin, timeMax) {
+    if (_syncing) return _events;
+    _syncing = true;
+
+    try {
+      // Default: 30 days back, 90 days forward
+      if (!timeMin) {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        timeMin = d.toISOString();
+      }
+      if (!timeMax) {
+        const d = new Date();
+        d.setDate(d.getDate() + 90);
+        timeMax = d.toISOString();
+      }
+
+      const params = new URLSearchParams({
+        timeMin, timeMax,
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '250',
+      });
+
+      const data = await _apiRequest(`${API_BASE}/calendars/primary/events?${params}`);
+      _events = (data.items || []).map(_normalizeEvent);
+      _lastSync = new Date().toISOString();
+      _save();
+      console.log(`[GCal] Synced ${_events.length} events`);
+      return _events;
+    } catch(e) {
+      console.error('[GCal] Sync error:', e);
+      U.toast('Google Calendar sync failed: ' + e.message);
+      return _events;
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  function _normalizeEvent(ge) {
+    const start = ge.start?.dateTime || ge.start?.date || '';
+    const end = ge.end?.dateTime || ge.end?.date || '';
+    const isAllDay = !ge.start?.dateTime;
+    const startDate = start.split('T')[0];
+
+    let startTime = null;
+    if (!isAllDay && ge.start?.dateTime) {
+      const dt = new Date(ge.start.dateTime);
+      startTime = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    return {
+      id: ge.id,
+      googleId: ge.id,
+      title: ge.summary || '(No title)',
+      description: ge.description || '',
+      location: ge.location || '',
+      startDate,
+      startTime,
+      start,
+      end,
+      isAllDay,
+      color: ge.colorId ? _colorMap(ge.colorId) : 'var(--sage)',
+      htmlLink: ge.htmlLink,
+      status: ge.status,
+      source: 'google',
+    };
+  }
+
+  function _colorMap(colorId) {
+    const colors = {
+      '1': '#7986CB', '2': '#33B679', '3': '#8E24AA', '4': '#E67C73',
+      '5': '#F6BF26', '6': '#F4511E', '7': '#039BE5', '8': '#616161',
+      '9': '#3F51B5', '10': '#0B8043', '11': '#D50000',
+    };
+    return colors[colorId] || 'var(--sage)';
+  }
+
+  // ── WRITE: Create event in Google Calendar ──────
+  async function createEvent({ title, description, location, startDate, startTime, endDate, endTime, isAllDay }) {
+    const body = { summary: title };
+    if (description) body.description = description;
+    if (location) body.location = location;
+
+    if (isAllDay) {
+      body.start = { date: startDate };
+      body.end = { date: endDate || startDate };
+    } else {
+      body.start = { dateTime: _buildDateTime(startDate, startTime), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+      body.end = { dateTime: _buildDateTime(endDate || startDate, endTime || _addHour(startTime)), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    }
+
+    const result = await _apiRequest(`${API_BASE}/calendars/primary/events`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+
+    const normalized = _normalizeEvent(result);
+    _events.push(normalized);
+    _save();
+    console.log('[GCal] Created event:', normalized.title);
+    return normalized;
+  }
+
+  // ── WRITE: Update event in Google Calendar ──────
+  async function updateEvent(eventId, { title, description, location, startDate, startTime, endDate, endTime, isAllDay }) {
+    const body = {};
+    if (title !== undefined) body.summary = title;
+    if (description !== undefined) body.description = description;
+    if (location !== undefined) body.location = location;
+
+    if (startDate) {
+      if (isAllDay) {
+        body.start = { date: startDate };
+        body.end = { date: endDate || startDate };
+      } else {
+        body.start = { dateTime: _buildDateTime(startDate, startTime), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+        body.end = { dateTime: _buildDateTime(endDate || startDate, endTime || _addHour(startTime)), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+      }
+    }
+
+    const result = await _apiRequest(`${API_BASE}/calendars/primary/events/${eventId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+
+    const normalized = _normalizeEvent(result);
+    const idx = _events.findIndex(e => e.googleId === eventId);
+    if (idx > -1) _events[idx] = normalized;
+    else _events.push(normalized);
+    _save();
+    console.log('[GCal] Updated event:', normalized.title);
+    return normalized;
+  }
+
+  // ── WRITE: Delete event from Google Calendar ────
+  async function deleteEvent(eventId) {
+    await _apiRequest(`${API_BASE}/calendars/primary/events/${eventId}`, { method: 'DELETE' });
+    _events = _events.filter(e => e.googleId !== eventId);
+    _save();
+    console.log('[GCal] Deleted event:', eventId);
+  }
+
+  // ── SYNC: Push HoneyCal events to Google Calendar
+  async function pushToGoogle(parlayEvent) {
+    if (!isConnected()) return null;
+    const title = parlayEvent.title || 'HoneyCal Event';
+    const description = [
+      parlayEvent.filteredInput || parlayEvent.rawInput || '',
+      parlayEvent.intentContext || '',
+      'Created via HoneyCal',
+    ].filter(Boolean).join('\n\n');
+
+    const confirmedDate = parlayEvent.confirmedDate;
+    if (!confirmedDate) return null;
+
+    const dateStr = typeof confirmedDate === 'string' ? confirmedDate : confirmedDate.date;
+    const timeLabel = typeof confirmedDate === 'object' ? confirmedDate.timeLabel : null;
+
+    let startTime = null;
+    let endTime = null;
+    let isAllDay = true;
+
+    if (timeLabel) {
+      // Parse common time labels
+      const timeMappings = {
+        'Morning': ['09:00', '10:00'], 'Afternoon': ['14:00', '15:00'],
+        'Evening': ['18:00', '20:00'], 'Night': ['20:00', '22:00'],
+        'Lunch': ['12:00', '13:00'], 'Dinner': ['19:00', '21:00'],
+        'Brunch': ['10:30', '12:00'],
+      };
+      const mapped = timeMappings[timeLabel];
+      if (mapped) {
+        startTime = mapped[0];
+        endTime = mapped[1];
+        isAllDay = false;
+      }
+    }
+
+    return createEvent({ title, description, startDate: dateStr, startTime, endDate: dateStr, endTime, isAllDay });
+  }
+
+  // ── Helpers ─────────────────────────────────────
+  function _buildDateTime(dateStr, timeStr) {
+    if (!timeStr) return dateStr + 'T00:00:00';
+    // Parse "HH:MM" or "h:mm AM/PM"
+    let hours, minutes;
+    if (timeStr.includes('AM') || timeStr.includes('PM')) {
+      const [time, ampm] = timeStr.split(' ');
+      [hours, minutes] = time.split(':').map(Number);
+      if (ampm === 'PM' && hours !== 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+    } else {
+      [hours, minutes] = timeStr.split(':').map(Number);
+    }
+    return `${dateStr}T${String(hours).padStart(2,'0')}:${String(minutes || 0).padStart(2,'0')}:00`;
+  }
+
+  function _addHour(timeStr) {
+    if (!timeStr) return '01:00';
+    const dt = new Date('2000-01-01T' + _buildDateTime('2000-01-01', timeStr).split('T')[1]);
+    dt.setHours(dt.getHours() + 1);
+    return dt.toTimeString().slice(0, 5);
+  }
+
+  function events() { return _events; }
+  function eventsForDate(dateStr) { return _events.filter(e => e.startDate === dateStr); }
+  function lastSyncTime() { return _lastSync; }
+  function isSyncing() { return _syncing; }
+
+  // Initialize
+  _load();
+
+  return {
+    setClientId, getClientId, isConfigured, isConnected, connectedEmail,
+    authorize, handleOAuthRedirect, disconnect,
+    syncFromGoogle, createEvent, updateEvent, deleteEvent, pushToGoogle,
+    events, eventsForDate, lastSyncTime, isSyncing,
+  };
+})();
+
+// ── Integrate Google Calendar events into CalendarEngine ──
+(function _patchCalendarEngineForGCal() {
+  const _origEventsForDate = CalendarEngine.eventsForDate;
+  CalendarEngine.eventsForDate = function(dateStr) {
+    const events = _origEventsForDate(dateStr);
+    if (GoogleCalendar.isConnected()) {
+      const gcalEvents = GoogleCalendar.eventsForDate(dateStr);
+      gcalEvents.forEach(ge => {
+        events.push({
+          id: 'gcal_' + ge.googleId,
+          type: 'google',
+          icon: '📆',
+          title: ge.title,
+          time: ge.startTime,
+          color: ge.color,
+          route: null,
+          routeParams: {},
+          source: 'google',
+          googleEvent: ge,
+        });
+      });
+      events.sort((a, b) => {
+        if (a.time && b.time) return a.time.localeCompare(b.time);
+        if (a.time) return -1;
+        if (b.time) return 1;
+        return 0;
+      });
+    }
+    return events;
+  };
+})();
+
+// Handle OAuth redirect on page load (before main init)
+GoogleCalendar.handleOAuthRedirect();
 
 
 /* ═══════════════════════════════════════════════════════════════
@@ -11626,8 +12403,8 @@ const ReflectionStore = (() => {
 
 const Milestones = (() => {
   const DEFINITIONS = [
-    { id: 'first-parlay', icon: '🎯', title: 'First Proposal', desc: 'Sent your first parlay proposal', check: () => Store.parlays().length >= 1 },
-    { id: 'first-resolved', icon: '🤝', title: 'First Resolution', desc: 'Successfully resolved a parlay together', check: () => Store.parlays().some(p => ParlayStateMachine.isTerminal(p.status)) },
+    { id: 'first-parlay', icon: '🎯', title: 'First Proposal', desc: 'Sent your first plan proposal', check: () => Store.parlays().length >= 1 },
+    { id: 'first-resolved', icon: '🤝', title: 'First Resolution', desc: 'Successfully resolved a plan together', check: () => Store.parlays().some(p => ParlayStateMachine.isTerminal(p.status)) },
     { id: 'five-parlays', icon: '📋', title: 'Active Communicator', desc: 'Created 5 or more proposals', check: () => Store.parlays().length >= 5 },
     { id: 'first-task', icon: '✅', title: 'Task Master', desc: 'Created your first task', check: () => Store.tasks().length >= 1 },
     { id: 'five-tasks-done', icon: '🏆', title: 'Getting Things Done', desc: 'Completed 5 tasks together', check: () => Store.tasks().filter(t => t.status === 'done').length >= 5 },
@@ -12206,7 +12983,7 @@ Router.register('onboarding', () => {
 
     <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:4px;" class="a1">Getting <em style="color:var(--terra)">Started</em></div>
     <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:24px;" class="a2">
-      Complete these steps to get the most out of Parlay.
+      Complete these steps to get the most out of HoneyCal.
     </div>
 
     <!-- Progress Bar -->
@@ -12769,7 +13546,7 @@ Router.register('partner-profile', () => {
 
     <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:4px;" class="a1">About <em style="color:var(--terra)">${U.esc(theirN)}</em></div>
     <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:24px;" class="a2">
-      The more you understand your partner, the better Parlay can help you communicate.
+      The more you understand your partner, the better HoneyCal can help you communicate.
     </div>
 
     <!-- Love Languages -->
@@ -12893,7 +13670,7 @@ const PartnerConnection = (() => {
   function inviteMessage() {
     const myName = Auth.myName();
     const code = Auth.couple()?.invite_code || '';
-    return `${myName} invited you to Parlay — the relationship app for couples. ` +
+    return `${myName} invited you to HoneyCal — the relationship app for couples. ` +
       `Use invite code: ${code}\n\n` +
       `Join here: ${inviteUrl()}`;
   }
@@ -12903,7 +13680,7 @@ const PartnerConnection = (() => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Join me on Parlay',
+          title: 'Join me on HoneyCal',
           text: inviteMessage(),
           url: inviteUrl(),
         });
@@ -12942,7 +13719,7 @@ const PartnerConnection = (() => {
   }
 
   function shareEmail(toEmail) {
-    const subject = encodeURIComponent(Auth.myName() + ' invited you to Parlay');
+    const subject = encodeURIComponent(Auth.myName() + ' invited you to HoneyCal');
     const body = encodeURIComponent(inviteMessage());
     const mailto = 'mailto:' + (toEmail || '') + '?subject=' + subject + '&body=' + body;
     window.open(mailto, '_blank');
@@ -12990,11 +13767,11 @@ const PartnerConnection = (() => {
     const couple = Auth.couple();
     const hasP = Auth.hasPartner();
     const steps = [
-      { id: 'account', label: 'Account created', desc: 'You signed up for Parlay', done: true },
+      { id: 'account', label: 'Account created', desc: 'You signed up for HoneyCal', done: true },
       { id: 'couple', label: 'Couple space created', desc: couple ? 'Your shared space is ready' : 'Create your couple space', done: !!couple },
       { id: 'invite', label: 'Invite sent', desc: couple?.invite_code ? 'Share code: ' + couple.invite_code : 'Generate an invite code', done: !!couple },
       { id: 'partner_joined', label: 'Partner joined', desc: hasP ? Auth.theirName() + ' is connected' : 'Waiting for partner to join', done: hasP },
-      { id: 'synced', label: 'Data syncing', desc: hasP ? 'Parlays, tasks & chat flowing' : 'Will activate when partner joins', done: hasP },
+      { id: 'synced', label: 'Data syncing', desc: hasP ? 'Plans, tasks & chat flowing' : 'Will activate when partner joins', done: hasP },
     ];
     return steps;
   }
@@ -13082,7 +13859,7 @@ Router.register('partner-hub', () => {
         </div>
         <div class="ph-quick-action" onclick="Router.go('new-parlay')">
           <span class="icon">⚖️</span>
-          <span class="label">New Parlay</span>
+          <span class="label">New Plan</span>
         </div>
         <div class="ph-quick-action" onclick="Router.go('new-task')">
           <span class="icon">✅</span>
@@ -13116,7 +13893,7 @@ Router.register('partner-hub', () => {
         </div>
         <div class="ph-diag-item">
           <div class="ph-diag-value" style="color:var(--amber);">${parlayCount}</div>
-          <div class="ph-diag-label">Parlays</div>
+          <div class="ph-diag-label">Plans</div>
         </div>
         <div class="ph-diag-item">
           <div class="ph-diag-value" style="color:var(--terra);">${taskCount}</div>
@@ -13221,7 +13998,7 @@ Router.register('partner-hub', () => {
       <div class="ph-card highlight">
         <div class="ph-invite-code" id="ph-code">${inviteCode}</div>
         <div style="text-align:center;font-size:.72rem;color:var(--muted);margin-bottom:8px;">
-          Share this code with your partner so they can join Parlay
+          Share this code with your partner so they can join HoneyCal
         </div>
         <div class="ph-invite-actions${navigator.share ? ' three-col' : ''}">
           <button class="ph-share-btn" id="ph-copy-code">
@@ -13299,7 +14076,7 @@ Router.register('partner-hub', () => {
         <div style="font-size:.75rem;color:var(--text);line-height:1.6;">
           <strong>Having trouble?</strong>
           <ul style="margin:6px 0 0 16px;padding:0;">
-            <li>Make sure your partner has created a Parlay account first</li>
+            <li>Make sure your partner has created a HoneyCal account first</li>
             <li>Codes are not case-sensitive</li>
             <li>Each code can only be used once</li>
             <li>Try regenerating the code if the current one doesn't work</li>
@@ -14493,7 +15270,7 @@ Router.register('couple-chat', () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `parlay-chat-${new Date().toISOString().split('T')[0]}.txt`;
+      a.download = `honeycal-chat-${new Date().toISOString().split('T')[0]}.txt`;
       a.click();
       URL.revokeObjectURL(url);
       U.toast('Chat exported!');
@@ -14531,7 +15308,7 @@ Router.register('couple-chat', () => {
     promptDiv.id = 'cc-toxicity-prompt';
     promptDiv.style.cssText = 'padding:12px 16px;background:linear-gradient(135deg,rgba(122,158,138,.12),rgba(196,113,74,.08));border-top:1px solid var(--border);';
     promptDiv.innerHTML = `
-      <div style="font-size:.72rem;font-weight:600;color:var(--sage);margin-bottom:6px;">✨ Parlay refined your message</div>
+      <div style="font-size:.72rem;font-weight:600;color:var(--sage);margin-bottom:6px;">✨ HoneyCal refined your message</div>
       <div style="font-size:.78rem;color:var(--muted);margin-bottom:4px;text-decoration:line-through;opacity:.6;">${U.esc(rawText)}</div>
       <div style="font-size:.88rem;line-height:1.5;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;color:var(--espresso);">${U.esc(filteredText)}</div>
       <div style="display:flex;gap:8px;">
@@ -15397,7 +16174,7 @@ Router.register('hub', () => {
       <button class="btn btn-outline btn-sm" onclick="Router.go('home')">‹ Home</button>
     </div>
 
-    <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:4px;" class="a1">Everything in <em style="color:var(--terra)">Parlay</em></div>
+    <div style="font-family:var(--font-display);font-size:1.9rem;font-weight:300;margin-bottom:4px;" class="a1">Everything in <em style="color:var(--terra)">HoneyCal</em></div>
     <div style="font-size:.78rem;color:var(--muted);line-height:1.65;margin-bottom:24px;" class="a2">All tools and features at your fingertips.</div>
 
     ${sections.map((sec, si) => `
@@ -17462,7 +18239,7 @@ Router.register('timeline', () => {
       '<div style="text-align:center;padding:40px 20px;">' +
         '<div style="font-size:2rem;margin-bottom:12px;">📖</div>' +
         '<div style="font-size:.88rem;font-weight:600;margin-bottom:4px;">Your timeline is empty</div>' +
-        '<div style="font-size:.75rem;color:var(--muted);">Start using Parlay to build your relationship story</div>' +
+        '<div style="font-size:.75rem;color:var(--muted);">Start using HoneyCal to build your relationship story</div>' +
       '</div>'
     ) +
   '</div>';
